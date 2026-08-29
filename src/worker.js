@@ -77,7 +77,6 @@ __gameRoot.GameRules = (() => {
 
 'use strict';
 var __refRoot = typeof window!=='undefined' ? window : globalThis;
-if(!__refRoot.GameRules && typeof require!=='undefined') __refRoot.GameRules=require('./rules.js');
 __refRoot.GameReferee = class GameReferee {
   #R = __refRoot.GameRules;
   #s;
