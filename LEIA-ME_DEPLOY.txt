@@ -1,0 +1,23 @@
+JOGO TÁTICO v1.9 — versão para hospedagem pública
+
+Arquitetura:
+- Navegadores: interface e visão filtrada.
+- Cloudflare Worker: roteia site e WebSocket.
+- 1 Durable Object por código de sala: mantém o Árbitro e o estado da partida.
+- O estado completo nunca é enviado ao navegador adversário.
+
+Depois de publicado, nenhum jogador precisa instalar Node.js. Basta abrir o link.
+
+Arquivos principais:
+public/index.html = Contra IA
+public/multiplayer.html = X1 online
+src/worker.js = servidor/Árbitro X1
+wrangler.jsonc = configuração Cloudflare
+
+Tentativa automática de publicação nesta sessão:
+- O projeto foi adaptado para Cloudflare Workers + Durable Objects.
+- A ferramenta Wrangler foi chamada em modo de deploy temporário, mas não concluiu dentro do ambiente desta sessão.
+
+Caminho mais curto fora daqui, sem instalar Node no PC dos jogadores:
+1. Publicar este projeto numa conta Cloudflare usando Workers Builds/Git ou Wrangler em qualquer ambiente de deploy.
+2. Depois disso, os jogadores só usam o URL gerado no navegador.

@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Protótipo v1.3 consolidada</title>
+<style>
+:root{
+  --bg:#0f1115;--card:#171a21;--cell:#12161d;--text:#f4f6f8;--muted:#9aa4b2;
+  --border:#343b47;--accent:#8065ff;--accentbg:#29213f;--warn:#ffcc66;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,"Segoe UI",Arial,sans-serif}
+.wrap{max-width:1120px;margin:auto;padding:20px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:9px}.between{justify-content:space-between}
+h1{font-size:21px;margin:0}.muted{color:var(--muted)}.small{font-size:12px}
+button{color:var(--text);background:transparent;border:1px solid var(--border);border-radius:11px;padding:9px 13px;cursor:pointer}
+button:hover{border-color:var(--accent)}button.primary{background:var(--accentbg);border-color:var(--accent)}button:disabled{opacity:.45;cursor:not-allowed}
+.stats{margin:13px 0}.stat{background:var(--card);border-radius:11px;padding:8px 11px;font-size:14px}
+.roster{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.char{text-align:left;min-height:82px}.char.chosen{background:var(--card)}.char.active{background:var(--accentbg);border-color:var(--accent)}
+.panels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}.panel{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:12px;min-height:110px}.panel-title{font-size:11px;color:var(--muted);margin-bottom:8px}.line{padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid var(--border)}.line:last-child{border:0;padding:0;margin:0}
+.board-scroll{overflow:auto}.board{display:grid;grid-template-columns:30px repeat(8,52px);gap:4px;width:max-content}.axis{height:22px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px}.rowaxis{width:30px;height:52px}.cell{width:52px;height:52px;padding:0;border-radius:8px;background:var(--cell);position:relative;display:flex;align-items:center;justify-content:center;font-size:23px}.cell.setup{background:var(--card)}.cell.revealed{background:var(--accentbg)}.cell.preview{outline:3px solid var(--accent);outline-offset:-3px}.cell.highlight{outline:3px solid var(--accent);outline-offset:-3px}.cell.attack-highlight{outline:3px dashed var(--accent);outline-offset:-3px}
+.marker{position:absolute;font-size:12px;line-height:1}.corpse{left:1px;bottom:1px}.mirror{right:1px;top:1px}.eye{right:1px;bottom:1px}.enemy-reveal{left:2px;top:2px;font-size:18px}.impact{right:-4px;top:-5px;font-size:16px}.previewmark{right:2px;top:2px}
+.controls{margin-top:11px}.hidden{display:none!important}.notice{margin-top:12px;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:12px}
+@media(max-width:780px){.roster{grid-template-columns:repeat(2,minmax(0,1fr))}.panels{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="row between">
+    <div><h1>Protótipo v1.2 — consolidada</h1><div class="muted small">Mesmas mecânicas já validadas + Kamikaze e Mago do Espelho, sem as regressões da cópia anterior.</div></div>
+    <div class="row"><button id="start" class="primary">Iniciar partida</button><button id="reset">Reiniciar</button></div>
+  </div>
+
+  <div class="row stats">
+    <div class="stat">Rodada <b id="round">—</b></div><div class="stat">Equipe <b id="count">0/4</b></div>
+    <div class="stat">Suas perdas <b id="myDeaths">0/3</b></div><div class="stat">Perdas inimigas <b id="enemyDeaths">0/3</b></div><div class="stat"><b id="phase">Posicionamento</b></div>
+  </div>
+
+  <div id="roster" class="roster"></div>
+
+  <div class="panels">
+    <div class="panel"><div class="panel-title">HISTÓRICO — ÚLTIMOS 5</div><div id="history"><div class="muted">Nenhum acontecimento.</div></div></div>
+    <div class="panel"><div class="panel-title">INFORMAÇÕES TÁTICAS — ÚLTIMAS 3</div><div id="intel"><div class="muted">Nenhuma informação.</div></div></div>
+    <div class="panel"><div class="panel-title">SUA AÇÃO</div><div id="status">Escolha quatro personagens.</div><div class="panel-title" style="margin-top:13px">DISPONÍVEIS NA RODADA</div><div id="available">—</div></div>
+  </div>
+
+  <div class="board-scroll"><div id="board" class="board"></div></div>
+
+  <div class="row controls">
+    <button id="move">Mover</button><button id="stop">Parar movimento</button><button id="attack">Atacar</button>
+    <button id="ability" class="primary">Habilidade</button><button id="end">Encerrar ativação</button><button id="cancel">Cancelar</button>
+  </div>
+
+  <div id="seerConfirm" class="notice hidden">
+    <b>👁️ Essas são as 4 casas que serão vigiadas.</b><div class="muted small" style="margin:5px 0 9px">Clique em outra casa para mudar a área ou confirme.</div>
+    <div class="row"><button id="confirmSeer" class="primary">Confirmar área</button><button id="cancelSeer">Cancelar visão</button></div>
+  </div>
+
+  <div id="combatChoice" class="notice hidden">
+    <b>Você venceu o Confronto Direto e eliminou a peça.</b><div class="muted small" style="margin:5px 0 9px">Onde quer terminar?</div>
+    <div class="row"><button id="stayCombat">Posição original</button><button id="advanceCombat" class="primary">Posição da derrotada</button></div>
+  </div>
+
+  <div class="muted small" style="margin-top:12px">🔮 Mago do Espelho · 🪞 seu espelho · 👁️ visão do Vidente · ☠️ cadáver · 💀 Esqueleto · 🟢 Mini-Slime.</div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $=s=>document.querySelector(s);
+const defs=[
+ {name:'Arqueiro',icon:'🏹',type:'S',typeIcon:'✂️',v:1,m:0,a:1,range:99},
+ {name:'Ninja',icon:'🥷',type:'S',typeIcon:'✂️',v:1,m:2,a:1,range:2},
+ {name:'Piromante',icon:'🔥',type:'S',typeIcon:'✂️',v:1,m:1,a:1,range:1},
+ {name:'Kamikaze',icon:'💣',type:'S',typeIcon:'✂️',v:1,m:1,a:0,range:0},
+ {name:'Escudeiro',icon:'🛡️',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:0},
+ {name:'Golem',icon:'🗿',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:0},
+ {name:'Cavaleiro',icon:'🐎',type:'R',typeIcon:'🪨',v:1,m:3,a:1,range:1},
+ {name:'Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:0},
+ {name:'Vidente',icon:'👁️',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
+ {name:'Mago do Espelho',icon:'🔮',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
+ {name:'Necromante',icon:'☠️',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1},
+ {name:'Doppelgänger',icon:'🎭',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
+ {name:'Coringa',icon:'🃏',type:'J',typeIcon:'🃏',v:1,m:1,a:0,range:0,diag:true}
+];
+const skeletonDef={name:'Esqueleto',icon:'💀',type:'C',typeIcon:'🦴',v:1,m:1,a:1,range:1};
+const miniDef={name:'Mini-Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:0};
+const lavaDef={name:'Golem de Lava',icon:'🌋',type:'R',typeIcon:'🪨',v:1,m:0,a:1,range:1};
+
+const roster=$('#roster'),board=$('#board'),historyEl=$('#history'),intelEl=$('#intel'),statusEl=$('#status'),availableEl=$('#available');
+const roundEl=$('#round'),countEl=$('#count'),myDeathsEl=$('#myDeaths'),enemyDeathsEl=$('#enemyDeaths'),phaseEl=$('#phase');
+const startBtn=$('#start'),resetBtn=$('#reset'),moveBtn=$('#move'),stopBtn=$('#stop'),attackBtn=$('#attack'),abilityBtn=$('#ability'),endBtn=$('#end'),cancelBtn=$('#cancel');
+const seerConfirm=$('#seerConfirm'),confirmSeerBtn=$('#confirmSeer'),cancelSeerBtn=$('#cancelSeer');
+const combatChoice=$('#combatChoice'),stayCombatBtn=$('#stayCombat'),advanceCombatBtn=$('#advanceCombat');
+
+let selected=[],setupSelected=null,setupPos=new Map();
+let players=[],enemies=[],corpses=[],mirrors=[],cells=new Map();
+let history=[],intel=[];
+let phase='setup',round=1,idSeq=1,activeId=null,mode=null,committed=false,movementUsed=false,moveRemaining=0;
+let aiBusy=false,paused=false,gameOver=false,aiTimer=null,impactCell=null,pendingCombat=null;
+let seerArea=new Set(),seerPreview=new Set(),seerExpiresOnNextCommit=false,mirrorBlockedCurrentActivation=false;
+let pendingSlimeSplits=[];
+
+const defOf=p=>p.summonType==='skeleton'?skeletonDef:p.summonType==='miniSlime'?miniDef:p.form==='lava'?lavaDef:defs.find(d=>d.name===p.name);
+const rc=c=>({x:c.charCodeAt(0)-65,y:Number(c.slice(1))-1});
+const coord=(x,y)=>String.fromCharCode(65+x)+(y+1);
+const inside=(x,y)=>x>=0&&x<8&&y>=0&&y<8;
+const man=(a,b)=>{const A=rc(a),B=rc(b);return Math.abs(A.x-B.x)+Math.abs(A.y-B.y)};
+const sameLine=(a,b)=>{const A=rc(a),B=rc(b);return A.x===B.x||A.y===B.y};
+const playerAt=c=>players.find(p=>p.alive&&p.coord===c);
+const enemyAt=c=>enemies.find(p=>p.alive&&p.coord===c);
+const corpseAt=c=>corpses.find(x=>x.coord===c);
+const mirrorAt=(c,owner)=>mirrors.find(m=>m.coord===c&&m.owner===owner);
+const activePiece=()=>players.find(p=>p.alive&&p.id===activeId);
+const originalDeaths=side=>side.filter(p=>p.original&&!p.alive).length;
+const setStatus=t=>statusEl.textContent=t;
+
+function renderList(el,arr,empty){el.innerHTML='';if(!arr.length){el.innerHTML=`<div class="muted">${empty}</div>`;return;}arr.forEach((t,i)=>{const d=document.createElement('div');d.className=i<arr.length-1?'line':'';d.textContent=t;el.appendChild(d);});}
+function addHistory(t){history.unshift(t);history=history.slice(0,5);renderList(historyEl,history,'Nenhum acontecimento.');}
+function addIntel(t){intel.unshift(t);intel=intel.slice(0,3);renderList(intelEl,intel,'Nenhuma informação.');}
+function neighbors(c,diag=false){const a=rc(c),ds=diag?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1]];return ds.map(([dx,dy])=>[a.x+dx,a.y+dy]).filter(([x,y])=>inside(x,y)).map(([x,y])=>coord(x,y));}
+function attackCells(p){const d=defOf(p),out=[];for(let y=0;y<8;y++)for(let x=0;x<8;x++){const c=coord(x,y);if(c!==p.coord&&man(p.coord,c)<=d.range)out.push(c);}return out;}
+function mirrorCells(p){const out=[];for(let y=0;y<8;y++)for(let x=0;x<8;x++){const c=coord(x,y),dist=man(p.coord,c);if(c!==p.coord&&sameLine(p.coord,c)&&dist>=1&&dist<=2&&!playerAt(c)&&!enemyAt(c)&&!mirrorAt(c,'player'))out.push(c);}return out;}
+function directWinner(a,d){const A=defOf(a).type,D=defOf(d).type;if(A==='C'&&D==='C')return'tie';if(A==='C')return'def';if(D==='C')return'att';if(A==='J'&&D==='J')return'tie';if(A==='J')return'att';if(D==='J')return'def';if(A===D)return'tie';return((A==='R'&&D==='S')||(A==='S'&&D==='P')||(A==='P'&&D==='R'))?'att':'def';}
+
+function buildBoard(){
+ board.innerHTML='';cells.clear();
+ const corner=document.createElement('div');board.appendChild(corner);
+ for(let x=0;x<8;x++){const a=document.createElement('div');a.className='axis';a.textContent=String.fromCharCode(65+x);board.appendChild(a);}
+ for(let y=0;y<8;y++){
+   const l=document.createElement('div');l.className='axis rowaxis';l.textContent=y+1;board.appendChild(l);
+   for(let x=0;x<8;x++){const c=coord(x,y),b=document.createElement('button');b.type='button';b.className='cell';b.dataset.coord=c;b.addEventListener('click',()=>cellClick(c));cells.set(c,b);board.appendChild(b);}
+ }
+}
+
+function renderRoster(){
+ roster.innerHTML='';
+ defs.forEach(d=>{
+   const chosen=selected.includes(d.name),p=players.find(q=>q.original&&q.name===d.name&&q.alive),active=p&&p.id===activeId;
+   const b=document.createElement('button');b.type='button';b.className='char'+(chosen?' chosen':'')+(active?' active':'');
+   let footer='';
+   if(phase==='play'&&chosen)footer=`<div class="small" style="margin-top:5px">${p?(p.activated?'✓ Já agiu':active?(committed?'🔒 Comprometido':'◉ Selecionado'):'● Disponível'):'☠ Eliminado'}</div>`;
+   const copy=p?.name==='Doppelgänger'&&p.copied?`<div class="small">Copiou: ${p.copied}</div>`:'';
+   const cd=p?.name==='Mago do Espelho'&&p.mirrorCooldown===1?`<div class="small">Espelho: recarga</div>`:'';
+   b.innerHTML=`<div><b>${d.icon} ${d.name}</b></div><div class="small muted">${d.typeIcon} · V${p?p.hp:d.v} · M${defOf(p||d).m??d.m} · ATQ${defOf(p||d).a??d.a}</div>${copy}${cd}${footer}`;
+   b.addEventListener('click',()=>selectDefinition(d));roster.appendChild(b);
+ });
+}
+function renderAvailable(){if(phase!=='play'){availableEl.textContent='—';return;}const avail=players.filter(p=>p.alive&&!p.activated).map(p=>`${defOf(p).icon} ${defOf(p).name}`);availableEl.textContent=avail.length?avail.join(' · '):'Nenhuma';}
+
+function paint(){
+ for(const[c,b]of cells){
+   b.innerHTML='';b.className='cell';
+   if(phase==='setup'&&Number(c.slice(1))<=4)b.classList.add('setup');
+   if(seerArea.has(c))b.classList.add('revealed');
+   if(seerPreview.has(c))b.classList.add('preview');
+   if(phase==='setup'){
+     const n=setupPos.get(c);if(n)b.textContent=defs.find(d=>d.name===n)?.icon||'';
+   } else {
+     if(seerArea.has(c)){const m=document.createElement('span');m.className='marker eye';m.textContent='👁️';b.appendChild(m);}
+     if(seerPreview.has(c)){const m=document.createElement('span');m.className='marker previewmark';m.textContent='◉';b.appendChild(m);}
+     const corpse=corpseAt(c);if(corpse){const m=document.createElement('span');m.className='marker corpse';m.textContent='☠️';b.appendChild(m);}
+     const mir=mirrorAt(c,'player');if(mir){const m=document.createElement('span');m.className='marker mirror';m.textContent='🪞';b.appendChild(m);}
+     const p=playerAt(c);if(p){const m=document.createElement('span');m.textContent=defOf(p).icon;b.appendChild(m);}
+     const e=enemyAt(c);if(e&&seerArea.has(c)){const m=document.createElement('span');m.className='marker enemy-reveal';m.textContent=defOf(e).icon;b.appendChild(m);}
+     if(impactCell===c){const m=document.createElement('span');m.className='marker impact';m.textContent='💥';b.appendChild(m);}
+   }
+   const p=activePiece();
+   if(p&&!paused&&!aiBusy&&!seerPreview.size){
+     if(mode==='move'&&moveRemaining>0&&neighbors(p.coord,defOf(p).diag).includes(c)&&!playerAt(c))b.classList.add('highlight');
+     if(mode==='attack'&&attackCells(p).includes(c))b.classList.add('attack-highlight');
+     if(mode==='raise'&&neighbors(p.coord,false).includes(c)&&corpseAt(c)&&!playerAt(c)&&!enemyAt(c))b.classList.add('highlight');
+     if(mode==='seer'){const a=rc(c);if(a.x<=6&&a.y<=6)b.classList.add('highlight');}
+     if(mode==='mirror'&&mirrorCells(p).includes(c))b.classList.add('highlight');
+   }
+ }
+}
+
+function update(){
+ countEl.textContent=`${selected.length}/4`;myDeathsEl.textContent=`${phase==='play'?originalDeaths(players):0}/3`;enemyDeathsEl.textContent=`${phase==='play'?originalDeaths(enemies):0}/3`;
+ roundEl.textContent=phase==='play'?round:'—';phaseEl.textContent=phase==='setup'?'Posicionamento':gameOver?'Encerrada':aiBusy?'Vez da IA':'Sua vez';
+ renderRoster();renderAvailable();paint();
+}
+
+function selectDefinition(d){
+ if(paused||aiBusy||gameOver)return;
+ if(phase==='setup'){
+   if(!selected.includes(d.name)){if(selected.length>=4){setStatus('Você já escolheu 4 personagens.');return;}selected.push(d.name);}
+   setupSelected=d.name;setStatus(`${d.name} selecionado. Posicione nas linhas 1–4.`);update();return;
+ }
+ const p=players.find(q=>q.original&&q.name===d.name&&q.alive);if(!p){setStatus('Essa peça não está disponível.');return;}selectPiece(p);
+}
+function selectPiece(p){
+ if(p.activated){setStatus(`${defOf(p).name} já agiu nesta rodada.`);return;}
+ if(activeId&&committed&&activeId!==p.id){setStatus(`A ativação de ${defOf(activePiece()).name} já foi comprometida.`);return;}
+ activeId=p.id;mode=null;moveRemaining=0;seerPreview.clear();seerConfirm.classList.add('hidden');
+ if(!committed)movementUsed=false;
+ mirrorBlockedCurrentActivation=(p.name==='Mago do Espelho'&&p.mirrorCooldown===1);
+ setStatus(`${defOf(p).name} selecionado. Ainda pode trocar enquanto não agir.`);update();
+}
+
+function commit(){
+ if(committed)return;
+ if(seerExpiresOnNextCommit){seerArea.clear();seerExpiresOnNextCommit=false;}
+ const p=activePiece();
+ if(p&&p.name==='Mago do Espelho'&&mirrorBlockedCurrentActivation){mirrors=mirrors.filter(m=>!(m.owner==='player'&&m.mageId===p.id));p.mirrorCooldown=0;}
+ committed=true;impactCell=null;
+}
+
+function cellClick(c){
+ if(paused||aiBusy||gameOver)return;
+ if(phase==='setup'){
+   if(!setupSelected){setStatus('Selecione um personagem primeiro.');return;}
+   if(Number(c.slice(1))>4){setStatus('Posicionamento inicial apenas nas linhas 1–4.');return;}
+   const occupant=setupPos.get(c);if(occupant&&occupant!==setupSelected){setStatus('Essa casa já está ocupada.');return;}
+   for(const[k,v]of setupPos)if(v===setupSelected)setupPos.delete(k);
+   setupPos.set(c,setupSelected);setStatus(`${setupSelected} posicionado.`);update();return;
+ }
+ if(!activeId){const p=playerAt(c);if(p)selectPiece(p);return;}
+ const p=activePiece();if(!p)return;
+ if(mode==='move'){moveStep(p,c);return;}
+ if(mode==='attack'){playerAttack(p,c);return;}
+ if(mode==='seer'){previewSeer(c);return;}
+ if(mode==='raise'){raiseAt(p,c);return;}
+ if(mode==='mirror'){placeMirror(p,c);return;}
+ const other=playerAt(c);if(other&&other.id!==p.id&&!other.activated&&!committed)selectPiece(other);
+}
+
+function checkDoppel(p){
+ if(p.name!=='Doppelgänger')return;
+ const corpse=corpseAt(p.coord);if(!corpse)return;
+ if(p.copied!==corpse.name){p.copied=corpse.name;addIntel(`🎭 Doppelgänger copiou a habilidade de ${corpse.name}.`);}
+}
+function moveStep(p,to){
+ const d=defOf(p);if(moveRemaining<=0||!neighbors(p.coord,d.diag).includes(to)||playerAt(to)){setStatus('Escolha uma casa destacada.');return;}
+ commit();movementUsed=true;const from=p.coord,foe=enemyAt(to);
+ if(foe){resolveDirect(p,foe,'player',from,to);return;}
+ p.coord=to;checkDoppel(p);moveRemaining--;
+ if(moveRemaining===0)finishMove();else{setStatus(`${d.name}: restam ${moveRemaining} passo(s).`);paint();}
+}
+function finishMove(){
+ const p=activePiece();if(!p)return;
+ if(!committed){mode=null;moveRemaining=0;setStatus('Movimento cancelado sem gastar a ativação.');update();return;}
+ mode=null;moveRemaining=0;
+ const detected=neighbors(p.coord,false).some(c=>enemyAt(c)||mirrorAt(c,'enemy'));
+ addIntel(`${defOf(p).icon} ${defOf(p).name}: ${detected?'⚠️ presença inimiga próxima.':'✓ nenhuma presença inimiga adjacente.'}`);
+ setStatus('Movimento encerrado. Agora ataque, use habilidade ou encerre.');update();
+}
+
+function createCorpse(p){if(!p.original||p.name==='Slime')return;if(!corpses.some(c=>c.sourceId===p.id))corpses.push({sourceId:p.id,coord:p.coord,name:p.name,owner:p.owner});}
+function kill(p){
+ if(!p||!p.alive)return;
+ p.alive=false;
+ if(p.name==='Slime'&&p.original)pendingSlimeSplits.push({owner:p.owner,coord:p.coord});else createCorpse(p);
+ if(p.name==='Kamikaze'&&p.original)explodeKamikaze(p);
+}
+function damage(p,n){
+ if(!p||!p.alive)return{dead:true,transform:false};
+ p.hp-=n;
+ if(p.name==='Golem'&&!p.form&&p.hp>0){p.form='lava';p.hp=1;return{dead:false,transform:true};}
+ if(p.hp<=0){kill(p);return{dead:true,transform:false};}
+ return{dead:false,transform:false};
+}
+function explodeKamikaze(p){
+ addHistory(`💥 ${p.owner==='player'?'Seu ':''}Kamikaze explodiu: 1 de dano nas 8 casas ao redor, com fogo amigo.`);
+ for(const c of neighbors(p.coord,true)){const target=playerAt(c)||enemyAt(c);if(target)damage(target,1);}
+}
+function resolveSlimeSplits(){
+ const q=[...pendingSlimeSplits];pendingSlimeSplits=[];
+ for(const s of q){
+   const side=s.owner==='player'?players:enemies;const occupied=c=>!!playerAt(c)||!!enemyAt(c);
+   const candidates=[s.coord,...neighbors(s.coord,false)].filter((c,i,a)=>a.indexOf(c)===i&&!occupied(c));const spots=candidates.slice(0,2);
+   for(const c of spots)side.push({id:(s.owner==='player'?'p':'e')+idSeq++,owner:s.owner,name:'Mini-Slime',hp:1,coord:c,alive:true,activated:true,original:false,summonType:'miniSlime'});
+   addHistory(`🟢 Slime se dividiu em ${spots.length} Mini-Slime${spots.length===1?'':'s'}.`);
+ }
+}
+
+function hitAttack(attacker,to,owner){
+ const d=defOf(attacker),opponent=owner==='player'?'enemy':'player',mir=mirrorAt(to,opponent);
+ if(mir){
+   mirrors=mirrors.filter(m=>m!==mir);const res=damage(attacker,d.a);
+   addHistory(`🪞 O ataque acertou um Espelho e ${d.a} de dano foi refletido${res.dead?' — o atacante morreu.':'.'}`);resolveSlimeSplits();return;
+ }
+ const target=owner==='player'?enemyAt(to):playerAt(to),dist=man(attacker.coord,to);
+ if(!target){if(owner==='player')addHistory(`${d.icon} ${d.name} atacou, mas não atingiu ninguém.`);else addHistory('💥 Ataque inimigo detectado.');return;}
+ const before=defOf(target).name,res=damage(target,d.a);
+ if(owner==='player'){
+   if(dist===1){if(res.dead)addHistory(`☠️ ${before} inimigo eliminado por ${d.name}.`);else if(res.transform)addHistory('🌋 Golem inimigo virou Golem de Lava.');else addHistory(`⚔️ ${before} inimigo foi atingido por ${d.name}.`);}
+   else addHistory(res.dead?'☠️ Um alvo distante foi eliminado.':'🎯 Um alvo distante foi atingido.');
+ }else{
+   if(dist===1){if(res.dead)addHistory(`☠️ Seu ${before} foi eliminado por ${d.name}.`);else if(res.transform)addHistory('🌋 Seu Golem virou Golem de Lava.');else addHistory(`⚔️ Seu ${before} foi atingido por ${d.name}.`);}
+   else addHistory(res.dead?`☠️ Seu ${before} foi eliminado por um ataque distante.`:`🎯 Seu ${before} foi atingido por um ataque distante.`);
+ }
+ resolveSlimeSplits();
+}
+function playerAttack(p,to){if(!attackCells(p).includes(to)){setStatus('Casa fora do alcance.');return;}commit();hitAttack(p,to,'player');mode=null;finishPlayerActivation();}
+
+function effectiveAbility(p){
+ if(p.name==='Vidente')return'seer';if(p.name==='Necromante')return'raise';if(p.name==='Mago do Espelho')return'mirror';
+ if(p.name==='Doppelgänger'){
+   if(p.copied==='Vidente')return'seer';if(p.copied==='Necromante')return'raise';if(p.copied==='Mago do Espelho')return'mirror';
+ }
+ return null;
+}
+function startAbility(){
+ if(aiBusy||paused)return;const p=activePiece();if(!p){setStatus('Selecione uma peça primeiro.');return;}
+ if(mode==='move'&&committed){setStatus('Primeiro termine ou pare o movimento.');return;}
+ const ab=effectiveAbility(p);
+ if(ab==='seer'){mode='seer';seerPreview.clear();seerConfirm.classList.add('hidden');setStatus('👁️ Clique para pré-visualizar uma área 2×2.');paint();return;}
+ if(ab==='raise'){
+   const existing=players.some(x=>x.alive&&x.summonType==='skeleton'&&x.summonerId===p.id);if(existing){setStatus('Essa peça já controla um Esqueleto vivo.');return;}
+   const valid=neighbors(p.coord,false).filter(c=>corpseAt(c)&&!playerAt(c)&&!enemyAt(c));if(!valid.length){setStatus('Não há cadáver adjacente disponível.');return;}
+   mode='raise';setStatus('☠️ Escolha um cadáver adjacente destacado.');paint();return;
+ }
+ if(ab==='mirror'){
+   if(p.name==='Mago do Espelho'&&mirrorBlockedCurrentActivation){setStatus('🔮 Nesta ativação o Mago está em recarga e não pode criar outro Espelho.');return;}
+   mode='mirror';setStatus('🪞 Escolha uma casa vazia em linha reta a 1 ou 2 casas.');paint();return;
+ }
+ if(p.name==='Doppelgänger')setStatus(p.copied?`A habilidade copiada de ${p.copied} ainda não foi implementada.`:'Doppelgänger ainda não passou por nenhum cadáver.');
+ else setStatus(`${defOf(p).name} ainda não tem habilidade ativa implementada nesta versão.`);
+}
+function previewSeer(c){const a=rc(c);if(a.x>6||a.y>6){setStatus('Escolha um ponto que comporte o quadrado 2×2.');return;}seerPreview=new Set([coord(a.x,a.y),coord(a.x+1,a.y),coord(a.x,a.y+1),coord(a.x+1,a.y+1)]);seerConfirm.classList.remove('hidden');setStatus('Essas são as 4 casas. Pode clicar em outro ponto ou confirmar.');paint();}
+function confirmSeer(){const p=activePiece();if(!p||!seerPreview.size)return;commit();seerArea=new Set(seerPreview);seerPreview.clear();seerConfirm.classList.add('hidden');const seen=enemies.filter(e=>e.alive&&seerArea.has(e.coord)).length;addIntel(`👁️ Área do Vidente: ${seen} presença(s) detectada(s) agora.`);addHistory('👁️ Vidente ativou sua visão 2×2.');mode=null;seerExpiresOnNextCommit=true;finishPlayerActivation();}
+function raiseAt(p,c){if(!neighbors(p.coord,false).includes(c)||!corpseAt(c)||playerAt(c)||enemyAt(c)){setStatus('Escolha um cadáver adjacente destacado.');return;}commit();const corpse=corpseAt(c);corpses=corpses.filter(x=>x!==corpse);players.push({id:'p'+idSeq++,owner:'player',name:'Esqueleto',hp:1,coord:c,alive:true,activated:true,original:false,summonType:'skeleton',summonerId:p.id});addHistory(`💀 ${defOf(p).name} ergueu um Esqueleto.`);mode=null;finishPlayerActivation();}
+function placeMirror(p,c){if(!mirrorCells(p).includes(c)){setStatus('Escolha uma casa destacada em linha reta a até 2 casas.');return;}commit();mirrors=mirrors.filter(m=>!(m.owner==='player'&&m.mageId===p.id));mirrors.push({owner:'player',coord:c,mageId:p.id});if(p.name==='Mago do Espelho')p.mirrorCooldown=1;addHistory('🪞 Mago do Espelho criou um Espelho invisível para o adversário.');addIntel('🪞 Seu Espelho pode gerar uma falsa presença e reflete o primeiro ataque que acertá-lo.');mode=null;finishPlayerActivation();}
+
+function resolveDirect(att,def,owner,from,to){
+ mode=null;moveRemaining=0;const r=directWinner(att,def),aName=defOf(att).name,dName=defOf(def).name;
+ if(r==='tie'){
+   att.coord=from;addHistory(owner==='player'?`↩️ ${aName} foi repelido por ${dName}.`:`↩️ ${aName} inimigo foi repelido pelo seu ${dName}.`);
+   return owner==='player'?finishPlayerActivation():(att.activated=true,finishEnemyTurn());
+ }
+ const attackerWins=r==='att',winner=attackerWins?att:def,loser=attackerWins?def:att,before=defOf(loser).name,res=damage(loser,1);
+ resolveSlimeSplits();
+ if(!res.dead){att.coord=from;if(res.transform)addHistory(`🌋 ${before} sofreu 1 no Confronto e virou Golem de Lava.`);else addHistory(`⚔️ ${defOf(winner).name} venceu o Confronto e causou 1 em ${before}, que sobreviveu.`);return owner==='player'?finishPlayerActivation():(att.activated=true,finishEnemyTurn());}
+ if(!winner.alive){addHistory(`💥 ${before} morreu, mas a reação também eliminou ${defOf(winner).name}.`);return owner==='player'?finishPlayerActivation():(att.activated=true,finishEnemyTurn());}
+ addHistory(`☠️ ${before} eliminado por ${defOf(winner).name} em Confronto Direto.`);
+ const ownCell=attackerWins?from:to,deadCell=attackerWins?to:from;
+ if(winner.owner==='player'){
+   winner.coord=ownCell;pendingCombat={winner,ownCell,deadCell,after:owner};paused=true;combatChoice.classList.remove('hidden');update();
+ }else{
+   winner.coord=Math.random()<.5&&!(playerAt(deadCell)||enemyAt(deadCell))?deadCell:ownCell;
+   if(owner==='player')finishPlayerActivation();else{att.activated=true;finishEnemyTurn();}
+ }
+}
+function chooseCombat(advance){if(!pendingCombat)return;const {winner,ownCell,deadCell,after}=pendingCombat;const occupied=playerAt(deadCell)||enemyAt(deadCell);winner.coord=advance&&!occupied?deadCell:ownCell;checkDoppel(winner);pendingCombat=null;paused=false;combatChoice.classList.add('hidden');if(after==='player')finishPlayerActivation();else finishEnemyTurn();}
+
+function finishPlayerActivation(){
+ const p=activePiece();if(p&&p.alive)p.activated=true;
+ activeId=null;mode=null;committed=false;movementUsed=false;moveRemaining=0;seerPreview.clear();seerConfirm.classList.add('hidden');mirrorBlockedCurrentActivation=false;
+ update();if(checkEnd())return;beginEnemyTurn();
+}
+function beginEnemyTurn(){aiBusy=true;setStatus('🤖 Vez da IA...');update();clearTimeout(aiTimer);aiTimer=setTimeout(enemyTurn,1050);}
+function enemyTurn(){
+ if(gameOver||paused)return;const avail=enemies.filter(e=>e.alive&&!e.activated);if(!avail.length){aiBusy=false;advanceFlow();return;}
+ const e=avail[Math.floor(Math.random()*avail.length)],d=defOf(e);
+ for(let i=0;i<d.m;i++){
+   if(i>0&&Math.random()<.3)break;
+   const opts=neighbors(e.coord,d.diag).filter(c=>!enemyAt(c));if(!opts.length)break;
+   const to=opts[Math.floor(Math.random()*opts.length)],from=e.coord,pl=playerAt(to);
+   if(pl){resolveDirect(e,pl,'enemy',from,to);return;}
+   e.coord=to;
+ }
+ if(d.a>0){
+   let opts=attackCells(e);
+   const sensed=neighbors(e.coord,false).some(c=>playerAt(c)||mirrorAt(c,'player'));
+   if(sensed){const adj=neighbors(e.coord,false).filter(c=>opts.includes(c));if(adj.length)opts=adj;}
+   if(opts.length){const target=opts[Math.floor(Math.random()*opts.length)];impactCell=target;hitAttack(e,target,'enemy');}
+ }else addHistory('🤖 Uma peça inimiga encerrou sua ativação sem atacar.');
+ e.activated=true;finishEnemyTurn();
+}
+function finishEnemyTurn(){update();if(checkEnd()){aiBusy=false;return;}clearTimeout(aiTimer);aiTimer=setTimeout(()=>{aiBusy=false;advanceFlow();},850);}
+function advanceFlow(){
+ if(gameOver||paused)return;const pLeft=players.some(p=>p.alive&&!p.activated),eLeft=enemies.some(e=>e.alive&&!e.activated);
+ if(!pLeft&&!eLeft){round++;players.forEach(p=>{if(p.alive)p.activated=false});enemies.forEach(e=>{if(e.alive)e.activated=false});addHistory(`🔄 Rodada ${round} começou.`);setStatus(`Rodada ${round}. Selecione uma peça.`);update();return;}
+ if(!pLeft&&eLeft){beginEnemyTurn();return;}
+ if(pLeft){setStatus('Selecione sua próxima peça disponível.');update();}
+}
+function checkEnd(){
+ const pd=originalDeaths(players),ed=originalDeaths(enemies);
+ if(pd>=3&&ed>=3){gameOver=true;addHistory('⚖️ As duas equipes chegaram a 3 perdas na mesma resolução.');setStatus('Partida encerrada em empate.');update();return true;}
+ if(pd>=3){gameOver=true;addHistory('☠️ Derrota: 3 das suas 4 peças originais foram eliminadas.');setStatus('Partida encerrada.');update();return true;}
+ if(ed>=3){gameOver=true;addHistory('🏆 Vitória: você eliminou 3 das 4 peças inimigas.');setStatus('Partida encerrada.');update();return true;}
+ return false;
+}
+
+function enemySetup(){
+ const chosen=[...defs].sort(()=>Math.random()-.5).slice(0,4),used=new Set();enemies=[];
+ for(const d of chosen){let c;do{c=coord(Math.floor(Math.random()*8),4+Math.floor(Math.random()*4));}while(used.has(c));used.add(c);enemies.push({id:'e'+idSeq++,owner:'enemy',name:d.name,hp:d.v,coord:c,alive:true,activated:false,original:true,form:null});}
+}
+function startGame(){
+ if(selected.length!==4||setupPos.size!==4){setStatus('Escolha e posicione exatamente 4 personagens.');return;}
+ players=selected.map(name=>{const d=defs.find(x=>x.name===name),entry=[...setupPos].find(([,n])=>n===name);return{id:'p'+idSeq++,owner:'player',name,hp:d.v,coord:entry[0],alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0};});
+ enemySetup();corpses=[];mirrors=[];history=[];intel=[];seerArea.clear();seerPreview.clear();pendingSlimeSplits=[];impactCell=null;activeId=null;mode=null;committed=false;movementUsed=false;gameOver=false;paused=false;aiBusy=false;round=1;phase='play';seerExpiresOnNextCommit=false;
+ addHistory('🎲 Partida iniciada. 4 peças por lado; 3 eliminações vencem.');setStatus('Selecione uma peça disponível.');startBtn.textContent='Partida iniciada';update();
+}
+function resetGame(){clearTimeout(aiTimer);selected=[];setupSelected=null;setupPos.clear();players=[];enemies=[];corpses=[];mirrors=[];history=[];intel=[];seerArea.clear();seerPreview.clear();pendingSlimeSplits=[];phase='setup';round=1;activeId=null;mode=null;committed=false;movementUsed=false;moveRemaining=0;aiBusy=false;paused=false;gameOver=false;impactCell=null;pendingCombat=null;seerExpiresOnNextCommit=false;mirrorBlockedCurrentActivation=false;startBtn.textContent='Iniciar partida';combatChoice.classList.add('hidden');seerConfirm.classList.add('hidden');renderList(historyEl,[],'Nenhum acontecimento.');renderList(intelEl,[],'Nenhuma informação.');setStatus('Escolha quatro personagens.');update();}
+
+startBtn.addEventListener('click',()=>phase==='setup'?startGame():setStatus('A partida já começou.'));
+resetBtn.addEventListener('click',resetGame);
+moveBtn.addEventListener('click',()=>{if(aiBusy||paused)return;const p=activePiece();if(!p){setStatus('Selecione uma peça.');return;}if(movementUsed){setStatus(`${defOf(p).name} já usou o movimento.`);return;}if(defOf(p).m<=0){setStatus(`${defOf(p).name} tem M0 e não pode se mover.`);return;}mode='move';moveRemaining=defOf(p).m;setStatus(`Prévia de movimento: até ${moveRemaining} passo(s). Ainda pode cancelar sem gastar.`);paint();});
+stopBtn.addEventListener('click',()=>{if(mode!=='move'){setStatus('Nenhum movimento em andamento.');return;}finishMove();});
+attackBtn.addEventListener('click',()=>{if(aiBusy||paused)return;const p=activePiece();if(!p){setStatus('Selecione uma peça.');return;}if(mode==='move'&&committed){setStatus('Primeiro termine ou pare o movimento.');return;}if(defOf(p).a<=0){setStatus(`${defOf(p).name} tem ATQ0 e não possui ataque normal.`);return;}mode='attack';moveRemaining=0;setStatus('Escolha uma casa destacada para atacar.');paint();});
+abilityBtn.addEventListener('click',startAbility);
+endBtn.addEventListener('click',()=>{if(aiBusy||paused)return;const p=activePiece();if(!p){setStatus('Selecione uma peça.');return;}commit();addHistory(`${defOf(p).icon} ${defOf(p).name} encerrou sua ativação.`);finishPlayerActivation();});
+cancelBtn.addEventListener('click',()=>{if(aiBusy||paused)return;const p=activePiece();if(!p){setStatus('Nada para cancelar.');return;}if(committed){setStatus(`A ativação de ${defOf(p).name} já foi comprometida.`);return;}activeId=null;mode=null;moveRemaining=0;movementUsed=false;seerPreview.clear();seerConfirm.classList.add('hidden');mirrorBlockedCurrentActivation=false;setStatus('Seleção cancelada. Escolha qualquer peça disponível.');update();});
+confirmSeerBtn.addEventListener('click',confirmSeer);
+cancelSeerBtn.addEventListener('click',()=>{seerPreview.clear();seerConfirm.classList.add('hidden');mode=null;setStatus('Visão cancelada sem gastar a ativação.');paint();});
+stayCombatBtn.addEventListener('click',()=>chooseCombat(false));advanceCombatBtn.addEventListener('click',()=>chooseCombat(true));
+
+buildBoard();update();
+})();
+</script>
+</body>
+</html>

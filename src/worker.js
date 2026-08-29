@@ -1,0 +1,689 @@
+// Jogo tático v1.9 — Cloudflare Worker + Durable Object
+// Regras/referee abaixo são derivados diretamente da v1.8 aprovada.
+'use strict';
+var __gameRoot = typeof window!=='undefined' ? window : globalThis;
+__gameRoot.GameRules = (() => {
+  const defs = [
+    {name:'Arqueiro',icon:'🏹',type:'S',typeIcon:'✂️',v:1,m:0,a:1,range:99},
+    {name:'Ninja',icon:'🥷',type:'S',typeIcon:'✂️',v:1,m:2,a:1,range:2},
+    {name:'Piromante',icon:'🔥',type:'S',typeIcon:'✂️',v:1,m:1,a:1,range:1},
+    {name:'Kamikaze',icon:'💣',type:'S',typeIcon:'✂️',v:1,m:1,a:0,range:0},
+    {name:'Escudeiro',icon:'🛡️',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:0},
+    {name:'Golem',icon:'🗿',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:0},
+    {name:'Cavaleiro',icon:'🐎',type:'R',typeIcon:'🪨',v:1,m:3,a:1,range:1},
+    {name:'Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:0},
+    {name:'Vidente',icon:'👁️',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
+    {name:'Mago do Espelho',icon:'🔮',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
+    {name:'Necromante',icon:'☠️',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1},
+    {name:'Doppelgänger',icon:'🎭',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
+    {name:'Coringa',icon:'🃏',type:'J',typeIcon:'🃏',v:1,m:1,a:0,range:0,diag:true}
+  ];
+  const skeletonDef={name:'Esqueleto',icon:'💀',type:'C',typeIcon:'🦴',v:1,m:1,a:1,range:1};
+  const miniDef={name:'Mini-Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:0};
+  const lavaDef={name:'Golem de Lava',icon:'🌋',type:'R',typeIcon:'🪨',v:1,m:0,a:1,range:1};
+  const byName = Object.fromEntries(defs.map(d=>[d.name,d]));
+  const baseBonuses=[
+    {id:'radarAdvanced',icon:'📡',name:'Radar Avançado',description:'Percepção ortogonal informa a casa exata com presença.'},
+    {id:'radarExpanded',icon:'📶',name:'Radar Ampliado',description:'Percepção também detecta diagonais e informa se a presença é ortogonal ou diagonal.'},
+    {id:'move',icon:'👟',name:'Mobilidade',description:'+1 M permanente para uma unidade aliada viva.'},
+    {id:'life',icon:'❤️',name:'Reforço',description:'+1 Vida máxima e +1 Vida atual para uma unidade aliada viva.'},
+    {id:'attack',icon:'⚔️',name:'Armamento',description:'+1 ATQ permanente para uma unidade aliada viva.'},
+    {id:'range',icon:'🎯',name:'Mira',description:'+1 alcance permanente para uma unidade aliada viva que possua ataque normal.'}
+  ];
+  const rc=c=>({x:c.charCodeAt(0)-65,y:Number(c.slice(1))-1});
+  const coord=(x,y)=>String.fromCharCode(65+x)+(y+1);
+  const inside=(x,y)=>x>=0&&x<8&&y>=0&&y<8;
+  const man=(a,b)=>{const A=rc(a),B=rc(b);return Math.abs(A.x-B.x)+Math.abs(A.y-B.y)};
+  const sameLine=(a,b)=>{const A=rc(a),B=rc(b);return A.x===B.x||A.y===B.y};
+  function neighbors(c,diag=false){
+    const a=rc(c),ds=diag?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1]];
+    return ds.map(([dx,dy])=>[a.x+dx,a.y+dy]).filter(([x,y])=>inside(x,y)).map(([x,y])=>coord(x,y));
+  }
+  function defOf(p){
+    if(!p) return null;
+    let base;
+    if(p.summonType==='skeleton') base=skeletonDef;
+    else if(p.summonType==='miniSlime') base=miniDef;
+    else if(p.form==='lava') base=lavaDef;
+    else base=byName[p.name] || p;
+    return {...base,
+      v:(base.v||0)+(p.bonusV||0),
+      m:(base.m||0)+(p.bonusM||0),
+      a:(base.a||0)+(p.bonusA||0),
+      range:(base.range||0)+(p.bonusRange||0)
+    };
+  }
+  function attackCells(p){
+    const d=defOf(p),out=[];
+    for(let y=0;y<8;y++) for(let x=0;x<8;x++){
+      const c=coord(x,y); if(c!==p.coord&&man(p.coord,c)<=d.range) out.push(c);
+    }
+    return out;
+  }
+  function directWinner(a,d){
+    const A=defOf(a).type,D=defOf(d).type;
+    if(A==='C'&&D==='C')return'tie';
+    if(A==='C')return'def';
+    if(D==='C')return'att';
+    if(A==='J'&&D==='J')return'tie';
+    if(A==='J')return'att';
+    if(D==='J')return'def';
+    if(A===D)return'tie';
+    return((A==='R'&&D==='S')||(A==='S'&&D==='P')||(A==='P'&&D==='R'))?'att':'def';
+  }
+  return Object.freeze({defs,skeletonDef,miniDef,lavaDef,baseBonuses,byName,rc,coord,inside,man,sameLine,neighbors,defOf,attackCells,directWinner});
+})();
+
+
+'use strict';
+var __refRoot = typeof window!=='undefined' ? window : globalThis;
+if(!__refRoot.GameRules && typeof require!=='undefined') __refRoot.GameRules=require('./rules.js');
+__refRoot.GameReferee = class GameReferee {
+  #R = __refRoot.GameRules;
+  #s;
+  constructor(){ this.reset(); }
+
+  reset(){
+    this.#s={
+      phase:'setup', mode:null, round:1, turn:'player', idSeq:1, gameOver:false, result:null,
+      pieces:{player:[],enemy:[]}, bases:[], chosenBaseBonuses:{player:[],enemy:[]}, corpses:[], mirrors:[], pendingSlimeSplits:[],
+      history:{player:[],enemy:[]}, intel:{player:[],enemy:[]}, impact:{player:null,enemy:null},
+      seer:{player:new Set(),enemy:new Set()}, seerExpires:{player:false,enemy:false},
+      activation:{player:null,enemy:null}, pendingCombat:null
+    };
+  }
+
+  createClient(side){
+    if(side!=='player'&&side!=='enemy') throw new Error('lado inválido');
+    const self=this;
+    return Object.freeze({
+      getView:()=>self.#getView(side),
+      selectPiece:(id)=>self.#selectPiece(side,id),
+      cancelSelection:()=>self.#cancelSelection(side),
+      cancelMode:()=>self.#cancelMode(side),
+      startMove:()=>self.#startMove(side),
+      moveStep:(to)=>self.#moveStep(side,to),
+      stopMove:()=>self.#stopMove(side),
+      startAttack:()=>self.#startAttack(side),
+      attack:(to)=>self.#attack(side,to),
+      selectPyroTarget:(to)=>self.#selectPyroTarget(side,to),
+      confirmPyroAttack:()=>self.#confirmPyroAttack(side),
+      startAbility:()=>self.#startAbility(side),
+      useSeer:(cells)=>self.#useSeer(side,cells),
+      raiseAt:(coord)=>self.#raiseAt(side,coord),
+      placeMirror:(coord)=>self.#placeMirror(side,coord),
+      endActivation:()=>self.#endActivationRequest(side),
+      chooseCombatPosition:(advance)=>self.#chooseCombatPosition(side,advance),
+      sabotageBase:(baseId,bonusId,targetPieceId=null)=>self.#sabotageBase(side,baseId,bonusId,targetPieceId)
+    });
+  }
+
+  validateSetup(side,setup,bases){
+    if(side!=='player'&&side!=='enemy') return this.#fail('Lado inválido.');
+    if(!Array.isArray(setup)||setup.length!==4) return this.#fail('É necessário posicionar exatamente 4 personagens.');
+    if(!Array.isArray(bases)||bases.length!==2) return this.#fail('É necessário posicionar exatamente 2 Postos de Operação.');
+    const names=new Set(setup.map(x=>x.name)),coords=new Set(setup.map(x=>x.coord)),baseCoords=new Set(bases);
+    if(names.size!==4||coords.size!==4) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
+    if(baseCoords.size!==2) return this.#fail('Os dois Postos precisam ficar em casas diferentes.');
+    const minRow=side==='player'?1:5,maxRow=side==='player'?4:8;
+    for(const x of setup){
+      const d=this.#R.byName[x.name];if(!d)return this.#fail('Personagem inválido.');
+      const r=Number(x.coord?.slice(1));if(!x.coord||r<minRow||r>maxRow)return this.#fail(`Posicionamento deve ficar nas linhas ${minRow}–${maxRow}.`);
+      if(baseCoords.has(x.coord))return this.#fail('Postos não podem ocupar a mesma casa de um personagem.');
+    }
+    for(const c of bases){
+      if(!c)return this.#fail('Posto sem posição.');
+      const q=this.#R.rc(c),r=q.y+1;if(r<minRow||r>maxRow)return this.#fail(`Postos devem ficar nas linhas ${minRow}–${maxRow}.`);
+      if(this.#isCorner(c))return this.#fail('Postos não podem ficar nos quatro cantos do mapa.');
+    }
+    return this.#ok('Preparação válida.');
+  }
+
+  startMultiplayerGame(playerSetup,playerBases,enemySetup,enemyBases){
+    if(this.#s.phase!=='setup')return this.#fail('A partida já começou.');
+    const vp=this.validateSetup('player',playerSetup,playerBases);if(!vp.ok)return vp;
+    const ve=this.validateSetup('enemy',enemySetup,enemyBases);if(!ve.ok)return ve;
+    this.#s.pieces.player=[];this.#s.pieces.enemy=[];this.#s.bases=[];
+    for(const [side,setup,bases] of [['player',playerSetup,playerBases],['enemy',enemySetup,enemyBases]]){
+      for(const x of setup){const d=this.#R.byName[x.name];this.#s.pieces[side].push({id:(side==='player'?'p':'e')+this.#s.idSeq++,owner:side,name:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});}
+      bases.forEach((coord,i)=>this.#s.bases.push({id:(side==='player'?'bp':'be')+(i+1),owner:side,coord,sabotaged:false}));
+    }
+    this.#s.phase='play';this.#s.mode='multiplayer';this.#s.round=1;this.#s.turn='player';this.#s.gameOver=false;this.#s.result=null;
+    this.#addHistory('player','🎲 X1 iniciado. Você começa. 3 eliminações vencem.');
+    this.#addHistory('enemy','🎲 X1 iniciado. O adversário começa. 3 eliminações vencem.');
+    return this.#ok('Partida X1 iniciada.');
+  }
+
+  startGame(playerSetup,playerBases){
+    if(this.#s.phase!=='setup') return this.#fail('A partida já começou.');
+    if(!Array.isArray(playerSetup)||playerSetup.length!==4) return this.#fail('É necessário posicionar exatamente 4 personagens.');
+    if(!Array.isArray(playerBases)||playerBases.length!==2) return this.#fail('É necessário posicionar exatamente 2 Postos de Operação.');
+    const names=new Set(playerSetup.map(x=>x.name)), coords=new Set(playerSetup.map(x=>x.coord));
+    const baseCoords=new Set(playerBases);
+    if(names.size!==4||coords.size!==4) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
+    if(baseCoords.size!==2) return this.#fail('Os dois Postos precisam ficar em casas diferentes.');
+    for(const x of playerSetup){
+      const d=this.#R.byName[x.name];
+      if(!d) return this.#fail('Personagem inválido.');
+      const r=Number(x.coord.slice(1)); if(r<1||r>4) return this.#fail('Posicionamento do jogador deve ficar nas linhas 1–4.');
+      if(baseCoords.has(x.coord)) return this.#fail('Postos não podem ocupar a mesma casa de um personagem.');
+    }
+    for(const c of playerBases){
+      const q=this.#R.rc(c),r=q.y+1;
+      if(r<1||r>4)return this.#fail('Postos do jogador devem ficar nas linhas 1–4.');
+      if(this.#isCorner(c))return this.#fail('Postos não podem ficar nos quatro cantos do mapa.');
+    }
+    this.#s.pieces.player=playerSetup.map(x=>{
+      const d=this.#R.byName[x.name];
+      return {id:'p'+this.#s.idSeq++,owner:'player',name:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0};
+    });
+    this.#s.bases=playerBases.map((coord,i)=>({id:'bp'+(i+1),owner:'player',coord,sabotaged:false}));
+    this.#enemySetup();
+    this.#s.phase='play'; this.#s.mode='solo'; this.#s.round=1; this.#s.turn='player'; this.#s.gameOver=false; this.#s.result=null;
+    this.#addHistory('player','🎲 Partida iniciada. 4 peças e 2 Postos por lado; 3 eliminações vencem.');
+    this.#addHistory('enemy','🎲 Partida iniciada. 4 peças e 2 Postos por lado; 3 eliminações vencem.');
+    return this.#ok('Partida iniciada.');
+  }
+
+  #enemySetup(){
+    const chosen=[...this.#R.defs].sort(()=>Math.random()-.5).slice(0,4),used=new Set(this.#s.bases.filter(b=>b.owner==='player').map(b=>b.coord));
+    this.#s.pieces.enemy=[];
+    for(const d of chosen){
+      let c; do{c=this.#R.coord(Math.floor(Math.random()*8),4+Math.floor(Math.random()*4));}while(used.has(c));
+      used.add(c);
+      this.#s.pieces.enemy.push({id:'e'+this.#s.idSeq++,owner:'enemy',name:d.name,hp:d.v,coord:c,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});
+    }
+    for(let i=0;i<2;i++){
+      let c;do{c=this.#R.coord(Math.floor(Math.random()*8),4+Math.floor(Math.random()*4));}while(used.has(c)||this.#isCorner(c));
+      used.add(c);this.#s.bases.push({id:'be'+(i+1),owner:'enemy',coord:c,sabotaged:false});
+    }
+  }
+
+  #other(side){return side==='player'?'enemy':'player';}
+  #isCorner(c){const q=this.#R.rc(c);return (q.x===0||q.x===7)&&(q.y===0||q.y===7);}
+  #baseAt(c){return this.#s.bases.find(b=>b.coord===c)||null;}
+  #baseById(id){return this.#s.bases.find(b=>b.id===id)||null;}
+  #hasBaseBonus(side,id){return this.#s.chosenBaseBonuses[side].includes(id);}
+  #pieces(side){return this.#s.pieces[side];}
+  #pieceById(side,id){return this.#pieces(side).find(p=>p.id===id&&p.alive);}
+  #piecesAt(side,c){return this.#pieces(side).filter(p=>p.alive&&p.coord===c);}
+  #pieceAt(side,c){const ps=this.#piecesAt(side,c);return ps.find(p=>p.name==='Escudeiro')||ps[0]||null;}
+  #shieldAt(side,c){return this.#piecesAt(side,c).find(p=>p.name==='Escudeiro')||null;}
+  #protectedTarget(side,c){const ps=this.#piecesAt(side,c);if(!ps.length)return null;return ps.find(p=>p.name==='Escudeiro')||ps[0];}
+  #canShareCell(side,p,c){if(this.#baseAt(c))return false;const ps=this.#piecesAt(side,c).filter(x=>x.id!==p.id);if(!ps.length)return true;if(ps.length>=2)return false;return p.name==='Escudeiro'||ps.some(x=>x.name==='Escudeiro');}
+  #corpseAt(c){return this.#s.corpses.find(x=>x.coord===c);}
+  #mirrorAt(c,owner){return this.#s.mirrors.find(m=>m.coord===c&&m.owner===owner);}
+  #originalDeaths(side){return this.#pieces(side).filter(p=>p.original&&!p.alive).length;}
+  #activation(side){return this.#s.activation[side];}
+  #activePiece(side){const a=this.#activation(side);return a?this.#pieceById(side,a.pieceId):null;}
+  #addHistory(side,t){const a=this.#s.history[side];a.unshift(t);this.#s.history[side]=a.slice(0,5);}
+  #addIntel(side,t){const a=this.#s.intel[side];a.unshift(t);this.#s.intel[side]=a.slice(0,3);}
+  #ok(status='',extra={}){return {ok:true,status,...extra};}
+  #fail(status='',extra={}){return {ok:false,status,...extra};}
+
+  #publicPiece(p){
+    const d=this.#R.defOf(p);
+    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:p.coord,alive:p.alive,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,diag:!!d.diag,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0};
+  }
+
+  #getView(side){
+    const other=this.#other(side), act=this.#activation(side), visible=[];
+    for(const e of this.#pieces(other)) if(e.alive&&this.#s.seer[side].has(e.coord)) visible.push(this.#publicPiece(e));
+    const pending=this.#s.pendingCombat&&this.#s.pendingCombat.winnerSide===side?{canChoose:true}:null;
+    return structuredClone({
+      phase:this.#s.phase, round:this.#s.round, turn:this.#s.turn, gameOver:this.#s.gameOver, result:this.#s.result,
+      ownPieces:this.#pieces(side).map(p=>this.#publicPiece(p)),
+      visibleOpponents:visible,
+      bases:this.#s.bases.map(b=>({id:b.id,owner:b.owner,coord:b.coord,sabotaged:b.sabotaged})),
+      chosenBaseBonuses:[...this.#s.chosenBaseBonuses[side]], baseBonusCatalog:this.#R.baseBonuses.map(b=>({...b})),
+      ownOriginalDeaths:this.#originalDeaths(side), enemyOriginalDeaths:this.#originalDeaths(other),
+      corpses:this.#s.corpses.map(c=>({coord:c.coord})),
+      ownMirrors:this.#s.mirrors.filter(m=>m.owner===side).map(m=>({coord:m.coord})),
+      seerArea:[...this.#s.seer[side]], impactCell:this.#s.impact[side],
+      history:[...this.#s.history[side]], intel:[...this.#s.intel[side]],
+      activation:act?{...act}:null, pendingCombat:pending,
+      availablePieceIds:this.#pieces(side).filter(p=>p.alive&&!p.activated).map(p=>p.id)
+    });
+  }
+
+  #validateTurn(side){
+    if(this.#s.phase!=='play') return this.#fail('A partida ainda não começou.');
+    if(this.#s.gameOver) return this.#fail('A partida já terminou.');
+    if(this.#s.pendingCombat) return this.#fail('Há um Confronto Direto aguardando resolução.');
+    if(this.#s.turn!==side) return this.#fail('Não é a vez deste lado.');
+    return null;
+  }
+
+  #selectPiece(side,id){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const p=this.#pieceById(side,id); if(!p)return this.#fail('Peça indisponível.');
+    if(p.activated)return this.#fail(`${this.#R.defOf(p).name} já agiu nesta rodada.`);
+    const a=this.#activation(side);
+    if(a&&a.committed&&a.pieceId!==id) return this.#fail(`A ativação de ${this.#R.defOf(this.#activePiece(side)).name} já foi comprometida.`);
+    const blocked=p.name==='Mago do Espelho'&&p.mirrorCooldown===1;
+    this.#s.activation[side]={pieceId:id,committed:a?.pieceId===id?!!a.committed:false,movementUsed:a?.pieceId===id?!!a.movementUsed:false,mode:null,moveRemaining:0,stepsTaken:a?.pieceId===id?(a.stepsTaken||0):0,lastPerception:a?.pieceId===id?(a.lastPerception??null):null,mirrorBlockedCurrentActivation:blocked};
+    return this.#ok(`${this.#R.defOf(p).name} selecionado. Ainda pode trocar enquanto não agir.`);
+  }
+
+  #cancelSelection(side){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side); if(!a)return this.#fail('Nada para cancelar.');
+    if(a.committed)return this.#fail('A ativação já foi comprometida.');
+    this.#s.activation[side]=null; return this.#ok('Seleção cancelada.');
+  }
+
+  #cancelMode(side){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side);if(!a)return this.#fail('Nenhuma peça selecionada.');
+    a.mode=null;a.moveRemaining=0;a.pyroTargets=[];return this.#ok('Ação cancelada. A peça continua selecionada.');
+  }
+
+  #commit(side){
+    const a=this.#activation(side); if(!a||a.committed)return;
+    if(this.#s.seerExpires[side]){this.#s.seer[side].clear();this.#s.seerExpires[side]=false;}
+    const p=this.#activePiece(side);
+    if(p&&p.name==='Mago do Espelho'&&a.mirrorBlockedCurrentActivation){
+      this.#s.mirrors=this.#s.mirrors.filter(m=>!(m.owner===side&&m.mageId===p.id));
+      p.mirrorCooldown=0;
+    }
+    a.committed=true; this.#s.impact[side]=null;
+  }
+
+  #startMove(side){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p)return this.#fail('Selecione uma peça.');
+    const d=this.#R.defOf(p); if(a.movementUsed)return this.#fail(`${d.name} já usou o movimento.`); if(d.m<=0)return this.#fail(`${d.name} tem M0 e não pode se mover.`);
+    a.mode='move';a.moveRemaining=d.m;return this.#ok(`Prévia de movimento: até ${d.m} passo(s). Ainda pode cancelar sem gastar.`);
+  }
+
+  #moveStep(side,to){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p||a.mode!=='move')return this.#fail('Movimento não iniciado.');
+    const d=this.#R.defOf(p);
+    if(a.moveRemaining<=0||!this.#R.neighbors(p.coord,d.diag).includes(to)||!this.#canShareCell(side,p,to))return this.#fail('Escolha uma casa válida.');
+    this.#commit(side);a.movementUsed=true;a.stepsTaken=(a.stepsTaken||0)+1;
+    const from=p.coord,foe=this.#pieceAt(this.#other(side),to);
+    if(foe){return this.#resolveDirect(side,p,foe,from,to);}
+    p.coord=to;this.#checkDoppel(side,p);a.moveRemaining--;
+    if(a.moveRemaining===0)return this.#finishMove(side);
+    return this.#ok(`${d.name}: restam ${a.moveRemaining} passo(s).`);
+  }
+
+  #stopMove(side){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side); if(!a||a.mode!=='move')return this.#fail('Nenhum movimento em andamento.');
+    return this.#finishMove(side);
+  }
+
+  #finishMove(side){
+    const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p)return this.#fail('Sem peça ativa.');
+    if(!a.committed){a.mode=null;a.moveRemaining=0;return this.#ok('Movimento cancelado sem gastar a ativação.');}
+    a.mode=null;a.moveRemaining=0;
+    const other=this.#other(side),orth=this.#R.neighbors(p.coord,false);
+    const orthHits=orth.filter(c=>this.#pieceAt(other,c)||this.#mirrorAt(c,other));
+    const diagOnly=this.#R.neighbors(p.coord,true).filter(c=>!orth.includes(c));
+    const diagHits=diagOnly.filter(c=>this.#pieceAt(other,c)||this.#mirrorAt(c,other));
+    const expanded=this.#hasBaseBonus(side,'radarExpanded'),advanced=this.#hasBaseBonus(side,'radarAdvanced');
+    const detected=orthHits.length>0||(expanded&&diagHits.length>0);a.lastPerception=detected;
+    let msg;
+    if(advanced&&orthHits.length){msg=`📡 presença ortogonal em ${orthHits.join(', ')}`;if(expanded&&diagHits.length)msg+=' + 📶 presença diagonal próxima';}
+    else if(expanded){const parts=[];if(orthHits.length)parts.push('presença ortogonal próxima');if(diagHits.length)parts.push('presença diagonal próxima');msg=parts.length?`📶 ${parts.join(' e ')}`:'✓ nenhuma presença nas 8 casas adjacentes';}
+    else msg=orthHits.length?'⚠️ presença inimiga próxima.':'✓ nenhuma presença inimiga adjacente.';
+    this.#addIntel(side,`${this.#R.defOf(p).icon} ${this.#R.defOf(p).name}: ${msg}`);
+    return this.#ok('Movimento encerrado. Agora ataque, use habilidade, sabote um Posto ou encerre.');
+  }
+
+  #startAttack(side){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p)return this.#fail('Selecione uma peça.');
+    if(a.mode==='move'&&a.committed)return this.#fail('Primeiro termine ou pare o movimento.');
+    const d=this.#R.defOf(p); if(d.a<=0)return this.#fail(`${d.name} tem ATQ0 e não possui ataque normal.`);
+    a.moveRemaining=0;
+    if(p.name==='Piromante'){a.mode='pyro';a.pyroTargets=[];return this.#ok('🔥 Escolha 1 ou 2 casas ortogonais adjacentes e confirme o ataque.',{attackMode:'pyro'});}
+    a.mode='attack';return this.#ok('Escolha uma casa para atacar.');
+  }
+
+  #attack(side,to){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p||a.mode!=='attack')return this.#fail('Ataque não iniciado.');
+    if(!this.#R.attackCells(p).includes(to))return this.#fail('Casa fora do alcance.');
+    if(this.#baseAt(to))return this.#fail('Postos de Operação não podem ser atacados; precisam ser sabotados.');
+    this.#commit(side);this.#hitAttack(side,p,to);a.mode=null;return this.#finishActivation(side);
+  }
+
+  #selectPyroTarget(side,to){
+    const bad=this.#validateTurn(side);if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='pyro'||p.name!=='Piromante')return this.#fail('Ataque do Piromante não iniciado.');
+    if(!this.#R.neighbors(p.coord,false).includes(to))return this.#fail('O Piromante só pode escolher casas ortogonalmente adjacentes.');
+    if(this.#baseAt(to))return this.#fail('O Piromante não pode atacar Postos de Operação.');
+    a.pyroTargets=Array.isArray(a.pyroTargets)?a.pyroTargets:[];
+    if(a.pyroTargets.includes(to)){a.pyroTargets=a.pyroTargets.filter(c=>c!==to);return this.#ok('Casa removida da rajada.',{pyroTargets:[...a.pyroTargets]});}
+    if(a.pyroTargets.length>=2)return this.#fail('O Piromante pode escolher no máximo 2 casas.');
+    a.pyroTargets.push(to);return this.#ok(`${a.pyroTargets.length}/2 casa(s) escolhida(s).`,{pyroTargets:[...a.pyroTargets]});
+  }
+
+  #confirmPyroAttack(side){
+    const bad=this.#validateTurn(side);if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='pyro'||p.name!=='Piromante')return this.#fail('Ataque do Piromante não iniciado.');
+    const targets=[...(a.pyroTargets||[])];if(targets.length<1||targets.length>2)return this.#fail('Escolha 1 ou 2 casas antes de confirmar.');
+    this.#commit(side);a.mode=null;a.pyroTargets=[];
+    this.#addHistory(side,`🔥 Piromante atacou ${targets.length} casa${targets.length===1?'':'s'} na mesma ação.`);
+    for(const c of targets)this.#hitAttack(side,p,c);
+    return this.#finishActivation(side);
+  }
+
+  #startAbility(side){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p)return this.#fail('Selecione uma peça.');
+    if(a.mode==='move'&&a.committed)return this.#fail('Primeiro termine o movimento.');
+    const ab=this.#effectiveAbility(p);
+    if(ab==='seer'){a.mode='seer';return this.#ok('👁️ Escolha uma área 2×2 e confirme.',{ability:'seer'});}
+    if(ab==='raise'){
+      const has=this.#pieces(side).some(x=>x.alive&&x.summonType==='skeleton'&&x.summonerId===p.id);if(has)return this.#fail('Este Necromante já controla um Esqueleto vivo.');
+      const legal=this.#R.neighbors(p.coord,false).filter(c=>this.#corpseAt(c)&&!this.#pieceAt(side,c)); if(!legal.length)return this.#fail('Nenhum cadáver adjacente disponível.');
+      a.mode='raise';return this.#ok('☠️ Escolha um cadáver adjacente.',{ability:'raise'});
+    }
+    if(ab==='mirror'){
+      if(p.name==='Mago do Espelho'&&a.mirrorBlockedCurrentActivation)return this.#fail('🔮 O Espelho está em recarga nesta ativação.');
+      a.mode='mirror';return this.#ok('🪞 Escolha uma casa em linha reta, a 1 ou 2 casas.',{ability:'mirror'});
+    }
+    if(p.name==='Doppelgänger')return this.#fail(p.copied?`A habilidade copiada de ${p.copied} ainda não possui efeito implementado.`:'Doppelgänger ainda não copiou habilidade.');
+    return this.#fail(`${this.#R.defOf(p).name} ainda não possui habilidade ativa implementada.`);
+  }
+
+  #effectiveAbility(p){
+    if(p.name==='Vidente')return'seer'; if(p.name==='Necromante')return'raise'; if(p.name==='Mago do Espelho')return'mirror';
+    if(p.name==='Doppelgänger'){if(p.copied==='Vidente')return'seer';if(p.copied==='Necromante')return'raise';if(p.copied==='Mago do Espelho')return'mirror';}
+    return null;
+  }
+
+  #useSeer(side,cells){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='seer')return this.#fail('Visão não iniciada.');
+    if(!Array.isArray(cells)||cells.length!==4)return this.#fail('Área inválida.');
+    const s=new Set(cells); if(s.size!==4)return this.#fail('Área inválida.');
+    const pts=cells.map(this.#R.rc);const xs=[...new Set(pts.map(q=>q.x))],ys=[...new Set(pts.map(q=>q.y))];
+    if(xs.length!==2||ys.length!==2||Math.max(...xs)-Math.min(...xs)!==1||Math.max(...ys)-Math.min(...ys)!==1)return this.#fail('A visão precisa formar um quadrado 2×2.');
+    this.#commit(side);this.#s.seer[side]=new Set(cells);const seen=this.#pieces(this.#other(side)).filter(e=>e.alive&&this.#s.seer[side].has(e.coord)).length;
+    this.#addIntel(side,`👁️ Área do Vidente: ${seen} presença(s) detectada(s) agora.`);this.#addHistory(side,'👁️ Vidente ativou sua visão 2×2.');this.#s.seerExpires[side]=true;a.mode=null;return this.#finishActivation(side);
+  }
+
+  #raiseAt(side,c){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='raise')return this.#fail('Necromancia não iniciada.');
+    if(!this.#R.neighbors(p.coord,false).includes(c)||!this.#corpseAt(c)||this.#pieceAt(side,c))return this.#fail('Não foi possível usar esse cadáver.');
+    if(this.#pieceAt(this.#other(side),c))return this.#fail('Não foi possível usar esse cadáver.');
+    this.#commit(side);const corpse=this.#corpseAt(c);this.#s.corpses=this.#s.corpses.filter(x=>x!==corpse);
+    this.#pieces(side).push({id:(side==='player'?'p':'e')+this.#s.idSeq++,owner:side,name:'Esqueleto',hp:1,coord:c,alive:true,activated:true,original:false,summonType:'skeleton',summonerId:p.id,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});
+    this.#addHistory(side,`💀 ${this.#R.defOf(p).name} ergueu um Esqueleto.`);a.mode=null;return this.#finishActivation(side);
+  }
+
+  #placeMirror(side,c){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='mirror')return this.#fail('Espelho não iniciado.');
+    const dist=this.#R.man(p.coord,c);if(c===p.coord||!this.#R.sameLine(p.coord,c)||dist<1||dist>2||this.#pieceAt(side,c)||this.#mirrorAt(c,side)||this.#baseAt(c))return this.#fail('Casa inválida para o Espelho.');
+    if(this.#pieceAt(this.#other(side),c))return this.#fail('Não foi possível criar o Espelho nessa casa.');
+    this.#commit(side);this.#s.mirrors=this.#s.mirrors.filter(m=>!(m.owner===side&&m.mageId===p.id));this.#s.mirrors.push({owner:side,coord:c,mageId:p.id});
+    if(p.name==='Mago do Espelho')p.mirrorCooldown=1;this.#addHistory(side,'🪞 Mago do Espelho criou um Espelho invisível para o adversário.');this.#addIntel(side,'🪞 Seu Espelho pode gerar falsa presença e reflete o primeiro ataque que acertá-lo.');a.mode=null;return this.#finishActivation(side);
+  }
+
+  #sabotageBase(side,baseId,bonusId,targetPieceId=null){
+    const bad=this.#validateTurn(side);if(bad)return bad;
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p)return this.#fail('Selecione uma peça para sabotar o Posto.');
+    if(a.mode)return this.#fail('Cancele ou termine a ação atual antes de sabotar.');
+    const base=this.#baseById(baseId);if(!base||base.owner===side)return this.#fail('Escolha um Posto inimigo.');
+    if(base.sabotaged)return this.#fail('Esse Posto já foi sabotado.');
+    if(!this.#R.neighbors(base.coord,true).includes(p.coord))return this.#fail('Para sabotar, a peça precisa estar em uma das 8 casas ao redor do Posto.');
+    const bonus=this.#R.baseBonuses.find(b=>b.id===bonusId);if(!bonus)return this.#fail('Benefício inválido.');
+    if(this.#hasBaseBonus(side,bonusId))return this.#fail('Esse benefício já foi escolhido nesta partida.');
+    let target=null;
+    if(['move','life','attack','range'].includes(bonusId)){
+      target=this.#pieceById(side,targetPieceId);if(!target)return this.#fail('Escolha uma unidade aliada viva para receber o benefício.');
+      if(bonusId==='range'&&this.#R.defOf(target).a<=0)return this.#fail('Mira só pode ser aplicada a um personagem que já possua ataque normal.');
+    }
+    this.#commit(side);base.sabotaged=true;this.#s.chosenBaseBonuses[side].push(bonusId);
+    if(target){
+      if(bonusId==='move')target.bonusM=(target.bonusM||0)+1;
+      if(bonusId==='life'){target.bonusV=(target.bonusV||0)+1;target.hp+=1;}
+      if(bonusId==='attack')target.bonusA=(target.bonusA||0)+1;
+      if(bonusId==='range')target.bonusRange=(target.bonusRange||0)+1;
+    }
+    const detail=target?`${bonus.icon} ${bonus.name} em ${this.#R.defOf(target).name}`:`${bonus.icon} ${bonus.name}`;
+    this.#addHistory(side,`🏢 Posto inimigo sabotado. Benefício escolhido: ${detail}.`);
+    this.#addHistory(this.#other(side),'🏚️ Um dos seus Postos de Operação foi sabotado.');
+    a.mode=null;return this.#finishActivation(side);
+  }
+
+  #endActivationRequest(side){
+    const bad=this.#validateTurn(side); if(bad)return bad;
+    const p=this.#activePiece(side);if(!p)return this.#fail('Selecione uma peça.');this.#commit(side);this.#addHistory(side,`${this.#R.defOf(p).icon} ${this.#R.defOf(p).name} encerrou sua ativação.`);return this.#finishActivation(side);
+  }
+
+  #createCorpse(p){if(!p.original||p.name==='Slime')return;if(!this.#s.corpses.some(c=>c.sourceId===p.id))this.#s.corpses.push({sourceId:p.id,coord:p.coord,name:p.name,owner:p.owner});}
+  #kill(p){
+    if(!p||!p.alive)return;p.alive=false;
+    if(p.name==='Slime'&&p.original)this.#s.pendingSlimeSplits.push({owner:p.owner,coord:p.coord});else this.#createCorpse(p);
+    if(p.name==='Kamikaze'&&p.original)this.#explodeKamikaze(p);
+  }
+  #damage(p,n){
+    if(!p||!p.alive)return{dead:true,transform:false};p.hp-=n;
+    if(p.name==='Golem'&&!p.form&&p.hp>0){p.form='lava';p.hp=1+(p.bonusV||0);return{dead:false,transform:true};}
+    if(p.hp<=0){this.#kill(p);return{dead:true,transform:false};}return{dead:false,transform:false};
+  }
+  #explodeKamikaze(p){
+    this.#addHistory(p.owner,'💥 Seu Kamikaze explodiu: 1 de dano nas 8 casas ao redor, com fogo amigo.');this.#addHistory(this.#other(p.owner),'💥 Um Kamikaze inimigo explodiu nas proximidades.');
+    for(const c of this.#R.neighbors(p.coord,true)){
+      for(const side of ['player','enemy']){const t=this.#protectedTarget(side,c);if(t)this.#damage(t,1);}
+    }
+  }
+  #resolveSlimeSplits(){
+    const q=[...this.#s.pendingSlimeSplits];this.#s.pendingSlimeSplits=[];
+    for(const s of q){
+      const occupied=c=>!!this.#pieceAt('player',c)||!!this.#pieceAt('enemy',c)||!!this.#baseAt(c);
+      const spots=[s.coord,...this.#R.neighbors(s.coord,false)].filter((c,i,a)=>a.indexOf(c)===i&&!occupied(c)).slice(0,2);
+      for(const c of spots)this.#pieces(s.owner).push({id:(s.owner==='player'?'p':'e')+this.#s.idSeq++,owner:s.owner,name:'Mini-Slime',hp:1,coord:c,alive:true,activated:true,original:false,summonType:'miniSlime',form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});
+      this.#addHistory(s.owner,`🟢 Slime se dividiu em ${spots.length} Mini-Slime${spots.length===1?'':'s'}.`);
+    }
+  }
+
+  #hitAttack(side,attacker,to){
+    const other=this.#other(side),d=this.#R.defOf(attacker),mir=this.#mirrorAt(to,other);
+    if(mir){
+      this.#s.mirrors=this.#s.mirrors.filter(m=>m!==mir);const res=this.#damage(attacker,d.a);
+      this.#addHistory(side,`🪞 O ataque do seu ${d.name} foi refletido por um Espelho.${res.dead?' Seu atacante morreu.':''}`);
+      this.#addHistory(other,`🪞 Seu Espelho refletiu um ataque.${res.dead?' O atacante inimigo morreu.':''}`);this.#resolveSlimeSplits();return;
+    }
+    const friendly=this.#protectedTarget(side,to),hostile=this.#protectedTarget(other,to),target=friendly||hostile,dist=this.#R.man(attacker.coord,to);
+    if(!target){
+      this.#addHistory(side,`${d.icon} ${d.name} atacou, mas não atingiu ninguém.`);
+      this.#addHistory(other,'💥 Ataque inimigo detectado.');this.#s.impact[other]=to;return;
+    }
+    const targetSide=target.owner,stacked=this.#piecesAt(targetSide,to).length>1&&target.name==='Escudeiro';
+    const before=this.#R.defOf(target).name,res=this.#damage(target,d.a),friendlyFire=targetSide===side;
+    if(friendlyFire){
+      this.#addHistory(side,res.dead?`⚠️ Seu ${before} foi eliminado pelo seu ${d.name}.`:res.transform?'🌋 Você atingiu seu Golem e o transformou em Golem de Lava.':`⚠️ Seu ${before} foi atingido pelo seu ${d.name}.`);
+      if(stacked)this.#addIntel(side,'🛡️ Seu Escudeiro interceptou o ataque aliado e protegeu a outra peça.');
+    }else{
+      if(dist===1)this.#addHistory(side,res.dead?`☠️ ${before} inimigo eliminado por ${d.name}.`:res.transform?'🌋 Golem inimigo virou Golem de Lava.':`⚔️ ${before} inimigo foi atingido por ${d.name}.`);
+      else this.#addHistory(side,res.dead?'☠️ Um alvo distante foi eliminado.':'🎯 Um alvo distante foi atingido.');
+      if(stacked)this.#addIntel(side,'🛡️ O Escudeiro inimigo interceptou o dano destinado à casa.');
+
+      if(dist===1)this.#addHistory(other,res.dead?`☠️ Seu ${before} foi eliminado por ${d.name}.`:res.transform?'🌋 Seu Golem virou Golem de Lava.':`⚔️ Seu ${before} foi atingido por ${d.name}.`);
+      else this.#addHistory(other,res.dead?`☠️ Seu ${before} foi eliminado por ataque distante.`:`🎯 Seu ${before} foi atingido por ataque distante.`);
+      if(stacked)this.#addIntel(other,'🛡️ Seu Escudeiro protegeu a outra peça na mesma casa.');
+      this.#s.impact[other]=to;
+    }
+    this.#resolveSlimeSplits();
+  }
+
+  #checkDoppel(side,p){
+    if(p.name!=='Doppelgänger')return;const corpse=this.#corpseAt(p.coord);if(!corpse)return;
+    if(p.copied!==corpse.name){p.copied=corpse.name;this.#addIntel(side,`🎭 Doppelgänger copiou a habilidade de ${corpse.name}.`);}
+  }
+
+  #resolveDirect(attackerSide,att,def,from,to){
+    const defenderSide=this.#other(attackerSide),r=this.#R.directWinner(att,def),aName=this.#R.defOf(att).name,dName=this.#R.defOf(def).name;
+    const a=this.#activation(attackerSide);if(a){a.mode=null;a.moveRemaining=0;}
+    const shieldLoserCandidate = att.name==='Escudeiro'?att:(def.name==='Escudeiro'?def:null);
+    const shieldCell = shieldLoserCandidate===att?from:to;
+    const protectedAlly = shieldLoserCandidate?this.#piecesAt(shieldLoserCandidate.owner,shieldCell).find(x=>x.id!==shieldLoserCandidate.id):null;
+    if(r==='tie'){
+      att.coord=from;this.#addHistory(attackerSide,`↩️ ${aName} foi repelido por ${dName}.`);this.#addHistory(defenderSide,`↩️ ${aName} inimigo foi repelido pelo seu ${dName}.`);
+      return this.#finishActivation(attackerSide);
+    }
+    const attackerWins=r==='att',winner=attackerWins?att:def,loser=attackerWins?def:att,before=this.#R.defOf(loser).name,res=this.#damage(loser,1);
+    this.#resolveSlimeSplits();
+    if(!res.dead){
+      att.coord=from;const msg=res.transform?`🌋 ${before} sofreu 1 no Confronto e virou Golem de Lava.`:`⚔️ ${this.#R.defOf(winner).name} venceu o Confronto e causou 1 em ${before}, que sobreviveu.`;
+      this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);
+    }
+    if(!winner.alive){const msg=`💥 ${before} morreu, mas a reação também eliminou ${this.#R.defOf(winner).name}.`;this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);}
+    this.#addHistory(attackerSide,`☠️ ${before} eliminado por ${this.#R.defOf(winner).name} em Confronto Direto.`);
+    this.#addHistory(defenderSide,`☠️ ${before} eliminado por ${this.#R.defOf(winner).name} em Confronto Direto.`);
+    const ownCell=winner===att?from:to,deadCell=winner===att?to:from,winnerSide=winner.owner;
+    const shieldProtected = loser.name==='Escudeiro'&&protectedAlly&&protectedAlly.alive;
+    if(winnerSide==='player'||this.#s.mode==='multiplayer'){
+      winner.coord=ownCell;this.#s.pendingCombat={winnerId:winner.id,winnerSide,ownCell,deadCell,afterSide:attackerSide,protectedAllyId:shieldProtected?protectedAlly.id:null,protectedSide:shieldProtected?protectedAlly.owner:null};
+      return this.#ok('Confronto resolvido. O jogador deve escolher onde o vencedor termina.',{pendingCombat:true});
+    }
+    let advance=Math.random()<.5;
+    if(shieldProtected&&advance){
+      const otherCell=ownCell;const blockers=this.#piecesAt(winnerSide,otherCell).filter(x=>x.id!==winner.id);
+      if(blockers.length)advance=false;
+    }
+    winner.coord=advance?deadCell:ownCell;
+    if(shieldProtected){
+      const allyDest=advance?ownCell:deadCell;
+      const enemyBlock=this.#piecesAt(winnerSide,allyDest).some(x=>x.id!==winner.id);
+      if(!enemyBlock)protectedAlly.coord=allyDest;
+      else {winner.coord=ownCell;protectedAlly.coord=deadCell;}
+    }
+    return this.#finishActivation(attackerSide);
+  }
+
+  #chooseCombatPosition(side,advance){
+    const p=this.#s.pendingCombat;if(!p||p.winnerSide!==side)return this.#fail('Nenhuma escolha de confronto disponível.');
+    const winner=this.#pieceById(side,p.winnerId);
+    const protectedAlly=p.protectedAllyId&&p.protectedSide?this.#pieceById(p.protectedSide,p.protectedAllyId):null;
+    if(winner){
+      let doAdvance=!!advance;
+      if(protectedAlly&&doAdvance){const blockers=this.#piecesAt(side,p.ownCell).filter(x=>x.id!==winner.id);if(blockers.length)doAdvance=false;}
+      winner.coord=doAdvance?p.deadCell:p.ownCell;
+      if(protectedAlly&&protectedAlly.alive){
+        const allyDest=doAdvance?p.ownCell:p.deadCell;
+        const enemyBlock=this.#piecesAt(side,allyDest).some(x=>x.id!==winner.id);
+        if(!enemyBlock)protectedAlly.coord=allyDest;
+        else {winner.coord=p.ownCell;protectedAlly.coord=p.deadCell;}
+      }
+      this.#checkDoppel(side,winner);
+    }
+    const after=p.afterSide;this.#s.pendingCombat=null;return this.#finishActivation(after);
+  }
+
+  #finishActivation(side){
+    const p=this.#activePiece(side);if(p&&p.alive)p.activated=true;this.#s.activation[side]=null;
+    if(this.#checkEnd())return this.#ok('Partida encerrada.',{gameOver:true});
+    this.#advanceAfterActivation(side);return this.#ok('Ativação encerrada.',{turn:this.#s.turn});
+  }
+
+  #advanceAfterActivation(side){
+    const pLeft=this.#pieces('player').some(p=>p.alive&&!p.activated),eLeft=this.#pieces('enemy').some(p=>p.alive&&!p.activated);
+    if(!pLeft&&!eLeft){this.#s.round++;for(const p of this.#pieces('player'))if(p.alive)p.activated=false;for(const p of this.#pieces('enemy'))if(p.alive)p.activated=false;this.#addHistory('player',`🔄 Rodada ${this.#s.round} começou.`);this.#addHistory('enemy',`🔄 Rodada ${this.#s.round} começou.`);this.#s.turn='player';return;}
+    if(side==='player')this.#s.turn=eLeft?'enemy':'player';
+    else this.#s.turn=pLeft?'player':(eLeft?'enemy':'player');
+  }
+
+  #checkEnd(){
+    const pd=this.#originalDeaths('player'),ed=this.#originalDeaths('enemy');
+    if(pd>=3&&ed>=3){this.#s.gameOver=true;this.#s.result='draw';this.#addHistory('player','⚖️ As duas equipes chegaram a 3 perdas na mesma resolução.');this.#addHistory('enemy','⚖️ As duas equipes chegaram a 3 perdas na mesma resolução.');return true;}
+    if(pd>=3){this.#s.gameOver=true;this.#s.result='enemy';this.#addHistory('player','☠️ Derrota: 3 das suas 4 peças originais foram eliminadas.');this.#addHistory('enemy','🏆 Vitória: você eliminou 3 das 4 peças inimigas.');return true;}
+    if(ed>=3){this.#s.gameOver=true;this.#s.result='player';this.#addHistory('player','🏆 Vitória: você eliminou 3 das 4 peças inimigas.');this.#addHistory('enemy','☠️ Derrota: 3 das suas 4 peças originais foram eliminadas.');return true;}
+    return false;
+  }
+  exportState(){
+    return JSON.stringify(this.#s,(k,v)=>v instanceof Set?{__set:[...v]}:v);
+  }
+  importState(raw){
+    if(!raw)return;
+    this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);
+  }
+
+};
+
+
+
+
+const actionMap={
+  selectPiece:(c,a)=>c.selectPiece(a.pieceId),cancelSelection:c=>c.cancelSelection(),cancelMode:c=>c.cancelMode(),startMove:c=>c.startMove(),moveStep:(c,a)=>c.moveStep(a.to),stopMove:c=>c.stopMove(),startAttack:c=>c.startAttack(),attack:(c,a)=>c.attack(a.to),selectPyroTarget:(c,a)=>c.selectPyroTarget(a.to),confirmPyroAttack:c=>c.confirmPyroAttack(),startAbility:c=>c.startAbility(),useSeer:(c,a)=>c.useSeer(a.cells),raiseAt:(c,a)=>c.raiseAt(a.coord),placeMirror:(c,a)=>c.placeMirror(a.coord),endActivation:c=>c.endActivation(),chooseCombatPosition:(c,a)=>c.chooseCombatPosition(!!a.advance),sabotageBase:(c,a)=>c.sabotageBase(a.baseId,a.bonusId,a.targetPieceId||null)
+};
+
+export class GameRoom {
+  constructor(ctx,env){
+    this.ctx=ctx;this.env=env;this.referee=new globalThis.GameReferee();this.ready={player:null,enemy:null};this.started=false;
+    ctx.blockConcurrencyWhile(async()=>{
+      const saved=await ctx.storage.get('room');
+      if(saved){this.ready=saved.ready||{player:null,enemy:null};this.started=!!saved.started;if(saved.gameState)this.referee.importState(saved.gameState);}
+    });
+  }
+  async persist(){await this.ctx.storage.put('room',{ready:this.ready,started:this.started,gameState:this.referee.exportState()});}
+  send(ws,obj){try{ws.send(JSON.stringify(obj));}catch{}}
+  sockets(){return this.ctx.getWebSockets();}
+  attachment(ws){try{return ws.deserializeAttachment()||{};}catch{return {};}}
+  sideSocket(side){return this.sockets().find(ws=>this.attachment(ws).side===side)||null;}
+  roomState(){return {type:'roomState',started:this.started,connected:{player:!!this.sideSocket('player'),enemy:!!this.sideSocket('enemy')},ready:{player:!!this.ready.player,enemy:!!this.ready.enemy}};}
+  broadcast(obj){for(const ws of this.sockets())this.send(ws,obj);}
+  broadcastRoomState(){this.broadcast(this.roomState());}
+  broadcastViews(){if(!this.started)return;for(const side of ['player','enemy']){const ws=this.sideSocket(side);if(ws)this.send(ws,{type:'view',view:this.referee.createClient(side).getView()});}}
+  async fetch(request){
+    if(request.headers.get('Upgrade')!=='websocket')return new Response('WebSocket required',{status:426});
+    const pair=new WebSocketPair();const client=pair[0],server=pair[1];
+    this.ctx.acceptWebSocket(server);server.serializeAttachment({side:null});
+    return new Response(null,{status:101,webSocket:client});
+  }
+  async webSocketMessage(ws,message){
+    let msg;try{msg=JSON.parse(typeof message==='string'?message:new TextDecoder().decode(message));}catch{return this.send(ws,{type:'error',message:'Mensagem inválida.'});}
+    const att=this.attachment(ws);const side=att.side;
+    if(msg.type==='join'){
+      if(side)return;
+      let chosen=null;if(!this.sideSocket('player'))chosen='player';else if(!this.sideSocket('enemy'))chosen='enemy';
+      if(!chosen){this.send(ws,{type:'error',message:'Sala cheia.'});try{ws.close(1008,'Sala cheia');}catch{}return;}
+      ws.serializeAttachment({side:chosen});this.send(ws,{type:'joined',room:String(msg.room||''),side:chosen});this.broadcastRoomState();if(this.started)this.broadcastViews();return;
+    }
+    if(!side)return this.send(ws,{type:'error',message:'Entre na sala primeiro.'});
+    if(msg.type==='ping')return this.send(ws,{type:'pong'});
+    if(msg.type==='unready'){
+      if(!this.started){this.ready[side]=null;await this.persist();this.send(ws,{type:'result',ok:true,status:'Pronto cancelado. Você pode alterar a preparação.'});this.broadcastRoomState();}return;
+    }
+    if(msg.type==='ready'){
+      if(this.started)return this.send(ws,{type:'result',ok:false,status:'A partida já começou.'});
+      const res=this.referee.validateSetup(side,msg.setup,msg.bases);if(!res.ok)return this.send(ws,{type:'result',ok:false,status:res.status});
+      this.ready[side]={setup:msg.setup,bases:msg.bases};this.send(ws,{type:'result',ok:true,status:'Você está pronto. Aguardando o outro jogador.'});
+      if(this.ready.player&&this.ready.enemy){const a=this.ready.player,b=this.ready.enemy;const start=this.referee.startMultiplayerGame(a.setup,a.bases,b.setup,b.bases);if(!start.ok)return this.broadcast({type:'result',ok:false,status:start.status});this.started=true;}
+      await this.persist();this.broadcastRoomState();this.broadcastViews();return;
+    }
+    if(msg.type==='action'){
+      if(!this.started)return this.send(ws,{type:'result',ok:false,status:'A partida ainda não começou.'});
+      const action=msg.action||{},fn=actionMap[action.type];if(!fn)return this.send(ws,{type:'result',ok:false,status:'Ação desconhecida.'});
+      let res;try{res=fn(this.referee.createClient(side),action);}catch(e){console.error(e);res={ok:false,status:'Erro interno ao resolver a ação.'};}
+      await this.persist();this.send(ws,{type:'result',...res});this.broadcastViews();return;
+    }
+    this.send(ws,{type:'error',message:'Tipo de mensagem desconhecido.'});
+  }
+  async webSocketClose(ws){
+    const side=this.attachment(ws).side;if(side&&!this.started){this.ready[side]=null;await this.persist();}
+    this.broadcastRoomState();
+  }
+  async webSocketError(ws){this.broadcastRoomState();}
+}
+
+export default {
+  async fetch(request,env){
+    const url=new URL(request.url);
+    if(url.pathname==='/ws'){
+      const room=String(url.searchParams.get('room')||'').toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);
+      if(!room)return new Response('Código de sala inválido.',{status:400});
+      return env.GAME_ROOMS.getByName(room).fetch(request);
+    }
+    return env.ASSETS.fetch(request);
+  }
+};
