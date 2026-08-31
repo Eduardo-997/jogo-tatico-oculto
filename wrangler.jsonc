@@ -1,15 +1,15 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "jogo-tatico-oculto",
+  "name": "jogo-tatico-oculto-v1-14-experimental",
   "main": "src/worker.js",
   "compatibility_date": "2026-08-29",
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "run_worker_first": ["/ws*"]
-  },
-  "durable_objects": {
-    "bindings": [{"name":"GAME_ROOMS","class_name":"GameRoom"}]
-  },
-  "migrations": [{"tag":"v1","new_sqlite_classes":["GameRoom"]}]
+  "assets": {"directory":"./public","binding":"ASSETS","run_worker_first":["/ws*","/tri-ws*"]},
+  "durable_objects": {"bindings":[
+    {"name":"GAME_ROOMS","class_name":"GameRoom"},
+    {"name":"TRI_ROOMS","class_name":"TriGameRoom"}
+  ]},
+  "migrations": [
+    {"tag":"v1","new_sqlite_classes":["GameRoom"]},
+    {"tag":"v2","new_sqlite_classes":["TriGameRoom"]}
+  ]
 }

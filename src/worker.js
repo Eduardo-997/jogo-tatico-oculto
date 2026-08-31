@@ -1,30 +1,31 @@
-// Jogo tático v1.9 — Cloudflare Worker + Durable Object
-// Regras/referee abaixo são derivados diretamente da v1.8 aprovada.
+import {TriReferee,TriAI,applyTriAction} from './tri-core.js';
+// Jogo tático v1.13.5 — Cloudflare Worker + Durable Object
+// Regras e árbitro mantidos autoritativos no servidor para o X1.
 'use strict';
 var __gameRoot = typeof window!=='undefined' ? window : globalThis;
 __gameRoot.GameRules = (() => {
   const defs = [
-    {name:'Arqueiro',icon:'🏹',type:'S',typeIcon:'✂️',v:1,m:0,a:1,range:99},
-    {name:'Ninja',icon:'🥷',type:'S',typeIcon:'✂️',v:1,m:2,a:1,range:2},
-    {name:'Piromante',icon:'🔥',type:'S',typeIcon:'✂️',v:1,m:1,a:1,range:1},
-    {name:'Kamikaze',icon:'💣',type:'S',typeIcon:'✂️',v:1,m:1,a:0,range:0},
-    {name:'Escudeiro',icon:'🛡️',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:0},
-    {name:'Golem',icon:'🗿',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:0},
-    {name:'Cavaleiro',icon:'🐎',type:'R',typeIcon:'🪨',v:1,m:3,a:1,range:1},
-    {name:'Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:0},
-    {name:'Vidente',icon:'👁️',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
-    {name:'Mago do Espelho',icon:'🔮',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
-    {name:'Necromante',icon:'☠️',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1},
-    {name:'Doppelgänger',icon:'🎭',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:0},
-    {name:'Coringa',icon:'🃏',type:'J',typeIcon:'🃏',v:1,m:1,a:0,range:0,diag:true}
+    {name:'Arqueiro',icon:'🏹',type:'S',typeIcon:'✂️',v:1,m:0,a:1,range:99,per:1},
+    {name:'Ninja',icon:'🗡️',type:'S',typeIcon:'✂️',v:1,m:2,a:1,range:2,per:1},
+    {name:'Piromante',icon:'🔥',type:'S',typeIcon:'✂️',v:1,m:1,a:1,range:1,per:1},
+    {name:'Kamikaze',icon:'💣',type:'S',typeIcon:'✂️',v:1,m:1,a:0,range:1,per:1},
+    {name:'Escudeiro',icon:'🛡️',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:1,per:1},
+    {name:'Golem',icon:'🗿',type:'R',typeIcon:'🪨',v:2,m:1,a:0,range:1,per:1},
+    {name:'Cavaleiro',icon:'🐎',type:'R',typeIcon:'🪨',v:1,m:3,a:1,range:1,per:1},
+    {name:'Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:1,per:1},
+    {name:'Vidente',icon:'👁️',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:1,per:1},
+    {name:'Mago do Espelho',icon:'🔮',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:1,per:1},
+    {name:'Necromante',icon:'☠️',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1,per:1},
+    {name:'Doppelgänger',icon:'🎭',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1,per:1},
+    {name:'Coringa',icon:'🃏',type:'J',typeIcon:'🃏',v:1,m:1,a:0,range:1,per:1,diag:true}
   ];
-  const skeletonDef={name:'Esqueleto',icon:'💀',type:'C',typeIcon:'🦴',v:1,m:1,a:1,range:1};
-  const miniDef={name:'Mini-Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:0};
-  const lavaDef={name:'Golem de Lava',icon:'🌋',type:'R',typeIcon:'🪨',v:1,m:0,a:1,range:1};
+  const skeletonDef={name:'Esqueleto',icon:'💀',type:'C',typeIcon:'🦴',v:1,m:1,a:1,range:1,per:1};
+  const miniDef={name:'Mini-Slime',icon:'🟢',type:'R',typeIcon:'🪨',v:1,m:1,a:0,range:1,per:1};
+  const lavaDef={name:'Golem de Lava',icon:'🌋',type:'R',typeIcon:'🪨',v:1,m:0,a:1,range:1,per:1};
   const byName = Object.fromEntries(defs.map(d=>[d.name,d]));
   const baseBonuses=[
-    {id:'radarAdvanced',icon:'📡',name:'Radar Avançado',description:'Percepção ortogonal informa a casa exata com presença.'},
-    {id:'radarExpanded',icon:'📶',name:'Radar Ampliado',description:'Percepção também detecta diagonais e informa se a presença é ortogonal ou diagonal.'},
+    {id:'radarAdvanced',icon:'📡',name:'Radar Avançado',description:'A percepção ortogonal da unidade escolhida informa a casa exata com presença.'},
+    {id:'radarExpanded',icon:'📶',name:'Radar Ampliado',description:'A unidade escolhida também detecta nas diagonais dentro do alcance de PER e informa se a presença é ortogonal ou diagonal.'},
     {id:'move',icon:'👟',name:'Mobilidade',description:'+1 M permanente para uma unidade aliada viva.'},
     {id:'life',icon:'❤️',name:'Reforço',description:'+1 Vida máxima e +1 Vida atual para uma unidade aliada viva.'},
     {id:'attack',icon:'⚔️',name:'Armamento',description:'+1 ATQ permanente para uma unidade aliada viva.'},
@@ -35,6 +36,8 @@ __gameRoot.GameRules = (() => {
   const inside=(x,y)=>x>=0&&x<8&&y>=0&&y<8;
   const man=(a,b)=>{const A=rc(a),B=rc(b);return Math.abs(A.x-B.x)+Math.abs(A.y-B.y)};
   const sameLine=(a,b)=>{const A=rc(a),B=rc(b);return A.x===B.x||A.y===B.y};
+  const blockedCells=Object.freeze(['C3','F6']);
+  const isBlocked=c=>blockedCells.includes(c);
   function neighbors(c,diag=false){
     const a=rc(c),ds=diag?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1]];
     return ds.map(([dx,dy])=>[a.x+dx,a.y+dy]).filter(([x,y])=>inside(x,y)).map(([x,y])=>coord(x,y));
@@ -46,17 +49,32 @@ __gameRoot.GameRules = (() => {
     else if(p.summonType==='miniSlime') base=miniDef;
     else if(p.form==='lava') base=lavaDef;
     else base=byName[p.name] || p;
+    const temp=(p.effects||[]).reduce((acc,e)=>{
+      const m=e&&e.modifiers||{};
+      acc.v+=(Number(m.v)||0);acc.m+=(Number(m.m)||0);acc.a+=(Number(m.a)||0);acc.range+=(Number(m.range)||0);acc.per+=(Number(m.per)||0);
+      return acc;
+    },{v:0,m:0,a:0,range:0,per:0});
     return {...base,
-      v:(base.v||0)+(p.bonusV||0),
-      m:(base.m||0)+(p.bonusM||0),
-      a:(base.a||0)+(p.bonusA||0),
-      range:(base.range||0)+(p.bonusRange||0)
+      v:Math.max(1,(base.v||0)+(p.bonusV||0)+temp.v),
+      m:Math.max(0,(base.m||0)+(p.bonusM||0)+temp.m),
+      a:Math.max(0,(base.a||0)+(p.bonusA||0)+temp.a),
+      range:Math.max(0,(base.range||0)+(p.bonusRange||0)+temp.range),
+      per:Math.max(0,(base.per??1)+(p.bonusPer||0)+temp.per)
     };
   }
   function attackCells(p){
     const d=defOf(p),out=[];
     for(let y=0;y<8;y++) for(let x=0;x<8;x++){
       const c=coord(x,y); if(c!==p.coord&&man(p.coord,c)<=d.range) out.push(c);
+    }
+    return out;
+  }
+  function perceptionCells(c,per=1,diag=false){
+    const a=rc(c),limit=Math.max(0,Math.floor(Number(per)||0));
+    const ds=diag?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1]];
+    const out=[];
+    for(const [dx,dy] of ds) for(let step=1;step<=limit;step++){
+      const x=a.x+dx*step,y=a.y+dy*step;if(inside(x,y))out.push(coord(x,y));
     }
     return out;
   }
@@ -71,9 +89,8 @@ __gameRoot.GameRules = (() => {
     if(A===D)return'tie';
     return((A==='R'&&D==='S')||(A==='S'&&D==='P')||(A==='P'&&D==='R'))?'att':'def';
   }
-  return Object.freeze({defs,skeletonDef,miniDef,lavaDef,baseBonuses,byName,rc,coord,inside,man,sameLine,neighbors,defOf,attackCells,directWinner});
+  return Object.freeze({defs,skeletonDef,miniDef,lavaDef,baseBonuses,byName,rc,coord,inside,man,sameLine,blockedCells,isBlocked,neighbors,perceptionCells,defOf,attackCells,directWinner});
 })();
-
 
 'use strict';
 var __refRoot = typeof window!=='undefined' ? window : globalThis;
@@ -84,11 +101,11 @@ __refRoot.GameReferee = class GameReferee {
 
   reset(){
     this.#s={
-      phase:'setup', mode:null, round:1, turn:'player', idSeq:1, gameOver:false, result:null,
+      phase:'setup', mode:null, round:1, turn:'player', idSeq:1, gameOver:false, result:null, aiDifficulty:'normal',
       pieces:{player:[],enemy:[]}, bases:[], chosenBaseBonuses:{player:[],enemy:[]}, corpses:[], mirrors:[], pendingSlimeSplits:[],
-      history:{player:[],enemy:[]}, intel:{player:[],enemy:[]}, impact:{player:null,enemy:null},
+      history:{player:[],enemy:[]}, intel:{player:[],enemy:[]}, impact:{player:null,enemy:null}, perceptionHints:{player:[],enemy:[]},
       seer:{player:new Set(),enemy:new Set()}, seerExpires:{player:false,enemy:false},
-      activation:{player:null,enemy:null}, pendingCombat:null
+      activation:{player:null,enemy:null}, pendingCombat:null, doppelChoice:{player:null,enemy:null}
     };
   }
 
@@ -113,7 +130,8 @@ __refRoot.GameReferee = class GameReferee {
       placeMirror:(coord)=>self.#placeMirror(side,coord),
       endActivation:()=>self.#endActivationRequest(side),
       chooseCombatPosition:(advance)=>self.#chooseCombatPosition(side,advance),
-      sabotageBase:(baseId,bonusId,targetPieceId=null)=>self.#sabotageBase(side,baseId,bonusId,targetPieceId)
+      sabotageBase:(baseId,bonusId,targetPieceId=null)=>self.#sabotageBase(side,baseId,bonusId,targetPieceId),
+      chooseDoppelCopy:(copyNew)=>self.#chooseDoppelCopy(side,copyNew)
     });
   }
 
@@ -128,11 +146,13 @@ __refRoot.GameReferee = class GameReferee {
     for(const x of setup){
       const d=this.#R.byName[x.name];if(!d)return this.#fail('Personagem inválido.');
       const r=Number(x.coord?.slice(1));if(!x.coord||r<minRow||r>maxRow)return this.#fail(`Posicionamento deve ficar nas linhas ${minRow}–${maxRow}.`);
+      if(this.#R.isBlocked(x.coord))return this.#fail('Árvores bloqueiam a casa e não podem ser ocupadas.');
       if(baseCoords.has(x.coord))return this.#fail('Postos não podem ocupar a mesma casa de um personagem.');
     }
     for(const c of bases){
       if(!c)return this.#fail('Posto sem posição.');
       const q=this.#R.rc(c),r=q.y+1;if(r<minRow||r>maxRow)return this.#fail(`Postos devem ficar nas linhas ${minRow}–${maxRow}.`);
+      if(this.#R.isBlocked(c))return this.#fail('Postos não podem ocupar uma casa com árvore.');
       if(this.#isCorner(c))return this.#fail('Postos não podem ficar nos quatro cantos do mapa.');
     }
     return this.#ok('Preparação válida.');
@@ -144,7 +164,7 @@ __refRoot.GameReferee = class GameReferee {
     const ve=this.validateSetup('enemy',enemySetup,enemyBases);if(!ve.ok)return ve;
     this.#s.pieces.player=[];this.#s.pieces.enemy=[];this.#s.bases=[];
     for(const [side,setup,bases] of [['player',playerSetup,playerBases],['enemy',enemySetup,enemyBases]]){
-      for(const x of setup){const d=this.#R.byName[x.name];this.#s.pieces[side].push({id:(side==='player'?'p':'e')+this.#s.idSeq++,owner:side,name:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});}
+      for(const x of setup){const d=this.#R.byName[x.name];this.#s.pieces[side].push({id:(side==='player'?'p':'e')+this.#s.idSeq++,owner:side,name:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,effects:[],bonusM:0,bonusV:0,bonusA:0,bonusRange:0,bonusRadarAdvanced:false,bonusRadarExpanded:false});}
       bases.forEach((coord,i)=>this.#s.bases.push({id:(side==='player'?'bp':'be')+(i+1),owner:side,coord,sabotaged:false}));
     }
     this.#s.phase='play';this.#s.mode='multiplayer';this.#s.round=1;this.#s.turn='player';this.#s.gameOver=false;this.#s.result=null;
@@ -153,7 +173,7 @@ __refRoot.GameReferee = class GameReferee {
     return this.#ok('Partida X1 iniciada.');
   }
 
-  startGame(playerSetup,playerBases){
+  startGame(playerSetup,playerBases,difficulty='normal'){
     if(this.#s.phase!=='setup') return this.#fail('A partida já começou.');
     if(!Array.isArray(playerSetup)||playerSetup.length!==4) return this.#fail('É necessário posicionar exatamente 4 personagens.');
     if(!Array.isArray(playerBases)||playerBases.length!==2) return this.#fail('É necessário posicionar exatamente 2 Postos de Operação.');
@@ -165,37 +185,76 @@ __refRoot.GameReferee = class GameReferee {
       const d=this.#R.byName[x.name];
       if(!d) return this.#fail('Personagem inválido.');
       const r=Number(x.coord.slice(1)); if(r<1||r>4) return this.#fail('Posicionamento do jogador deve ficar nas linhas 1–4.');
+      if(this.#R.isBlocked(x.coord)) return this.#fail('Árvores bloqueiam a casa e não podem ser ocupadas.');
       if(baseCoords.has(x.coord)) return this.#fail('Postos não podem ocupar a mesma casa de um personagem.');
     }
     for(const c of playerBases){
       const q=this.#R.rc(c),r=q.y+1;
       if(r<1||r>4)return this.#fail('Postos do jogador devem ficar nas linhas 1–4.');
+      if(this.#R.isBlocked(c))return this.#fail('Postos não podem ocupar uma casa com árvore.');
       if(this.#isCorner(c))return this.#fail('Postos não podem ficar nos quatro cantos do mapa.');
     }
     this.#s.pieces.player=playerSetup.map(x=>{
       const d=this.#R.byName[x.name];
-      return {id:'p'+this.#s.idSeq++,owner:'player',name:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0};
+      return {id:'p'+this.#s.idSeq++,owner:'player',name:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,effects:[],bonusM:0,bonusV:0,bonusA:0,bonusRange:0,bonusRadarAdvanced:false,bonusRadarExpanded:false};
     });
     this.#s.bases=playerBases.map((coord,i)=>({id:'bp'+(i+1),owner:'player',coord,sabotaged:false}));
-    this.#enemySetup();
+    this.#s.aiDifficulty=['easy','normal','hard'].includes(difficulty)?difficulty:'normal';
+    this.#enemySetup(this.#s.aiDifficulty);
     this.#s.phase='play'; this.#s.mode='solo'; this.#s.round=1; this.#s.turn='player'; this.#s.gameOver=false; this.#s.result=null;
     this.#addHistory('player','🎲 Partida iniciada. 4 peças e 2 Postos por lado; 3 eliminações vencem.');
     this.#addHistory('enemy','🎲 Partida iniciada. 4 peças e 2 Postos por lado; 3 eliminações vencem.');
     return this.#ok('Partida iniciada.');
   }
 
-  #enemySetup(){
-    const chosen=[...this.#R.defs].sort(()=>Math.random()-.5).slice(0,4),used=new Set(this.#s.bases.filter(b=>b.owner==='player').map(b=>b.coord));
+  #enemySetup(difficulty='normal'){
+    // Dificuldade nunca altera informação disponível para a IA. Aqui ela só muda
+    // qualidade de composição/posicionamento inicial — especialmente os Postos.
+    const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+    let chosen;
+    if(difficulty==='easy'){
+      chosen=[...this.#R.defs].sort(()=>Math.random()-.5).slice(0,4);
+    }else{
+      const byType=t=>this.#R.defs.filter(d=>d.type===t);
+      chosen=[pick(byType('R')),pick(byType('P')),pick(byType('S'))];
+      const remaining=this.#R.defs.filter(d=>!chosen.some(x=>x.name===d.name));
+      const joker=remaining.find(d=>d.type==='J');
+      const jokerChance=difficulty==='hard'?0.38:0.30;
+      chosen.push(joker&&Math.random()<jokerChance?joker:pick(remaining));
+    }
+    const used=new Set([...this.#s.bases.filter(b=>b.owner==='player').map(b=>b.coord),...this.#R.blockedCells]);
     this.#s.pieces.enemy=[];
     for(const d of chosen){
       let c; do{c=this.#R.coord(Math.floor(Math.random()*8),4+Math.floor(Math.random()*4));}while(used.has(c));
       used.add(c);
-      this.#s.pieces.enemy.push({id:'e'+this.#s.idSeq++,owner:'enemy',name:d.name,hp:d.v,coord:c,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});
+      this.#s.pieces.enemy.push({id:'e'+this.#s.idSeq++,owner:'enemy',name:d.name,hp:d.v,coord:c,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,effects:[],bonusM:0,bonusV:0,bonusA:0,bonusRange:0,bonusRadarAdvanced:false,bonusRadarExpanded:false});
     }
-    for(let i=0;i<2;i++){
-      let c;do{c=this.#R.coord(Math.floor(Math.random()*8),4+Math.floor(Math.random()*4));}while(used.has(c)||this.#isCorner(c));
-      used.add(c);this.#s.bases.push({id:'be'+(i+1),owner:'enemy',coord:c,sabotaged:false});
+    const validBaseCells=(rows)=>{
+      const out=[];for(const y of rows)for(let x=0;x<8;x++){
+        const c=this.#R.coord(x,y);if(!used.has(c)&&!this.#isCorner(c))out.push(c);
+      }return out;
+    };
+    let candidates;
+    if(difficulty==='easy') candidates=validBaseCells([4,5,6,7]);
+    else if(difficulty==='hard'){
+      candidates=validBaseCells([7]);
+      if(candidates.length<2)candidates.push(...validBaseCells([6]).filter(c=>!candidates.includes(c)));
+    }else{
+      // Normal: prefere última linha, mas às vezes usa a penúltima.
+      const back=validBaseCells([7]),penultimate=validBaseCells([6]);
+      candidates=[...back,...back,...back,...penultimate];
     }
+    const chosenBases=[];
+    while(chosenBases.length<2){
+      const pool=candidates.filter(c=>!used.has(c)&&!chosenBases.includes(c));
+      if(!pool.length){candidates=validBaseCells([4,5,6,7]);continue;}
+      let c;
+      if(difficulty==='hard'&&chosenBases.length){
+        c=[...pool].sort((a,b)=>this.#R.man(b,chosenBases[0])-this.#R.man(a,chosenBases[0]))[0];
+      }else c=pick(pool);
+      chosenBases.push(c);used.add(c);
+    }
+    chosenBases.forEach((c,i)=>this.#s.bases.push({id:'be'+(i+1),owner:'enemy',coord:c,sabotaged:false}));
   }
 
   #other(side){return side==='player'?'enemy':'player';}
@@ -209,29 +268,36 @@ __refRoot.GameReferee = class GameReferee {
   #pieceAt(side,c){const ps=this.#piecesAt(side,c);return ps.find(p=>p.name==='Escudeiro')||ps[0]||null;}
   #shieldAt(side,c){return this.#piecesAt(side,c).find(p=>p.name==='Escudeiro')||null;}
   #protectedTarget(side,c){const ps=this.#piecesAt(side,c);if(!ps.length)return null;return ps.find(p=>p.name==='Escudeiro')||ps[0];}
-  #canShareCell(side,p,c){if(this.#baseAt(c))return false;const ps=this.#piecesAt(side,c).filter(x=>x.id!==p.id);if(!ps.length)return true;if(ps.length>=2)return false;return p.name==='Escudeiro'||ps.some(x=>x.name==='Escudeiro');}
+  #canShareCell(side,p,c){if(this.#R.isBlocked(c)||this.#baseAt(c))return false;const ps=this.#piecesAt(side,c).filter(x=>x.id!==p.id);if(!ps.length)return true;if(ps.length>=2)return false;return p.name==='Escudeiro'||ps.some(x=>x.name==='Escudeiro');}
   #corpseAt(c){return this.#s.corpses.find(x=>x.coord===c);}
   #mirrorAt(c,owner){return this.#s.mirrors.find(m=>m.coord===c&&m.owner===owner);}
-  #originalDeaths(side){return this.#pieces(side).filter(p=>p.original&&!p.alive).length;}
+  #slimeLineageAlive(side,sourceId){return this.#pieces(side).some(p=>p.alive&&p.summonType==='miniSlime'&&p.slimeLineageId===sourceId);}
+  #originalDeaths(side){return this.#pieces(side).filter(p=>p.original&&!p.alive&&(p.name!=='Slime'||!this.#slimeLineageAlive(side,p.id))).length;}
   #activation(side){return this.#s.activation[side];}
   #activePiece(side){const a=this.#activation(side);return a?this.#pieceById(side,a.pieceId):null;}
-  #addHistory(side,t){const a=this.#s.history[side];a.unshift(t);this.#s.history[side]=a.slice(0,5);}
+  #addHistory(side,t){
+    // O histórico registra acontecimentos relevantes; simples encerramentos de ativação ficam fora para reduzir ruído.
+    if(/encerrou sua ativa[cç][aã]o/i.test(t))return;
+    const a=this.#s.history[side];a.unshift(t);this.#s.history[side]=a.slice(0,5);
+  }
+  #appendLatestHistory(side,t){const a=this.#s.history[side];if(a.length)a[0]=`${a[0].replace(/\.$/,'')} → ${t}`;else this.#addHistory(side,t);}
   #addIntel(side,t){const a=this.#s.intel[side];a.unshift(t);this.#s.intel[side]=a.slice(0,3);}
   #ok(status='',extra={}){return {ok:true,status,...extra};}
   #fail(status='',extra={}){return {ok:false,status,...extra};}
 
-  #publicPiece(p){
+  #publicPiece(p,viewerSide=p.owner){
     const d=this.#R.defOf(p);
-    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:p.coord,alive:p.alive,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,diag:!!d.diag,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0};
+    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:p.coord,alive:p.alive,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,diag:!!d.diag,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,effects:(p.effects||[]).filter(e=>viewerSide===p.owner||e.public!==false).map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
   }
 
   #getView(side){
     const other=this.#other(side), act=this.#activation(side), visible=[];
-    for(const e of this.#pieces(other)) if(e.alive&&this.#s.seer[side].has(e.coord)) visible.push(this.#publicPiece(e));
-    const pending=this.#s.pendingCombat&&this.#s.pendingCombat.winnerSide===side?{canChoose:true}:null;
+    for(const e of this.#pieces(other)) if(e.alive&&this.#s.seer[side].has(e.coord)) visible.push(this.#publicPiece(e,side));
+    const pc=this.#s.pendingCombat;
+    const pending=pc&&pc.winnerSide===side?{canChoose:true,canAdvance:!!pc.protectedAllyId||!this.#piecesAt(other,pc.deadCell).length}:null;
     return structuredClone({
       phase:this.#s.phase, round:this.#s.round, turn:this.#s.turn, gameOver:this.#s.gameOver, result:this.#s.result,
-      ownPieces:this.#pieces(side).map(p=>this.#publicPiece(p)),
+      ownPieces:this.#pieces(side).map(p=>this.#publicPiece(p,side)),
       visibleOpponents:visible,
       bases:this.#s.bases.map(b=>({id:b.id,owner:b.owner,coord:b.coord,sabotaged:b.sabotaged})),
       chosenBaseBonuses:[...this.#s.chosenBaseBonuses[side]], baseBonusCatalog:this.#R.baseBonuses.map(b=>({...b})),
@@ -239,8 +305,8 @@ __refRoot.GameReferee = class GameReferee {
       corpses:this.#s.corpses.map(c=>({coord:c.coord})),
       ownMirrors:this.#s.mirrors.filter(m=>m.owner===side).map(m=>({coord:m.coord})),
       seerArea:[...this.#s.seer[side]], impactCell:this.#s.impact[side],
-      history:[...this.#s.history[side]], intel:[...this.#s.intel[side]],
-      activation:act?{...act}:null, pendingCombat:pending,
+      history:[...this.#s.history[side]], intel:[...this.#s.intel[side]], perceptionHints:(this.#s.perceptionHints[side]||[]).map(h=>({...h})),
+      activation:act?{...act}:null, pendingCombat:pending, doppelChoice:this.#s.doppelChoice[side]?{...this.#s.doppelChoice[side]}:null,
       availablePieceIds:this.#pieces(side).filter(p=>p.alive&&!p.activated).map(p=>p.id)
     });
   }
@@ -249,6 +315,7 @@ __refRoot.GameReferee = class GameReferee {
     if(this.#s.phase!=='play') return this.#fail('A partida ainda não começou.');
     if(this.#s.gameOver) return this.#fail('A partida já terminou.');
     if(this.#s.pendingCombat) return this.#fail('Há um Confronto Direto aguardando resolução.');
+    if(this.#s.doppelChoice?.[side]) return this.#fail('Escolha qual habilidade do Doppelgänger manter.');
     if(this.#s.turn!==side) return this.#fail('Não é a vez deste lado.');
     return null;
   }
@@ -259,7 +326,7 @@ __refRoot.GameReferee = class GameReferee {
     if(p.activated)return this.#fail(`${this.#R.defOf(p).name} já agiu nesta rodada.`);
     const a=this.#activation(side);
     if(a&&a.committed&&a.pieceId!==id) return this.#fail(`A ativação de ${this.#R.defOf(this.#activePiece(side)).name} já foi comprometida.`);
-    const blocked=p.name==='Mago do Espelho'&&p.mirrorCooldown===1;
+    const blocked=false;
     this.#s.activation[side]={pieceId:id,committed:a?.pieceId===id?!!a.committed:false,movementUsed:a?.pieceId===id?!!a.movementUsed:false,mode:null,moveRemaining:0,stepsTaken:a?.pieceId===id?(a.stepsTaken||0):0,lastPerception:a?.pieceId===id?(a.lastPerception??null):null,mirrorBlockedCurrentActivation:blocked};
     return this.#ok(`${this.#R.defOf(p).name} selecionado. Ainda pode trocar enquanto não agir.`);
   }
@@ -279,12 +346,9 @@ __refRoot.GameReferee = class GameReferee {
 
   #commit(side){
     const a=this.#activation(side); if(!a||a.committed)return;
+    this.#s.perceptionHints[side]=[];
     if(this.#s.seerExpires[side]){this.#s.seer[side].clear();this.#s.seerExpires[side]=false;}
     const p=this.#activePiece(side);
-    if(p&&p.name==='Mago do Espelho'&&a.mirrorBlockedCurrentActivation){
-      this.#s.mirrors=this.#s.mirrors.filter(m=>!(m.owner===side&&m.mageId===p.id));
-      p.mirrorCooldown=0;
-    }
     a.committed=true; this.#s.impact[side]=null;
   }
 
@@ -318,16 +382,26 @@ __refRoot.GameReferee = class GameReferee {
     const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p)return this.#fail('Sem peça ativa.');
     if(!a.committed){a.mode=null;a.moveRemaining=0;return this.#ok('Movimento cancelado sem gastar a ativação.');}
     a.mode=null;a.moveRemaining=0;
-    const other=this.#other(side),orth=this.#R.neighbors(p.coord,false);
+    const other=this.#other(side),d=this.#R.defOf(p),per=Math.max(0,d.per||0);
+    const orth=this.#R.perceptionCells(p.coord,per,false);
     const orthHits=orth.filter(c=>this.#pieceAt(other,c)||this.#mirrorAt(c,other));
-    const diagOnly=this.#R.neighbors(p.coord,true).filter(c=>!orth.includes(c));
+    const diagOnly=this.#R.perceptionCells(p.coord,per,true).filter(c=>!orth.includes(c));
     const diagHits=diagOnly.filter(c=>this.#pieceAt(other,c)||this.#mirrorAt(c,other));
-    const expanded=this.#hasBaseBonus(side,'radarExpanded'),advanced=this.#hasBaseBonus(side,'radarAdvanced');
-    const detected=orthHits.length>0||(expanded&&diagHits.length>0);a.lastPerception=detected;
+    const expanded=!!p.bonusRadarExpanded,advanced=!!p.bonusRadarAdvanced;
+    const detected=per>0&&(orthHits.length>0||(expanded&&diagHits.length>0));a.lastPerception=detected;
+    const hintable=c=>!this.#R.isBlocked(c)&&!this.#pieceAt(side,c)&&!this.#baseAt(c);
+    const hints=[];
+    if(per>0){
+      if(advanced&&orthHits.length){for(const c of orthHits)hints.push({coord:c,kind:'exact'});}
+      else if(orthHits.length){for(const c of orth.filter(hintable))hints.push({coord:c,kind:'orth'});}
+      if(expanded&&diagHits.length){for(const c of diagOnly.filter(hintable))hints.push({coord:c,kind:'diag'});}
+    }
+    this.#s.perceptionHints[side]=hints.filter((h,i,a)=>a.findIndex(x=>x.coord===h.coord&&x.kind===h.kind)===i);
     let msg;
-    if(advanced&&orthHits.length){msg=`📡 presença ortogonal em ${orthHits.join(', ')}`;if(expanded&&diagHits.length)msg+=' + 📶 presença diagonal próxima';}
-    else if(expanded){const parts=[];if(orthHits.length)parts.push('presença ortogonal próxima');if(diagHits.length)parts.push('presença diagonal próxima');msg=parts.length?`📶 ${parts.join(' e ')}`:'✓ nenhuma presença nas 8 casas adjacentes';}
-    else msg=orthHits.length?'⚠️ presença inimiga próxima.':'✓ nenhuma presença inimiga adjacente.';
+    if(per<=0)msg='◌ PER0: esta unidade não possui percepção.';
+    else if(advanced&&orthHits.length){msg=`📡 presença ortogonal em ${orthHits.join(', ')}`;if(expanded&&diagHits.length)msg+=' + 📶 presença diagonal no alcance';}
+    else if(expanded){const parts=[];if(orthHits.length)parts.push('presença ortogonal no alcance');if(diagHits.length)parts.push('presença diagonal no alcance');msg=parts.length?`📶 ${parts.join(' e ')}`:`✓ nenhuma presença no alcance PER${per}`;}
+    else msg=orthHits.length?'⚠️ presença inimiga no alcance ortogonal.':`✓ nenhuma presença inimiga no alcance PER${per}.`;
     this.#addIntel(side,`${this.#R.defOf(p).icon} ${this.#R.defOf(p).name}: ${msg}`);
     return this.#ok('Movimento encerrado. Agora ataque, use habilidade, sabote um Posto ou encerre.');
   }
@@ -376,14 +450,13 @@ __refRoot.GameReferee = class GameReferee {
     const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p)return this.#fail('Selecione uma peça.');
     if(a.mode==='move'&&a.committed)return this.#fail('Primeiro termine o movimento.');
     const ab=this.#effectiveAbility(p);
-    if(ab==='seer'){a.mode='seer';return this.#ok('👁️ Escolha uma área 2×2 e confirme.',{ability:'seer'});}
+    if(ab==='seer'){a.mode='seer';return this.#ok('👁️ Escolha uma casa principal + 3 casas adjacentes a ela (lado ou diagonal).',{ability:'seer'});}
     if(ab==='raise'){
       const has=this.#pieces(side).some(x=>x.alive&&x.summonType==='skeleton'&&x.summonerId===p.id);if(has)return this.#fail('Este Necromante já controla um Esqueleto vivo.');
       const legal=this.#R.neighbors(p.coord,false).filter(c=>this.#corpseAt(c)&&!this.#pieceAt(side,c)); if(!legal.length)return this.#fail('Nenhum cadáver adjacente disponível.');
       a.mode='raise';return this.#ok('☠️ Escolha um cadáver adjacente.',{ability:'raise'});
     }
     if(ab==='mirror'){
-      if(p.name==='Mago do Espelho'&&a.mirrorBlockedCurrentActivation)return this.#fail('🔮 O Espelho está em recarga nesta ativação.');
       a.mode='mirror';return this.#ok('🪞 Escolha uma casa em linha reta, a 1 ou 2 casas.',{ability:'mirror'});
     }
     if(p.name==='Doppelgänger')return this.#fail(p.copied?`A habilidade copiada de ${p.copied} ainda não possui efeito implementado.`:'Doppelgänger ainda não copiou habilidade.');
@@ -401,29 +474,61 @@ __refRoot.GameReferee = class GameReferee {
     const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='seer')return this.#fail('Visão não iniciada.');
     if(!Array.isArray(cells)||cells.length!==4)return this.#fail('Área inválida.');
     const s=new Set(cells); if(s.size!==4)return this.#fail('Área inválida.');
-    const pts=cells.map(this.#R.rc);const xs=[...new Set(pts.map(q=>q.x))],ys=[...new Set(pts.map(q=>q.y))];
-    if(xs.length!==2||ys.length!==2||Math.max(...xs)-Math.min(...xs)!==1||Math.max(...ys)-Math.min(...ys)!==1)return this.#fail('A visão precisa formar um quadrado 2×2.');
+    const main=cells[0],adj=new Set(this.#R.neighbors(main,true));if(cells.slice(1).some(c=>!adj.has(c)))return this.#fail('As 3 casas extras precisam ser adjacentes à casa principal por lado ou diagonal.');
     this.#commit(side);this.#s.seer[side]=new Set(cells);const seen=this.#pieces(this.#other(side)).filter(e=>e.alive&&this.#s.seer[side].has(e.coord)).length;
-    this.#addIntel(side,`👁️ Área do Vidente: ${seen} presença(s) detectada(s) agora.`);this.#addHistory(side,'👁️ Vidente ativou sua visão 2×2.');this.#s.seerExpires[side]=true;a.mode=null;return this.#finishActivation(side);
+    this.#addIntel(side,`👁️ Área do Vidente: ${seen} presença(s) detectada(s) agora.`);this.#addHistory(side,'👁️ Vidente ativou visão em 4 casas conectadas.');this.#s.seerExpires[side]=true;a.mode=null;return this.#finishActivation(side);
   }
 
   #raiseAt(side,c){
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='raise')return this.#fail('Necromancia não iniciada.');
     if(!this.#R.neighbors(p.coord,false).includes(c)||!this.#corpseAt(c)||this.#pieceAt(side,c))return this.#fail('Não foi possível usar esse cadáver.');
-    if(this.#pieceAt(this.#other(side),c))return this.#fail('Não foi possível usar esse cadáver.');
     this.#commit(side);const corpse=this.#corpseAt(c);this.#s.corpses=this.#s.corpses.filter(x=>x!==corpse);
-    this.#pieces(side).push({id:(side==='player'?'p':'e')+this.#s.idSeq++,owner:side,name:'Esqueleto',hp:1,coord:c,alive:true,activated:true,original:false,summonType:'skeleton',summonerId:p.id,form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});
-    this.#addHistory(side,`💀 ${this.#R.defOf(p).name} ergueu um Esqueleto.`);a.mode=null;return this.#finishActivation(side);
+    const summon={id:(side==='player'?'p':'e')+this.#s.idSeq++,owner:side,name:'Esqueleto',hp:1,coord:c,alive:true,activated:true,original:false,summonType:'skeleton',summonerId:p.id,form:null,copied:null,mirrorCooldown:0,effects:[],bonusM:0,bonusV:0,bonusA:0,bonusRange:0,bonusRadarAdvanced:false,bonusRadarExpanded:false};
+    this.#pieces(side).push(summon);
+    const hostile=this.#pieceAt(this.#other(side),c);
+    if(hostile)this.#resolveSpawnConflict(side,summon,hostile,c);
+    else this.#addHistory(side,`💀 ${this.#R.defOf(p).name} ergueu um Esqueleto.`);
+    a.mode=null;return this.#finishActivation(side);
+  }
+
+  // Regra geral para unidades criadas em casa ocupada:
+  // aliado bloqueia a criação; inimigo provoca Confronto Direto imediato.
+  // Como a unidade criada não possui casa anterior para ser repelida, empate ou defensor sobrevivente desfaz a criação.
+  #resolveSpawnConflict(side,summon,def,c){
+    if(!summon?.alive||!def?.alive)return;
+    const other=this.#other(side),sName=this.#R.defOf(summon).name,dName=this.#R.defOf(def).name,r=this.#R.directWinner(summon,def);
+    if(r==='tie'){
+      summon.alive=false;
+      this.#addHistory(side,`💀 ${sName} surgiu sobre ${dName} → Confronto empatou e a criação foi desfeita.`);
+      this.#addHistory(other,`🛡️ ${sName} inimigo surgiu sobre seu ${dName} → empate; seu defensor impediu a criação.`);
+      return;
+    }
+    if(r==='att'){
+      const res=this.#damage(def,1);this.#resolveSlimeSplits();
+      if(res.dead){
+        this.#addHistory(side,`💀 ${sName} surgiu sobre ${dName} → venceu o Confronto e eliminou o defensor.`);
+        this.#addHistory(other,`☠️ ${sName} inimigo surgiu sobre seu ${dName} → seu defensor foi eliminado.`);
+      }else{
+        summon.alive=false;
+        const result=res.transform?`${dName} sofreu 1, virou Golem de Lava e impediu a criação.`:`${dName} sofreu 1, sobreviveu e impediu a criação.`;
+        this.#addHistory(side,`💀 ${sName} surgiu sobre ${dName} → ${result}`);
+        this.#addHistory(other,`🛡️ ${sName} inimigo surgiu sobre seu ${dName} → ${result}`);
+      }
+      return;
+    }
+    const res=this.#damage(summon,1);if(!res.dead)summon.alive=false;
+    this.#addHistory(side,`💀 ${sName} surgiu sobre ${dName} → perdeu o Confronto e foi destruído.`);
+    this.#addHistory(other,`🛡️ ${sName} inimigo surgiu sobre seu ${dName} → seu defensor venceu e destruiu a criação.`);
   }
 
   #placeMirror(side,c){
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='mirror')return this.#fail('Espelho não iniciado.');
-    const dist=this.#R.man(p.coord,c);if(c===p.coord||!this.#R.sameLine(p.coord,c)||dist<1||dist>2||this.#pieceAt(side,c)||this.#mirrorAt(c,side)||this.#baseAt(c))return this.#fail('Casa inválida para o Espelho.');
+    const dist=this.#R.man(p.coord,c);if(c===p.coord||!this.#R.sameLine(p.coord,c)||dist<1||dist>2||this.#R.isBlocked(c)||this.#pieceAt(side,c)||this.#mirrorAt(c,side)||this.#baseAt(c))return this.#fail('Casa inválida para o Espelho.');
     if(this.#pieceAt(this.#other(side),c))return this.#fail('Não foi possível criar o Espelho nessa casa.');
     this.#commit(side);this.#s.mirrors=this.#s.mirrors.filter(m=>!(m.owner===side&&m.mageId===p.id));this.#s.mirrors.push({owner:side,coord:c,mageId:p.id});
-    if(p.name==='Mago do Espelho')p.mirrorCooldown=1;this.#addHistory(side,'🪞 Mago do Espelho criou um Espelho invisível para o adversário.');this.#addIntel(side,'🪞 Seu Espelho pode gerar falsa presença e reflete o primeiro ataque que acertá-lo.');a.mode=null;return this.#finishActivation(side);
+    p.mirrorCooldown=0;this.#addHistory(side,'🪞 Mago do Espelho criou um Espelho invisível para o adversário.');this.#addIntel(side,'🪞 Seu Espelho pode gerar falsa presença e reflete o primeiro ataque que acertá-lo.');a.mode=null;return this.#finishActivation(side);
   }
 
   #sabotageBase(side,baseId,bonusId,targetPieceId=null){
@@ -436,7 +541,7 @@ __refRoot.GameReferee = class GameReferee {
     const bonus=this.#R.baseBonuses.find(b=>b.id===bonusId);if(!bonus)return this.#fail('Benefício inválido.');
     if(this.#hasBaseBonus(side,bonusId))return this.#fail('Esse benefício já foi escolhido nesta partida.');
     let target=null;
-    if(['move','life','attack','range'].includes(bonusId)){
+    if(['radarAdvanced','radarExpanded','move','life','attack','range'].includes(bonusId)){
       target=this.#pieceById(side,targetPieceId);if(!target)return this.#fail('Escolha uma unidade aliada viva para receber o benefício.');
       if(bonusId==='range'&&this.#R.defOf(target).a<=0)return this.#fail('Mira só pode ser aplicada a um personagem que já possua ataque normal.');
     }
@@ -446,22 +551,28 @@ __refRoot.GameReferee = class GameReferee {
       if(bonusId==='life'){target.bonusV=(target.bonusV||0)+1;target.hp+=1;}
       if(bonusId==='attack')target.bonusA=(target.bonusA||0)+1;
       if(bonusId==='range')target.bonusRange=(target.bonusRange||0)+1;
+      if(bonusId==='radarAdvanced')target.bonusRadarAdvanced=true;
+      if(bonusId==='radarExpanded')target.bonusRadarExpanded=true;
     }
     const detail=target?`${bonus.icon} ${bonus.name} em ${this.#R.defOf(target).name}`:`${bonus.icon} ${bonus.name}`;
-    this.#addHistory(side,`🏢 Posto inimigo sabotado. Benefício escolhido: ${detail}.`);
+    this.#addHistory(side,`🏰 Posto inimigo sabotado. Benefício escolhido: ${detail}.`);
     this.#addHistory(this.#other(side),'🏚️ Um dos seus Postos de Operação foi sabotado.');
     a.mode=null;return this.#finishActivation(side);
   }
 
   #endActivationRequest(side){
     const bad=this.#validateTurn(side); if(bad)return bad;
-    const p=this.#activePiece(side);if(!p)return this.#fail('Selecione uma peça.');this.#commit(side);this.#addHistory(side,`${this.#R.defOf(p).icon} ${this.#R.defOf(p).name} encerrou sua ativação.`);return this.#finishActivation(side);
+    const p=this.#activePiece(side);if(!p)return this.#fail('Selecione uma peça.');this.#commit(side);return this.#finishActivation(side);
   }
 
   #createCorpse(p){if(!p.original||p.name==='Slime')return;if(!this.#s.corpses.some(c=>c.sourceId===p.id))this.#s.corpses.push({sourceId:p.id,coord:p.coord,name:p.name,owner:p.owner});}
   #kill(p){
     if(!p||!p.alive)return;p.alive=false;
-    if(p.name==='Slime'&&p.original)this.#s.pendingSlimeSplits.push({owner:p.owner,coord:p.coord});else this.#createCorpse(p);
+    if(p.name==='Slime'&&p.original)this.#s.pendingSlimeSplits.push({owner:p.owner,coord:p.coord,lineageId:p.id,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusPer:p.bonusPer||0,bonusRadarAdvanced:!!p.bonusRadarAdvanced,bonusRadarExpanded:!!p.bonusRadarExpanded,effects:(p.effects||[]).map(e=>structuredClone(e))});else this.#createCorpse(p);
+    if(p.summonType==='miniSlime'&&p.slimeLineageId&&!this.#slimeLineageAlive(p.owner,p.slimeLineageId)){
+      this.#addHistory(p.owner,'☠️ O último Mini-Slime caiu. A linhagem do Slime foi eliminada e agora conta como 1 perda.');
+      this.#addHistory(this.#other(p.owner),'☠️ Uma eliminação inimiga foi confirmada.');
+    }
     if(p.name==='Kamikaze'&&p.original)this.#explodeKamikaze(p);
   }
   #damage(p,n){
@@ -478,10 +589,12 @@ __refRoot.GameReferee = class GameReferee {
   #resolveSlimeSplits(){
     const q=[...this.#s.pendingSlimeSplits];this.#s.pendingSlimeSplits=[];
     for(const s of q){
-      const occupied=c=>!!this.#pieceAt('player',c)||!!this.#pieceAt('enemy',c)||!!this.#baseAt(c);
+      const occupied=c=>this.#R.isBlocked(c)||!!this.#pieceAt('player',c)||!!this.#pieceAt('enemy',c)||!!this.#baseAt(c);
       const spots=[s.coord,...this.#R.neighbors(s.coord,false)].filter((c,i,a)=>a.indexOf(c)===i&&!occupied(c)).slice(0,2);
-      for(const c of spots)this.#pieces(s.owner).push({id:(s.owner==='player'?'p':'e')+this.#s.idSeq++,owner:s.owner,name:'Mini-Slime',hp:1,coord:c,alive:true,activated:true,original:false,summonType:'miniSlime',form:null,copied:null,mirrorCooldown:0,bonusM:0,bonusV:0,bonusA:0,bonusRange:0});
-      this.#addHistory(s.owner,`🟢 Slime se dividiu em ${spots.length} Mini-Slime${spots.length===1?'':'s'}.`);
+      for(const c of spots)this.#pieces(s.owner).push({id:(s.owner==='player'?'p':'e')+this.#s.idSeq++,owner:s.owner,name:'Mini-Slime',hp:1+(s.bonusV||0),coord:c,alive:true,activated:true,original:false,summonType:'miniSlime',slimeLineageId:s.lineageId,form:null,copied:null,mirrorCooldown:0,effects:(s.effects||[]).map(e=>structuredClone(e)),bonusM:s.bonusM||0,bonusV:s.bonusV||0,bonusA:s.bonusA||0,bonusRange:s.bonusRange||0,bonusPer:s.bonusPer||0,bonusRadarAdvanced:!!s.bonusRadarAdvanced,bonusRadarExpanded:!!s.bonusRadarExpanded});
+      const splitText=`dividiu-se em ${spots.length} Mini-Slime${spots.length===1?'':'s'}; herdaram os bônus e a perda só conta quando todos os fragmentos forem destruídos.`;
+      const latest=this.#s.history[s.owner]?.[0]||'';
+      if(/Slime/i.test(latest)&&/(rompido|atingido|Confronto)/i.test(latest))this.#appendLatestHistory(s.owner,splitText);else this.#addHistory(s.owner,`🟢 Slime ${splitText}`);
     }
   }
 
@@ -495,20 +608,20 @@ __refRoot.GameReferee = class GameReferee {
     const friendly=this.#protectedTarget(side,to),hostile=this.#protectedTarget(other,to),target=friendly||hostile,dist=this.#R.man(attacker.coord,to);
     if(!target){
       this.#addHistory(side,`${d.icon} ${d.name} atacou, mas não atingiu ninguém.`);
-      this.#addHistory(other,'💥 Ataque inimigo detectado.');this.#s.impact[other]=to;return;
+      this.#addIntel(other,'💥 Ataque inimigo detectado: a casa atingida foi marcada no tabuleiro.');this.#s.impact[other]=to;return;
     }
     const targetSide=target.owner,stacked=this.#piecesAt(targetSide,to).length>1&&target.name==='Escudeiro';
-    const before=this.#R.defOf(target).name,res=this.#damage(target,d.a),friendlyFire=targetSide===side;
+    const before=this.#R.defOf(target).name,res=this.#damage(target,d.a),friendlyFire=targetSide===side,slimeSplit=target.name==='Slime'&&target.original&&res.dead;
     if(friendlyFire){
-      this.#addHistory(side,res.dead?`⚠️ Seu ${before} foi eliminado pelo seu ${d.name}.`:res.transform?'🌋 Você atingiu seu Golem e o transformou em Golem de Lava.':`⚠️ Seu ${before} foi atingido pelo seu ${d.name}.`);
+      this.#addHistory(side,slimeSplit?`🟢 Seu Slime foi rompido pelo seu ${d.name} e vai se dividir.`:res.dead?`⚠️ Seu ${before} foi eliminado pelo seu ${d.name}.`:res.transform?'🌋 Você atingiu seu Golem e o transformou em Golem de Lava.':`⚠️ Seu ${before} foi atingido pelo seu ${d.name}.`);
       if(stacked)this.#addIntel(side,'🛡️ Seu Escudeiro interceptou o ataque aliado e protegeu a outra peça.');
     }else{
-      if(dist===1)this.#addHistory(side,res.dead?`☠️ ${before} inimigo eliminado por ${d.name}.`:res.transform?'🌋 Golem inimigo virou Golem de Lava.':`⚔️ ${before} inimigo foi atingido por ${d.name}.`);
-      else this.#addHistory(side,res.dead?'☠️ Um alvo distante foi eliminado.':'🎯 Um alvo distante foi atingido.');
+      if(dist===1)this.#addHistory(side,slimeSplit?`🟢 Slime inimigo foi rompido por ${d.name} e se dividiu.`:res.dead?`☠️ ${before} inimigo eliminado por ${d.name}.`:res.transform?'🌋 Golem inimigo virou Golem de Lava.':`⚔️ ${before} inimigo foi atingido por ${d.name}.`);
+      else this.#addHistory(side,slimeSplit?'🎯 O alvo distante foi atingido, mas nenhuma eliminação foi confirmada.':res.dead?'☠️ Um alvo distante foi eliminado.':'🎯 Um alvo distante foi atingido.');
       if(stacked)this.#addIntel(side,'🛡️ O Escudeiro inimigo interceptou o dano destinado à casa.');
 
-      if(dist===1)this.#addHistory(other,res.dead?`☠️ Seu ${before} foi eliminado por ${d.name}.`:res.transform?'🌋 Seu Golem virou Golem de Lava.':`⚔️ Seu ${before} foi atingido por ${d.name}.`);
-      else this.#addHistory(other,res.dead?`☠️ Seu ${before} foi eliminado por ataque distante.`:`🎯 Seu ${before} foi atingido por ataque distante.`);
+      if(dist===1)this.#addHistory(other,slimeSplit?`🟢 Seu Slime foi rompido por ${d.name} e vai se dividir.`:res.dead?`☠️ Seu ${before} foi eliminado por ${d.name}.`:res.transform?'🌋 Seu Golem virou Golem de Lava.':`⚔️ Seu ${before} foi atingido por ${d.name}.`);
+      else this.#addHistory(other,slimeSplit?'🟢 Seu Slime foi atingido por ataque distante e vai se dividir.':res.dead?`☠️ Seu ${before} foi eliminado por ataque distante.`:`🎯 Seu ${before} foi atingido por ataque distante.`);
       if(stacked)this.#addIntel(other,'🛡️ Seu Escudeiro protegeu a outra peça na mesma casa.');
       this.#s.impact[other]=to;
     }
@@ -516,8 +629,16 @@ __refRoot.GameReferee = class GameReferee {
   }
 
   #checkDoppel(side,p){
-    if(p.name!=='Doppelgänger')return;const corpse=this.#corpseAt(p.coord);if(!corpse)return;
-    if(p.copied!==corpse.name){p.copied=corpse.name;this.#addIntel(side,`🎭 Doppelgänger copiou a habilidade de ${corpse.name}.`);}
+    if(p.name!=='Doppelgänger')return;const corpse=this.#corpseAt(p.coord);if(!corpse||p.copied===corpse.name)return;
+    if(!p.copied){p.copied=corpse.name;this.#addIntel(side,`🎭 Doppelgänger copiou a habilidade de ${corpse.name}.`);return;}
+    this.#s.doppelChoice[side]={pieceId:p.id,current:p.copied,newAbility:corpse.name};
+    this.#addIntel(side,`🎭 Novo cadáver encontrado: manter ${p.copied} ou copiar ${corpse.name}?`);
+  }
+  #chooseDoppelCopy(side,copyNew){
+    const ch=this.#s.doppelChoice?.[side];if(!ch)return this.#fail('Nenhuma escolha do Doppelgänger disponível.');
+    const p=this.#pieceById(side,ch.pieceId);if(p&&copyNew)p.copied=ch.newAbility;this.#s.doppelChoice[side]=null;
+    this.#addIntel(side,copyNew?`🎭 Doppelgänger agora mantém ${ch.newAbility}.`:`🎭 Doppelgänger manteve ${ch.current}.`);
+    return this.#ok('Escolha do Doppelgänger confirmada.');
   }
 
   #resolveDirect(attackerSide,att,def,from,to){
@@ -533,31 +654,20 @@ __refRoot.GameReferee = class GameReferee {
     const attackerWins=r==='att',winner=attackerWins?att:def,loser=attackerWins?def:att,before=this.#R.defOf(loser).name,res=this.#damage(loser,1);
     this.#resolveSlimeSplits();
     if(!res.dead){
-      att.coord=from;const msg=res.transform?`🌋 ${before} sofreu 1 no Confronto e virou Golem de Lava.`:`⚔️ ${this.#R.defOf(winner).name} venceu o Confronto e causou 1 em ${before}, que sobreviveu.`;
+      att.coord=from;const msg=res.transform?`🌋 ${this.#R.defOf(winner).name} venceu o Confronto contra ${before}; ${before} sofreu 1 e virou Golem de Lava.`:`⚔️ ${this.#R.defOf(winner).name} venceu o Confronto e causou 1 em ${before}, que sobreviveu.`;
       this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);
     }
     if(!winner.alive){const msg=`💥 ${before} morreu, mas a reação também eliminou ${this.#R.defOf(winner).name}.`;this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);}
-    this.#addHistory(attackerSide,`☠️ ${before} eliminado por ${this.#R.defOf(winner).name} em Confronto Direto.`);
-    this.#addHistory(defenderSide,`☠️ ${before} eliminado por ${this.#R.defOf(winner).name} em Confronto Direto.`);
+    const slimeSplit=loser.name==='Slime'&&loser.original;
+    const directMsg=slimeSplit?`🟢 Slime foi rompido por ${this.#R.defOf(winner).name} no Confronto Direto e se dividiu.`:`☠️ ${before} eliminado por ${this.#R.defOf(winner).name} em Confronto Direto.`;
+    this.#addHistory(attackerSide,directMsg);
+    this.#addHistory(defenderSide,directMsg);
     const ownCell=winner===att?from:to,deadCell=winner===att?to:from,winnerSide=winner.owner;
     const shieldProtected = loser.name==='Escudeiro'&&protectedAlly&&protectedAlly.alive;
-    if(winnerSide==='player'||this.#s.mode==='multiplayer'){
-      winner.coord=ownCell;this.#s.pendingCombat={winnerId:winner.id,winnerSide,ownCell,deadCell,afterSide:attackerSide,protectedAllyId:shieldProtected?protectedAlly.id:null,protectedSide:shieldProtected?protectedAlly.owner:null};
-      return this.#ok('Confronto resolvido. O jogador deve escolher onde o vencedor termina.',{pendingCombat:true});
-    }
-    let advance=Math.random()<.5;
-    if(shieldProtected&&advance){
-      const otherCell=ownCell;const blockers=this.#piecesAt(winnerSide,otherCell).filter(x=>x.id!==winner.id);
-      if(blockers.length)advance=false;
-    }
-    winner.coord=advance?deadCell:ownCell;
-    if(shieldProtected){
-      const allyDest=advance?ownCell:deadCell;
-      const enemyBlock=this.#piecesAt(winnerSide,allyDest).some(x=>x.id!==winner.id);
-      if(!enemyBlock)protectedAlly.coord=allyDest;
-      else {winner.coord=ownCell;protectedAlly.coord=deadCell;}
-    }
-    return this.#finishActivation(attackerSide);
+    // O vencedor sempre escolhe onde termina. Em solo, se o vencedor for a IA,
+    // a decisão volta ao Web Worker usando apenas a visão filtrada dela.
+    winner.coord=ownCell;this.#s.pendingCombat={winnerId:winner.id,winnerSide,ownCell,deadCell,afterSide:attackerSide,protectedAllyId:shieldProtected?protectedAlly.id:null,protectedSide:shieldProtected?protectedAlly.owner:null};
+    return this.#ok('Confronto resolvido. O vencedor deve escolher onde termina.',{pendingCombat:true});
   }
 
   #chooseCombatPosition(side,advance){
@@ -566,6 +676,7 @@ __refRoot.GameReferee = class GameReferee {
     const protectedAlly=p.protectedAllyId&&p.protectedSide?this.#pieceById(p.protectedSide,p.protectedAllyId):null;
     if(winner){
       let doAdvance=!!advance;
+      if(!protectedAlly&&doAdvance&&this.#piecesAt(this.#other(side),p.deadCell).length)doAdvance=false;
       if(protectedAlly&&doAdvance){const blockers=this.#piecesAt(side,p.ownCell).filter(x=>x.id!==winner.id);if(blockers.length)doAdvance=false;}
       winner.coord=doAdvance?p.deadCell:p.ownCell;
       if(protectedAlly&&protectedAlly.alive){
@@ -579,15 +690,35 @@ __refRoot.GameReferee = class GameReferee {
     const after=p.afterSide;this.#s.pendingCombat=null;return this.#finishActivation(after);
   }
 
+  #tickPieceEffects(p,tick){
+    if(!p||!p.alive||!Array.isArray(p.effects)||!p.effects.length)return;
+    const keep=[];
+    for(const effect of p.effects){
+      const e={...effect};
+      if((e.tick||'round')===tick&&Number.isFinite(Number(e.remaining)))e.remaining=Number(e.remaining)-1;
+      if(Number(e.remaining)>0){keep.push(e);continue;}
+      this.#addHistory(p.owner,`⏳ ${e.name||'Um efeito temporário'} terminou em ${this.#R.defOf(p).name}.`);
+      if(e.onExpire==='despawn'&&p.alive){
+        p.alive=false;
+        this.#addHistory(p.owner,`⌛ ${this.#R.defOf(p).name} deixou o campo ao fim da duração.`);
+        this.#addHistory(this.#other(p.owner),'⌛ Uma presença temporária inimiga deixou o campo.');
+      }
+    }
+    p.effects=keep;const maxHp=this.#R.defOf(p).v;if(p.hp>maxHp)p.hp=maxHp;
+  }
+  #tickRoundEffects(){
+    for(const side of ['player','enemy'])for(const p of this.#pieces(side))this.#tickPieceEffects(p,'round');
+  }
+
   #finishActivation(side){
-    const p=this.#activePiece(side);if(p&&p.alive)p.activated=true;this.#s.activation[side]=null;
+    const p=this.#activePiece(side);if(p&&p.alive){p.activated=true;this.#tickPieceEffects(p,'activation');}this.#s.activation[side]=null;
     if(this.#checkEnd())return this.#ok('Partida encerrada.',{gameOver:true});
     this.#advanceAfterActivation(side);return this.#ok('Ativação encerrada.',{turn:this.#s.turn});
   }
 
   #advanceAfterActivation(side){
     const pLeft=this.#pieces('player').some(p=>p.alive&&!p.activated),eLeft=this.#pieces('enemy').some(p=>p.alive&&!p.activated);
-    if(!pLeft&&!eLeft){this.#s.round++;for(const p of this.#pieces('player'))if(p.alive)p.activated=false;for(const p of this.#pieces('enemy'))if(p.alive)p.activated=false;this.#addHistory('player',`🔄 Rodada ${this.#s.round} começou.`);this.#addHistory('enemy',`🔄 Rodada ${this.#s.round} começou.`);this.#s.turn='player';return;}
+    if(!pLeft&&!eLeft){this.#s.round++;this.#tickRoundEffects();for(const p of this.#pieces('player'))if(p.alive)p.activated=false;for(const p of this.#pieces('enemy'))if(p.alive)p.activated=false;this.#addHistory('player',`🔄 Rodada ${this.#s.round} começou.`);this.#addHistory('enemy',`🔄 Rodada ${this.#s.round} começou.`);this.#s.turn='player';return;}
     if(side==='player')this.#s.turn=eLeft?'enemy':'player';
     else this.#s.turn=pLeft?'player':(eLeft?'enemy':'player');
   }
@@ -605,15 +736,14 @@ __refRoot.GameReferee = class GameReferee {
   importState(raw){
     if(!raw)return;
     this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);
+    if(!this.#s.doppelChoice)this.#s.doppelChoice={player:null,enemy:null};
+    for(const side of ['player','enemy'])for(const p of this.#pieces(side))if(!Array.isArray(p.effects))p.effects=[];
   }
 
 };
 
-
-
-
 const actionMap={
-  selectPiece:(c,a)=>c.selectPiece(a.pieceId),cancelSelection:c=>c.cancelSelection(),cancelMode:c=>c.cancelMode(),startMove:c=>c.startMove(),moveStep:(c,a)=>c.moveStep(a.to),stopMove:c=>c.stopMove(),startAttack:c=>c.startAttack(),attack:(c,a)=>c.attack(a.to),selectPyroTarget:(c,a)=>c.selectPyroTarget(a.to),confirmPyroAttack:c=>c.confirmPyroAttack(),startAbility:c=>c.startAbility(),useSeer:(c,a)=>c.useSeer(a.cells),raiseAt:(c,a)=>c.raiseAt(a.coord),placeMirror:(c,a)=>c.placeMirror(a.coord),endActivation:c=>c.endActivation(),chooseCombatPosition:(c,a)=>c.chooseCombatPosition(!!a.advance),sabotageBase:(c,a)=>c.sabotageBase(a.baseId,a.bonusId,a.targetPieceId||null)
+  selectPiece:(c,a)=>c.selectPiece(a.pieceId),cancelSelection:c=>c.cancelSelection(),cancelMode:c=>c.cancelMode(),startMove:c=>c.startMove(),moveStep:(c,a)=>c.moveStep(a.to),stopMove:c=>c.stopMove(),startAttack:c=>c.startAttack(),attack:(c,a)=>c.attack(a.to),selectPyroTarget:(c,a)=>c.selectPyroTarget(a.to),confirmPyroAttack:c=>c.confirmPyroAttack(),startAbility:c=>c.startAbility(),useSeer:(c,a)=>c.useSeer(a.cells),raiseAt:(c,a)=>c.raiseAt(a.coord),placeMirror:(c,a)=>c.placeMirror(a.coord),endActivation:c=>c.endActivation(),chooseCombatPosition:(c,a)=>c.chooseCombatPosition(!!a.advance),sabotageBase:(c,a)=>c.sabotageBase(a.baseId,a.bonusId,a.targetPieceId||null),chooseDoppelCopy:(c,a)=>c.chooseDoppelCopy(!!a.copyNew)
 };
 
 export class GameRoom {
@@ -675,6 +805,50 @@ export class GameRoom {
   async webSocketError(ws){this.broadcastRoomState();}
 }
 
+
+
+export class TriGameRoom {
+  constructor(ctx,env){
+    this.ctx=ctx;this.env=env;this.referee=new TriReferee();this.ready={A:null,B:null};this.started=false;this.ai=null;this.difficulty='normal';
+    ctx.blockConcurrencyWhile(async()=>{const saved=await ctx.storage.get('triRoom');if(saved){this.ready=saved.ready||{A:null,B:null};this.started=!!saved.started;this.difficulty=saved.difficulty||'normal';if(saved.gameState)this.referee.importState(saved.gameState);if(this.started)this.ai=new TriAI('C',this.difficulty);}});
+  }
+  async persist(){await this.ctx.storage.put('triRoom',{ready:this.ready,started:this.started,difficulty:this.difficulty,gameState:this.referee.exportState()});}
+  send(ws,obj){try{ws.send(JSON.stringify(obj));}catch{}}
+  sockets(){return this.ctx.getWebSockets();}
+  attachment(ws){try{return ws.deserializeAttachment()||{};}catch{return {};}}
+  sideSocket(side){return this.sockets().find(ws=>this.attachment(ws).side===side)||null;}
+  roomState(){return{type:'roomState',started:this.started,connected:{A:!!this.sideSocket('A'),B:!!this.sideSocket('B')},ready:{A:!!this.ready.A,B:!!this.ready.B},ai:'C'};}
+  broadcast(obj){for(const ws of this.sockets())this.send(ws,obj);}
+  broadcastRoomState(){this.broadcast(this.roomState());}
+  broadcastViews(){if(!this.started)return;for(const side of ['A','B']){const ws=this.sideSocket(side);if(ws)this.send(ws,{type:'view',view:this.referee.client(side).getView()});}}
+  async runAI(){if(!this.started||!this.ai)return;let guard=0;while(guard++<80){const v=this.referee.client('C').getView();if(v.gameOver)break;if(!(v.pendingCombat||v.doppelChoice||v.turn==='C'))break;const act=this.ai.decide(v);if(!act||act.type==='wait')break;applyTriAction(this.referee.client('C'),act);this.broadcastViews();await new Promise(r=>setTimeout(r,120));}}
+  async fetch(request){if(request.headers.get('Upgrade')!=='websocket')return new Response('WebSocket required',{status:426});const pair=new WebSocketPair();const client=pair[0],server=pair[1];this.ctx.acceptWebSocket(server);server.serializeAttachment({side:null});return new Response(null,{status:101,webSocket:client});}
+  async webSocketMessage(ws,message){
+    let msg;try{msg=JSON.parse(typeof message==='string'?message:new TextDecoder().decode(message));}catch{return this.send(ws,{type:'error',message:'Mensagem inválida.'});}
+    const att=this.attachment(ws),side=att.side;
+    if(msg.type==='join'){
+      if(side)return;let chosen=null;if(!this.sideSocket('A'))chosen='A';else if(!this.sideSocket('B'))chosen='B';
+      if(!chosen){this.send(ws,{type:'error',message:'Sala 1x1x1 cheia: já existem dois humanos.'});try{ws.close(1008,'Sala cheia');}catch{}return;}
+      ws.serializeAttachment({side:chosen});this.send(ws,{type:'joined',room:String(msg.room||''),side:chosen});this.broadcastRoomState();if(this.started)this.broadcastViews();return;
+    }
+    if(!side)return this.send(ws,{type:'error',message:'Entre na sala primeiro.'});
+    if(msg.type==='ping')return this.send(ws,{type:'pong'});
+    if(msg.type==='ready'){
+      if(this.started)return this.send(ws,{type:'result',ok:false,status:'A partida já começou.'});const res=this.referee.validateSetup(side,msg.setup,msg.bases);if(!res.ok)return this.send(ws,{type:'result',ok:false,status:res.status});
+      this.ready[side]={setup:msg.setup,bases:msg.bases,difficulty:msg.difficulty||'normal'};this.send(ws,{type:'result',ok:true,status:'Pronto. Aguardando o outro jogador.'});
+      if(this.ready.A&&this.ready.B){this.difficulty=['easy','normal','hard'].includes(this.ready.A.difficulty)?this.ready.A.difficulty:'normal';const st=this.referee.startOnline(this.ready.A.setup,this.ready.A.bases,this.ready.B.setup,this.ready.B.bases,this.difficulty);if(!st.ok)return this.broadcast({type:'result',ok:false,status:st.status});this.started=true;this.ai=new TriAI('C',this.difficulty);}
+      await this.persist();this.broadcastRoomState();this.broadcastViews();return;
+    }
+    if(msg.type==='action'){
+      if(!this.started)return this.send(ws,{type:'result',ok:false,status:'A partida ainda não começou.'});let res;try{res=applyTriAction(this.referee.client(side),msg.action||{});}catch(e){console.error(e);res={ok:false,status:'Erro interno.'};}
+      this.send(ws,{type:'result',...res});this.broadcastViews();await this.runAI();await this.persist();this.broadcastViews();return;
+    }
+    this.send(ws,{type:'error',message:'Tipo desconhecido.'});
+  }
+  async webSocketClose(ws){const side=this.attachment(ws).side;if(side&&!this.started){this.ready[side]=null;await this.persist();}this.broadcastRoomState();}
+  async webSocketError(ws){this.broadcastRoomState();}
+}
+
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
@@ -682,6 +856,11 @@ export default {
       const room=String(url.searchParams.get('room')||'').toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);
       if(!room)return new Response('Código de sala inválido.',{status:400});
       return env.GAME_ROOMS.getByName(room).fetch(request);
+    }
+    if(url.pathname==='/tri-ws'){
+      const room=String(url.searchParams.get('room')||'').toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);
+      if(!room)return new Response('Código de sala inválido.',{status:400});
+      return env.TRI_ROOMS.getByName(room).fetch(request);
     }
     return env.ASSETS.fetch(request);
   }
