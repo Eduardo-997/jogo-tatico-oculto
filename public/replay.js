@@ -1,0 +1,77 @@
+'use strict';
+(() => {
+  const clone=x=>{try{return structuredClone(x);}catch{return JSON.parse(JSON.stringify(x));}};
+  function parse(raw){return typeof raw==='string'?JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?v.__set:v):clone(raw);}
+  function replayPiece(p){return {id:p.id,owner:p.owner,name:p.name,identity:p.identity,hp:p.hp,coord:p.coord,alive:p.alive,activated:!!p.activated,form:p.form||null,copied:p.copied||null,summonType:p.summonType||null,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,possession:p.possession?{hostSide:p.possession.hostSide,hostId:p.possession.hostId}:null,possessedBy:p.possessedBy||null,effects:(p.effects||[]).map(e=>({id:e.id,name:e.name,remaining:e.remaining,kind:e.kind}))};}
+  function meaningful(s){
+    if(s?.pieces?.A||s?.pieces?.B||s?.pieces?.C){
+      return JSON.stringify({round:s.round,turn:s.turn,gameOver:s.gameOver,result:s.result,pieces:{A:(s.pieces?.A||[]).map(replayPiece),B:(s.pieces?.B||[]).map(replayPiece),C:(s.pieces?.C||[]).map(replayPiece)},bases:s.bases||[],corpses:s.corpses||[],mirrors:s.mirrors||[],trees:s.trees||[],traps:s.traps||{},history:s.history||{},eliminated:s.eliminated||{}});
+    }
+    return JSON.stringify({round:s.round,turn:s.turn,gameOver:s.gameOver,result:s.result,pieces:{player:(s.pieces?.player||[]).map(replayPiece),enemy:(s.pieces?.enemy||[]).map(replayPiece)},bases:s.bases||[],corpses:s.corpses||[],mirrors:s.mirrors||[],trees:s.trees||[],traps:s.traps||{},history:s.history||{}});
+  }
+  class Recorder{
+    constructor(exporter,opts={}){this.exporter=exporter;this.opts=opts;this.items=[];this.lastSig='';}
+    clear(){this.items=[];this.lastSig='';}
+    capture(label=''){
+      let state;try{state=parse(this.exporter());}catch{return false;}
+      const sig=meaningful(state);if(sig===this.lastSig)return false;this.lastSig=sig;
+      let auto=label;
+      if(!auto){
+        if(state?.history?.A)auto=state.history.A[0]||state.history.B?.[0]||state.history.C?.[0];
+        else auto=state.history?.player?.[0]||state.history?.enemy?.[0];
+      }
+      this.items.push({label:auto||`Rodada ${state.round||1}`,state,t:Date.now()});if(this.items.length>600)this.items.shift();return true;
+    }
+    frames(){return this.items.map(x=>({label:x.label,state:clone(x.state),t:x.t}));}
+    get length(){return this.items.length;}
+  }
+
+  function injectStyle(){if(document.getElementById('gameReplayStyle'))return;const st=document.createElement('style');st.id='gameReplayStyle';st.textContent=`
+  .replay-overlay{position:fixed;inset:0;z-index:9999;background:rgba(5,6,8,.94);display:flex;align-items:flex-start;justify-content:center;padding:22px;overflow:auto;color:#f3ead8;font-family:Inter,system-ui,"Segoe UI",Arial,sans-serif}
+  .replay-card{width:min(1080px,100%);background:#151515;border:1px solid #6c5738;border-radius:14px;padding:16px;box-shadow:0 20px 60px #000}
+  .replay-head,.replay-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}.replay-controls{justify-content:flex-start;margin:12px 0}
+  .replay-card button{color:#f3ead8;background:#1d1d1c;border:1px solid #66583f;border-radius:9px;padding:8px 11px;cursor:pointer}.replay-card button:hover{border-color:#c29b63}.replay-card input[type=range]{min-width:220px;flex:1}
+  .replay-grid{display:grid;grid-template-columns:minmax(440px,max-content) minmax(230px,1fr);gap:14px;align-items:start}.replay-board{display:grid;grid-template-columns:28px repeat(8,50px);gap:3px;width:max-content}.replay-axis{height:22px;display:flex;align-items:center;justify-content:center;color:#a99d8b;font-size:11px}.replay-rowaxis{height:50px}.replay-cell{width:50px;height:50px;border:1px solid #4d4438;border-radius:7px;background:#101214;display:flex;align-items:center;justify-content:center;position:relative;font-size:22px}.replay-cell.tree{background:#172019}.replay-cell .enemy{filter:drop-shadow(0 0 4px #d06666)}.replay-cell .player{filter:drop-shadow(0 0 4px #72aee6)}
+  .replay-arena-wrap{width:min(720px,72vw);min-width:540px}.replay-arena{width:100%;height:auto;display:block;background:#0d0f11;border:1px solid #423b31;border-radius:12px}.replay-arena-cell{stroke:#171717;stroke-width:2;vector-effect:non-scaling-stroke}.replay-arena-piece{font-size:25px;text-anchor:middle;dominant-baseline:middle}.replay-arena-hp{font-size:10px;fill:#fff;text-anchor:middle;paint-order:stroke;stroke:#000;stroke-width:3px}.replay-arena-marker{font-size:18px;text-anchor:middle;dominant-baseline:middle}.replay-arena-base{font-size:23px;text-anchor:middle;dominant-baseline:middle}.replay-arena .side-A{filter:drop-shadow(0 0 3px #78aef0)}.replay-arena .side-B{filter:drop-shadow(0 0 3px #f07878)}.replay-arena .side-C{filter:drop-shadow(0 0 3px #78c97c)}
+  .replay-mini{font-size:11px;position:absolute}.replay-corpse{left:2px;bottom:1px}.replay-mirror{right:2px;top:1px}.replay-trap{right:2px;bottom:1px}.replay-side{background:#0f1012;border:1px solid #423b31;border-radius:10px;padding:11px;max-height:680px;overflow:auto}.replay-side h3{margin:0 0 7px;font-size:13px;color:#d8bc8a}.replay-event{padding:6px 0;border-bottom:1px solid #302b25;font-size:12px}.replay-event:last-child{border:0}.replay-muted{color:#a99d8b;font-size:12px}.replay-label{font-weight:700;margin-top:5px}.replay-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#a99d8b;margin-top:8px}@media(max-width:820px){.replay-overlay{padding:8px}.replay-grid{grid-template-columns:1fr}.replay-board-wrap{overflow:auto}.replay-card input[type=range]{min-width:120px}.replay-arena-wrap{width:100%;min-width:520px}}
+  `;document.head.appendChild(st);}
+  function pieceIcon(p){
+    if(window.TriGame?.defOf&&['A','B','C'].includes(p?.owner)){try{return window.TriGame.defOf(p)?.icon||p.icon||'●';}catch{}}
+    const d=window.GameRules?.defOf?window.GameRules.defOf(p):null;return d?.icon||p?.icon||({Arqueiro:'🏹',Ninja:'🗡️',Piromante:'🔥',Kamikaze:'💣',Caçador:'🐾',Paranoia:'🧠',Escudeiro:'🛡️',Golem:'🗿','Golem de Lava':'🌋',Cavaleiro:'🐎',Slime:'🟢','Mini-Slime':'🟢',Zumbi:'🧟',Druida:'🌿','Galho-Vivo':'🌲',Vidente:'👁️','Mago do Espelho':'🔮',Necromante:'☠️',Esqueleto:'💀','Doppelgänger':'🎭',Sentinela:'🦉',Bardo:'🎵',Coringa:'🃏',Fantasma:'👻'}[p?.name]||'●');
+  }
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function classicEvents(s){return [...(s.history?.player||[]).slice(0,3).map(x=>'A: '+x),...(s.history?.enemy||[]).slice(0,3).map(x=>'B: '+x)];}
+  function arenaEvents(s){const out=[];for(const side of ['A','B','C'])for(const x of (s.history?.[side]||[]).slice(0,3))out.push(`${side}: ${x}`);return [...new Set(out)].slice(0,9);}
+  function drawClassic(board,s){
+    board.className='replay-board';board.removeAttribute('viewBox');board.innerHTML='<div></div>'+[...'ABCDEFGH'].map(x=>`<div class="replay-axis">${x}</div>`).join('');
+    const alive=new Map();for(const p of s.pieces?.player||[])if(p.alive&&p.coord)alive.set(p.coord,[...(alive.get(p.coord)||[]),{...p,side:'player'}]);for(const p of s.pieces?.enemy||[])if(p.alive&&p.coord)alive.set(p.coord,[...(alive.get(p.coord)||[]),{...p,side:'enemy'}]);
+    const trees=new Map((s.trees||[]).map(t=>[t.coord,t]));const bases=new Map((s.bases||[]).map(b=>[b.coord,b]));const corpses=new Set((s.corpses||[]).map(c=>c.coord));const mirrors=new Set((s.mirrors||[]).map(m=>m.coord));const traps=new Set([...(s.traps?.player||[]),...(s.traps?.enemy||[])].map(t=>t.coord));
+    for(let r=1;r<=8;r++){const ax=document.createElement('div');ax.className='replay-axis replay-rowaxis';ax.textContent=r;board.appendChild(ax);for(const col of 'ABCDEFGH'){const c=col+r,el=document.createElement('div');el.className='replay-cell'+(trees.has(c)?' tree':'');const ps=alive.get(c)||[];if(ps.length)el.innerHTML=ps.map(p=>`<span class="${p.side}" title="${esc(p.name)} · V${p.hp}">${pieceIcon(p)}</span>`).join('');else if(bases.has(c)){const b=bases.get(c);el.innerHTML=`<span class="${b.owner==='player'?'player':'enemy'}" title="Posto do Lado ${b.owner==='player'?'A':'B'}${b.sabotaged?' · sabotado':''}">${b.sabotaged?'🏚️':'🏰'}</span>`;}else if(trees.has(c))el.textContent=trees.get(c).state==='dead'?'🪵':'🌳';if(corpses.has(c))el.insertAdjacentHTML('beforeend','<span class="replay-mini replay-corpse">☠</span>');if(mirrors.has(c))el.insertAdjacentHTML('beforeend','<span class="replay-mini replay-mirror">🪞</span>');if(traps.has(c))el.insertAdjacentHTML('beforeend','<span class="replay-mini replay-trap">🕳️</span>');board.appendChild(el);}}
+  }
+  function svgEl(tag,attrs={}){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));return e;}
+  function drawArena(board,s){
+    const map=window.TRI_MAP;if(!map?.cells?.length){board.outerHTML='<div class="replay-muted">Mapa da Arena indisponível.</div>';return;}
+    board.setAttribute('class','replay-arena');board.setAttribute('viewBox','-405 -355 810 710');board.innerHTML='';
+    const outer=[];const rr=370;for(const d of [0,60,120,180,240,300]){const a=d*Math.PI/180;outer.push([rr*Math.cos(a),-rr*Math.sin(a)].join(','));}board.appendChild(svgEl('polygon',{points:outer.join(' '),fill:'#4e3524',stroke:'#b39764','stroke-width':12,'stroke-linejoin':'round'}));
+    const fill={A:['#263f69','#315e9e'],B:['#672d2d','#983d3d'],C:['#315d34','#447f46']};for(const c of map.cells)board.appendChild(svgEl('polygon',{points:c.poly.map(p=>p.join(',')).join(' '),fill:fill[c.owner]?.[c.home?1:0]||'#222',class:'replay-arena-cell'}));
+    const byCoord=new Map();for(const side of ['A','B','C'])for(const p of s.pieces?.[side]||[])if(p.alive&&p.coord)byCoord.set(p.coord,[...(byCoord.get(p.coord)||[]),{...p,owner:p.owner||side}]);
+    const centroid=id=>map.cells.find(c=>c.id===id)?.centroid||[0,0];
+    for(const t of s.trees||[]){const [x,y]=centroid(t.coord),el=svgEl('text',{x,y:y+1,class:'replay-arena-marker'});el.textContent=t.state==='dead'?'🪵':'🌳';board.appendChild(el);}
+    for(const b of s.bases||[]){if(b.disabled)continue;const [x,y]=centroid(b.coord),el=svgEl('text',{x,y,class:`replay-arena-base side-${b.owner}`});el.textContent=b.sabotaged?'🏚️':'🏰';const ti=svgEl('title');ti.textContent=`Posto do Jogador ${b.owner}${b.sabotaged?' · sabotado':''}`;el.appendChild(ti);board.appendChild(el);}
+    for(const c of s.corpses||[]){const [x,y]=centroid(c.coord),el=svgEl('text',{x:x-13,y:y+13,class:'replay-arena-marker'});el.textContent='☠';board.appendChild(el);}
+    for(const m of s.mirrors||[]){const [x,y]=centroid(m.coord),el=svgEl('text',{x:x+13,y:y-13,class:`replay-arena-marker side-${m.owner||''}`});el.textContent='🪞';board.appendChild(el);}
+    for(const side of ['A','B','C'])for(const t of s.traps?.[side]||[]){const [x,y]=centroid(t.coord),el=svgEl('text',{x:x+13,y:y+13,class:`replay-arena-marker side-${side}`});el.textContent=t.kind==='spot'?'🦉':'🕳️';const ti=svgEl('title');ti.textContent=`Armadilha do Jogador ${side}`;el.appendChild(ti);board.appendChild(el);}
+    for(const [coord,ps] of byCoord){const [cx,cy]=centroid(coord);ps.forEach((p,i)=>{const dx=ps.length>1?(i===0?-9:9):0;const icon=svgEl('text',{x:cx+dx,y:cy-2,class:`replay-arena-piece side-${p.owner}`});icon.textContent=pieceIcon(p);const ti=svgEl('title');ti.textContent=`Jogador ${p.owner} · ${p.name} · V${p.hp}`;icon.appendChild(ti);board.appendChild(icon);const hp=svgEl('text',{x:cx+dx,y:cy+17,class:'replay-arena-hp'});hp.textContent=`${p.hp}`;board.appendChild(hp);});}
+  }
+  function normalizeFrames(frames){return (frames||[]).map(f=>({...f,state:parse(f.state)}));}
+  function open(rawFrames,opts={}){
+    const frames=normalizeFrames(rawFrames);if(!frames.length)return false;injectStyle();document.querySelector('.replay-overlay')?.remove();
+    const arena=opts.kind==='arena'||!!(frames[0]?.state?.pieces?.A||frames[0]?.state?.pieces?.B||frames[0]?.state?.pieces?.C);let idx=frames.length-1,timer=null;
+    const ov=document.createElement('div');ov.className='replay-overlay';ov.innerHTML=`<div class="replay-card"><div class="replay-head"><div><b>🎞️ ${esc(opts.title||'Replay da partida')}</b><div class="replay-muted">Replay disponível somente após o encerramento e mostrando o estado real completo da partida.</div></div><button data-close>Fechar</button></div><div class="replay-controls"><button data-prev>◀</button><button data-play>▶ Reproduzir</button><button data-next>▶</button><input data-range type="range" min="0" max="${frames.length-1}" value="${idx}"><span data-count></span></div><div data-label class="replay-label"></div><div data-meta class="replay-muted"></div><div class="replay-grid"><div class="replay-board-wrap ${arena?'replay-arena-wrap':''}">${arena?'<svg data-board class="replay-arena"></svg>':'<div data-board class="replay-board"></div>'}<div class="replay-legend">${arena?'<span>🔵 Jogador A</span><span>🔴 Jogador B</span><span>🟢 Jogador C</span>':'<span>🔵 Lado A</span><span>🔴 Lado B</span>'}<span>🏰 Posto</span><span>🌳 terreno</span><span>☠ cadáver</span><span>🪞 espelho</span><span>🕳️ armadilha</span></div></div><div class="replay-side"><h3>Acontecimentos registrados</h3><div data-events></div></div></div></div>`;document.body.appendChild(ov);
+    const board=ov.querySelector('[data-board]'),range=ov.querySelector('[data-range]'),count=ov.querySelector('[data-count]'),label=ov.querySelector('[data-label]'),meta=ov.querySelector('[data-meta]'),events=ov.querySelector('[data-events]'),play=ov.querySelector('[data-play]');
+    function stop(){if(timer){clearInterval(timer);timer=null;}play.textContent='▶ Reproduzir';}
+    function draw(){const f=frames[idx],s=f.state;range.value=idx;count.textContent=`${idx+1}/${frames.length}`;label.textContent=f.label||'Estado da partida';const active=arena?(s.turn?` · turno: Jogador ${s.turn}`:''):(s.turn?` · lado ativo: ${s.turn==='player'?'A':s.turn==='enemy'?'B':s.turn}`:'');meta.textContent=`Rodada ${s.round||1}${active}${s.gameOver?' · partida encerrada':''}`;try{if(arena)drawArena(board,s);else drawClassic(board,s);}catch(err){console.error('Falha ao desenhar quadro do Replay',err);board.innerHTML='';const msg=arena?svgEl('text',{x:0,y:0,fill:'#f0c9a6','text-anchor':'middle'}):document.createElement('div');msg.textContent='Não foi possível desenhar este quadro do Replay.';if(arena)board.appendChild(msg);else board.appendChild(msg);}const hs=arena?arenaEvents(s):classicEvents(s);events.innerHTML=hs.length?hs.map(x=>`<div class="replay-event">${esc(x)}</div>`).join(''):'<div class="replay-muted">Sem evento registrado neste quadro.</div>';}
+    ov.querySelector('[data-close]').onclick=()=>{stop();ov.remove();};ov.querySelector('[data-prev]').onclick=()=>{stop();idx=Math.max(0,idx-1);draw();};ov.querySelector('[data-next]').onclick=()=>{stop();idx=Math.min(frames.length-1,idx+1);draw();};range.oninput=()=>{stop();idx=Number(range.value)||0;draw();};play.onclick=()=>{if(timer){stop();return;}if(idx>=frames.length-1)idx=0;play.textContent='⏸ Pausar';draw();timer=setInterval(()=>{if(idx>=frames.length-1){stop();return;}idx++;draw();},750);};draw();return true;
+  }
+  window.GameReplay={Recorder,open,parse};
+})();

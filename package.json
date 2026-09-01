@@ -1,7 +1,7 @@
 {
-  "name": "jogo-tatico-oculto",
+  "name": "batalha-nas-sombras",
   "private": true,
-  "version": "1.14.0",
+  "version": "1.15.16",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"

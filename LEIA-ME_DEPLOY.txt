@@ -1,56 +1,9 @@
-JOGO TÁTICO OCULTO — v1.14 EXPERIMENTAL
-ARENA 1x1x1 · 2 HUMANOS + 1 IA
+BATALHA NAS SOMBRAS v1.15.16 — GIT + CLOUDFLARE
 
-TESTE LOCAL
-- Abra public/triplayer.html para testar 1 humano + 2 IAs sem servidor.
-- O modo 2 humanos + 1 IA precisa estar publicado, pois usa WebSocket + Durable Object.
+1. Substitua no repositório os arquivos do jogo pelos deste pacote.
+2. Mantenha a estrutura public/, src/, package.json e wrangler.jsonc.
+3. Faça commit/push normalmente.
+4. Aguarde o deploy do Cloudflare concluir.
+5. Reabra/atualize a página do Clássico Online no PC e celular.
 
-DEPLOY CLOUDFLARE
-1. Use este pacote em um repositório/projeto separado para preservar o jogo atualmente publicado.
-2. Envie o conteúdo desta pasta para a raiz do repositório.
-3. Build command: deixe vazio.
-4. Deploy command: npx wrangler deploy
-5. Root directory: /
-
-O wrangler.jsonc desta versão usa o projeto:
-  jogo-tatico-oculto-v1-14-experimental
-
-e cria/usa:
-- GAME_ROOMS / GameRoom        = X1 tradicional
-- TRI_ROOMS / TriGameRoom      = Arena 1x1x1
-
-COMO TESTAR COM UM AMIGO + IA
-1. Depois do deploy, os dois abrem /triplayer.html no mesmo site.
-2. Os dois escolhem "2 jogadores + 1 IA".
-3. Digitem EXATAMENTE o mesmo código de sala.
-4. Quem entrar primeiro recebe Jogador A; o segundo recebe Jogador B; C é IA.
-5. Cada humano escolhe 4 personagens, posiciona 2 Postos e clica Pronto.
-6. Quando A e B estiverem prontos, a Arena começa em A → B → C.
-
-v1.14 — PRINCIPAIS MUDANÇAS DA ARENA
-- 20 personagens disponíveis.
-- AH (Alcance de Habilidade) visível na ficha.
-- Canalização (+1 AH) como bônus de Posto.
-- 3 árvores simétricas na Arena: uma região equivalente para cada jogador.
-- Zumbi, Paranoia, Druida/Galho-Vivo, Sentinela, Caçador, Bardo e Fantasma.
-- Armadilhas e informações ocultas permanecem no Árbitro; não são enviadas ao adversário.
-- Padronização visual/textual para "turno" em vez de "ativação" onde aplicado na Arena.
-
-VALIDAÇÕES AUTOMÁTICAS DESTA BUILD
-- sintaxe dos módulos e Worker;
-- 96 casas / 24 casas de preparação por jogador;
-- 20 personagens e valores de AH;
-- AH2 alcançando diagonal por 2 passos normais;
-- sala online com dois humanos A/B + IA C;
-- visão inicial sem coordenadas ocultas dos adversários;
-- dano de armadilha antes do Confronto Direto;
-- Sentinela revelando até o início do próximo turno da peça;
-- Bardo e expiração do buff;
-- Fantasma: possessão, perda de localização e recuperação;
-- Zumbi: primeira queda sem contar eliminação e retorno;
-- Druida/Galho-Vivo e árvore morta;
-- Paranoia com até 2 alvos;
-- Kamikaze expandindo explosão com AH;
-- smoke test da IA.
-
-Esta é uma build EXPERIMENTAL para playtest. Balanceamento dos personagens novos ainda deve ser ajustado conforme partidas reais.
+IMPORTANTE: esta versão altera `src/worker.js` para sincronizar as regras do Clássico Online. O nome/bindings do Worker em wrangler.jsonc NÃO foram alterados.

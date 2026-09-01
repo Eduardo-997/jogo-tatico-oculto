@@ -5,12 +5,14 @@
   const player=referee.createClient('player');
   const ai=referee.createClient('enemy');
   const aiWorker=window.createGameAiWorker();
+  const replay=window.GameReplay?new window.GameReplay.Recorder(()=>referee.exportState(),{kind:'classic'}):null;
   let aiReq=0,aiScheduled=false,aiLastResult=null;
 
   const $=s=>document.querySelector(s);
   const roster=$('#roster'),board=$('#board'),historyEl=$('#history'),intelEl=$('#intel'),statusEl=$('#status'),availableEl=$('#available');
+  const Presentation=window.BattlePresentation||{battleEvents:a=>a||[],showEndScreen:()=>{},hideEndScreen:()=>{}};
   const roundEl=$('#round'),countEl=$('#count'),myDeathsEl=$('#myDeaths'),enemyDeathsEl=$('#enemyDeaths'),phaseEl=$('#phase');
-  const startBtn=$('#start'),resetBtn=$('#reset'),moveBtn=$('#move'),stopBtn=$('#stop'),attackBtn=$('#attack'),abilityBtn=$('#ability'),endBtn=$('#end'),cancelBtn=$('#cancel');
+  const startBtn=$('#start'),resetBtn=$('#reset'),moveBtn=$('#move'),stopBtn=$('#stop'),attackBtn=$('#attack'),abilityBtn=$('#ability'),endBtn=$('#end'),cancelBtn=$('#cancel'),replayBtn=$('#replayBtn');
   const seerConfirm=$('#seerConfirm'),confirmSeerBtn=$('#confirmSeer'),cancelSeerBtn=$('#cancelSeer');
   const pyroConfirm=$('#pyroConfirm'),confirmPyroBtn=$('#confirmPyro'),cancelPyroBtn=$('#cancelPyro');
   const stackChoice=$('#stackChoice'),stackButtons=$('#stackButtons');
@@ -29,28 +31,28 @@
   let rosterCollapsed=false,inspectedPieceId=null,rosterFilter='all',aiDifficulty='normal';
   let status='Inspecione os personagens e marque ☐ Selecionar para montar a equipe.';
   const ABILITY_TEXT={
-    "Arqueiro":"Pode atacar qualquer casa do mapa. O alcance global é sua característica.",
-    "Ninja":"Especialista em mobilidade e alcance: M2 e ALC2.",
-    "Piromante":"Escolhe 1 ou 2 casas dentro do seu AH e resolve os dois ataques na mesma ação.",
-    "Kamikaze":"Ao morrer, causa 1 de dano em toda a área do seu AH, inclusive aliados. Aumentar AH expande a explosão para a camada seguinte.",
-    "Caçador":"Coloca 1 armadilha oculta dentro do AH. Quando um inimigo entra na casa, sofre 1 de dano antes de qualquer Confronto Direto. Colocar outra substitui a anterior.",
-    "Paranoia":"Quando detecta inimigos pela própria PER, afeta até 2 deles. Após o alvo se mover, por 2 turnos sua percepção sempre acusa uma presença, verdadeira ou falsa.",
-    "Escudeiro":"Pode compartilhar casa com 1 aliado, intercepta ataques e dano em área e esconde a presença do aliado protegido.",
-    "Golem":"Ao sofrer o primeiro dano e sobreviver, vira Golem de Lava: perde 1 Movimento e ganha 1 Ataque. Mantém bônus.",
-    "Cavaleiro":"Não possui habilidade adicional; compensa com M3 e ataque normal.",
-    "Slime":"Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem morrer; os Minis herdam seus bônus.",
-    "Zumbi":"Na primeira morte não conta como eliminação. Levanta-se na rodada seguinte com 1 Vida e, depois de 3 turnos próprios, cai definitivamente. Se morrer antes, a eliminação é imediata.",
-    "Druida":"Pode entrar em árvores vivas e não é detectado por PER enquanto estiver nelas. Desperta uma árvore dentro do AH como Galho-Vivo. Druida e Galho-Vivo compartilham o turno; se o Druida morrer, o Galho volta a ser árvore normal.",
-    "Vidente":"Escolhe uma casa principal dentro do AH + 3 casas que toquem a principal por lado ou diagonal e revela as 4.",
-    "Mago do Espelho":"Cria 1 Espelho dentro do AH. A distância usa passos ortogonais: AH2 alcança também uma diagonal. O Espelho gera falsa presença e reflete o primeiro ataque; criar outro substitui o anterior.",
-    "Necromante":"Ergue um Esqueleto usando um cadáver dentro do AH. Limite de 1 Esqueleto vivo por Necromante.",
-    "Doppelgänger":"Ao passar por um cadáver, copia sua habilidade. Habilidades ativas copiadas usam o AH do próprio Doppelgänger.",
-    "Sentinela":"Mantém até 2 armadilhas ocultas dentro do AH. Um inimigo que entra numa delas é revelado até o início do próximo turno daquela peça.",
-    "Bardo":"Escolhe 1 aliado dentro do AH e concede +1 ATQ, ALC, M ou Vida. Só mantém 1 aliado inspirado; o bônus dura até o fim do próximo turno do Bardo.",
-    "Coringa":"Possui todos os arquétipos no Confronto Direto e pode mover também pelas diagonais.",
-    "Fantasma":"Ataques e Confrontos Diretos vencidos possuem o inimigo em vez de causar dano. Você passa a controlar a peça e o antigo dono perde sua localização. Ao sofrer dano, o Fantasma morre e a peça é recuperada."
+    "Arqueiro":"Pode atacar qualquer casa do tabuleiro. O alcance global é sua principal característica.",
+    "Ninja":"Especialista em mobilidade e alcance: M2 e ALC2. Não possui habilidade ativa.",
+    "Piromante":"Escolhe 1 ou 2 casas dentro do Alc. Hab. e resolve os dois ataques na mesma ação.",
+    "Kamikaze":"Ao morrer, causa 1 de dano em toda a área do Alc. Hab., inclusive em aliados. Aumentar o Alc. Hab. expande a explosão.",
+    "Caçador":"Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Quando um inimigo entra na casa, sofre 1 de dano antes de qualquer Confronto Direto. Colocar outra armadilha substitui a anterior.",
+    "Paranoia":"Ao detectar inimigos com a própria PER, afeta até 2 alvos. Depois que um alvo se move, por 2 turnos a percepção dele sempre acusa uma presença, verdadeira ou falsa.",
+    "Escudeiro":"Pode compartilhar casa com 1 aliado, intercepta ataques e dano em área para protegê-lo e esconde a presença do aliado enquanto dividem a casa.",
+    "Golem":"Ao sofrer o primeiro dano e sobreviver, vira Golem de Lava: perde 1 de Movimento e ganha 1 de Ataque. Mantém os bônus recebidos.",
+    "Cavaleiro":"Não possui habilidade ativa; compensa com M3 e ataque normal.",
+    "Slime":"Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem morrer; os Mini-Slimes herdam seus bônus.",
+    "Zumbi":"Na primeira morte, não conta como eliminação. Levanta-se na rodada seguinte com 1 de Vida e, depois de 3 turnos próprios, cai definitivamente. Se morrer antes disso, a eliminação é imediata.",
+    "Druida":"Pode entrar em árvores vivas e não é detectado por PER enquanto estiver nelas. Desperta uma árvore dentro do Alc. Hab. como Galho-Vivo. Druida e Galho-Vivo compartilham a ativação; se o Druida morrer, o Galho-Vivo volta a ser uma árvore normal.",
+    "Vidente":"Escolhe 1 casa principal dentro do Alc. Hab. e mais 3 casas adjacentes a ela por lado ou diagonal, revelando as 4.",
+    "Mago do Espelho":"Cria 1 Espelho dentro do Alc. Hab. A distância é medida em passos ortogonais; com Alc. Hab. 2, uma casa diagonal também fica ao alcance. O Espelho gera falsa presença e reflete o primeiro ataque; criar outro substitui o anterior.",
+    "Necromante":"Ergue um Esqueleto usando um cadáver dentro do Alc. Hab. Limite de 1 Esqueleto vivo por Necromante.",
+    "Doppelgänger":"Ao passar por um cadáver, copia sua habilidade. Habilidades ativas copiadas usam o Alc. Hab. do próprio Doppelgänger; ao encontrar outra, escolhe manter a atual ou trocar.",
+    "Sentinela":"Mantém até 2 armadilhas ocultas dentro do Alc. Hab. Um inimigo que entra em uma delas fica com a posição revelada até o início do próximo turno daquela peça.",
+    "Bardo":"Escolhe 1 aliado dentro do Alc. Hab. e concede +1 ATQ, ALC, Alc. Hab., M ou Vida. Mantém apenas 1 aliado inspirado; o bônus dura até o fim do próximo turno do Bardo.",
+    "Coringa":"Possui todos os arquétipos no Confronto Direto e também pode se mover pelas diagonais.",
+    "Fantasma":"Ataques e Confrontos Diretos vencidos possuem o inimigo em vez de causar dano. Você passa a controlar a peça e o antigo dono perde sua localização. Se o Fantasma sofrer dano, ele morre e a peça é recuperada."
   };
-  const SCENERY_CELLS=new Set(['C3','F6']); // árvores antigas espelhadas: terreno bloqueante
+  const SCENERY_CELLS=new Set(['C3','F6']); // árvores fixas: terreno bloqueante
   const setStatus=t=>{status=t;statusEl.textContent=t;};
   let previousFxView=null,pendingActionFx=[];
   const FX_MS=760;
@@ -133,7 +135,7 @@
     if(p.bonusM)tags.push(`👟 +${p.bonusM} M`);
     if(p.bonusV)tags.push(`❤️ +${p.bonusV} V`);
     if(p.bonusA)tags.push(`⚔️ +${p.bonusA} ATQ`);
-    if(p.bonusRange)tags.push(`🎯 +${p.bonusRange} ALC`);if(p.bonusAH)tags.push(`✨ +${p.bonusAH} AH`);
+    if(p.bonusRange)tags.push(`🎯 +${p.bonusRange} ALC`);if(p.bonusAH)tags.push(`✨ +${p.bonusAH} Alc. Hab.`);
     if(p.radarAdvanced)tags.push('📡 Radar Avançado');
     if(p.radarExpanded)tags.push('📶 Radar Ampliado');
     return tags;
@@ -141,7 +143,7 @@
   function showDefinitionInfo(d){
     if(!d)return;inspectedPieceId=null;
     const alc=d.range===99?'∞':d.range;
-    const html=`<div class="setup-definition"><div class="piece-info-grid"><div class="info-pill">❤️ Vida: <b>${d.v}</b></div><div class="info-pill">👣 Movimento: <b>${d.m}</b></div><div class="info-pill">⚔️ Ataque: <b>${d.a}</b></div><div class="info-pill">🎯 Alcance: <b>${alc}</b></div><div class="info-pill">👁️ Percepção: <b>PER ${d.per}</b></div><div class="info-pill">✨ Habilidade: <b>AH ${d.ah||0}</b></div><div class="info-pill">Arquétipo: <b>${d.typeIcon} ${d.type}</b></div></div><div class="ability-box"><b>Habilidade / característica</b><br>${ABILITY_TEXT[d.name]||'Sem descrição adicional.'}</div></div>`;
+    const html=`<div class="setup-definition"><div class="piece-info-grid"><div class="info-pill">❤️ Vida: <b>${d.v}</b></div><div class="info-pill">👣 Movimento: <b>${d.m}</b></div><div class="info-pill">⚔️ Ataque: <b>${d.a}</b></div><div class="info-pill">🎯 Alcance: <b>${alc}</b></div><div class="info-pill">👁️ Percepção: <b>PER ${d.per}</b></div><div class="info-pill">✨ Alc. Hab.: <b>${d.ah||0}</b></div><div class="info-pill">Arquétipo: <b>${d.typeIcon} ${R.archetypeName(d.type)}</b></div></div><div class="ability-box"><b>Habilidade / característica</b><br>${ABILITY_TEXT[d.name]||'Sem descrição adicional.'}</div></div>`;
     if(setupInspector){setupInspectorTitle.textContent=`${d.icon} ${d.name}`;setupInspectorBody.innerHTML=html;setupInspector.classList.remove('hidden');}
   }
   function showPieceInfo(v,p,enemy=false){
@@ -160,8 +162,8 @@
         <div class="info-pill">Movimento: <b>${p.m}</b></div>
         <div class="info-pill">Ataque: <b>${p.a}</b></div>
         <div class="info-pill">Alcance: <b>${p.range}</b></div>
-        <div class="info-pill">Percepção: <b>PER ${p.per}</b></div><div class="info-pill">Alc. habilidade: <b>AH ${p.ah||0}</b></div>
-        <div class="info-pill">Arquétipo: <b>${p.typeIcon||''} ${p.type}</b></div>
+        <div class="info-pill">Percepção: <b>PER ${p.per}</b></div><div class="info-pill">Alc. Hab.: <b>${p.ah||0}</b></div>
+        <div class="info-pill">Arquétipo: <b>${p.typeIcon||''} ${R.archetypeName(p.type)}</b></div>
         <div class="info-pill">${kind}</div>
         ${copied}${cd}${lineage}
       </div>
@@ -197,7 +199,7 @@
       const label=baseTargetArea.querySelector('.small.muted');if(label)label.textContent=`Escolha quem recebe ${bonus.icon} ${bonus.name}:`;
       let targets=v.ownPieces.filter(p=>p.alive);
       if(bonus.id==='range')targets=targets.filter(p=>p.a>0);if(bonus.id==='abilityRange')targets=targets.filter(p=>(p.ah||0)>0);
-      for(const t of targets){const b=document.createElement('button');b.type='button';b.className='target-btn';b.innerHTML=`<b>${t.icon} ${t.displayName}${t.original?'':' <span class="muted">(invocação)</span>'}</b><span>V${t.hp}/${t.maxHp} · M${t.m} · ATQ${t.a} · ALC${t.range} · PER${t.per} · AH${t.ah||0}</span>`;b.addEventListener('click',()=>{const r=player.sabotageBase(base.id,bonus.id,t.id);setStatus(r.status);closeBasePanel();afterMutation();});baseTargetGrid.appendChild(b);}
+      for(const t of targets){const b=document.createElement('button');b.type='button';b.className='target-btn';b.innerHTML=`<b>${t.icon} ${t.displayName}${t.original?'':' <span class="muted">(invocação)</span>'}</b><span>V${t.hp}/${t.maxHp} · M${t.m} · ATQ${t.a} · ALC${t.range} · PER${t.per} · Alc. Hab. ${t.ah||0}</span>`;b.addEventListener('click',()=>{const r=player.sabotageBase(base.id,bonus.id,t.id);setStatus(r.status);closeBasePanel();afterMutation();});baseTargetGrid.appendChild(b);}
       baseTargetArea.classList.remove('hidden');setStatus(`Escolha qual personagem recebe ${bonus.icon} ${bonus.name}.`);return;
     }
     const r=player.sabotageBase(base.id,bonus.id,null);setStatus(r.status);closeBasePanel();afterMutation();
@@ -297,7 +299,7 @@
         if(seer.has(c)){const m=document.createElement('span');m.className='marker eye';m.textContent='👁️';b.appendChild(m);}
         if(seerPreview.has(c)){const m=document.createElement('span');m.className='marker previewmark';m.textContent='◉';b.appendChild(m);}
         if(corpseAt(v,c)){const m=document.createElement('span');m.className='marker corpse';m.textContent='☠️';b.appendChild(m);}
-        if(ownMirrorAt(v,c)){const m=document.createElement('span');m.className='marker mirror';m.textContent='🪞';b.appendChild(m);}for(const t of v.ownTraps||[])if(t.coord===c){const m=document.createElement('span');m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🪤';m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';b.appendChild(m);}
+        if(ownMirrorAt(v,c)){const m=document.createElement('span');m.className='marker mirror';m.textContent='🪞';b.appendChild(m);}for(const t of v.ownTraps||[])if(t.coord===c){const m=document.createElement('span');m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🕳️';m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';b.appendChild(m);}
         const base=baseAt(v,c);if(base){const m=document.createElement('span');m.className='base-icon'+(base.sabotaged?' base-dead':'');m.textContent='🏰';b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=base.owner==='player'?'SEU':'IA';b.appendChild(lab);}
         const group=ownGroups.get(c)||[];
         if(group.length){
@@ -306,17 +308,18 @@
           if(ordered[1]){const s2=document.createElement('span');s2.className=`stack-second${ordered[1].activated?' spent-stack':''}`;s2.textContent=ordered[1].icon;b.appendChild(s2);}
         }
         const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}
-        if(v.impactCell===c){const m=document.createElement('span');m.className='marker impact';m.textContent='💥';b.appendChild(m);}
+        if(v.impactCell===c){const m=document.createElement('span');m.className='marker impact';m.textContent='💥';b.appendChild(m);}if((v.combatCells||[]).includes(c)){const m=document.createElement('span');m.className='marker combat-mark';m.textContent='⚔️';m.title='Confronto Direto ocorreu aqui';b.appendChild(m);}
         for(const h of v.perceptionHints||[])if(h.coord===c){const m=document.createElement('span');m.className=`presence-hint ${h.kind||'orth'}`;m.textContent=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';m.title=h.kind==='exact'?'Presença detectada nesta casa':h.kind==='diag'?'Possível presença diagonal':'Possível presença ortogonal';b.appendChild(m);}
       }
       const p=activePiece(v),a=v.activation;
       if(p&&v.turn==='player'&&!v.pendingCombat&&!seerPreview.size){
         if(a.mode==='move'&&a.moveRemaining>0&&R.neighbors(p.coord,p.diag).includes(c)&&canShareUi(v,p,c))b.classList.add('highlight');
         if(a.mode==='attack'&&R.attackCells(p).includes(c)&&!baseAt(v,c))b.classList.add('attack-highlight');
-        if(a.mode==='pyro'&&R.abilityCells(p).includes(c)&&!baseAt(v,c))b.classList.add('attack-highlight');
-        if(a.mode==='raise'&&R.abilityCells(p).includes(c)&&corpseAt(v,c)&&!ownAtAll(v,c).length)b.classList.add('highlight');
-        if(a.mode==='seer'){if(!seerPreview.size&&R.man(p.coord,c)<=p.ah)b.classList.add('highlight');else{const main=[...seerPreview][0];if(c===main||R.neighbors(main,true).includes(c))b.classList.add('highlight');}}
-        if(a.mode==='mirror'&&safeMirrorCells(v,p).includes(c))b.classList.add('highlight');if(a.mode==='awaken'&&R.abilityCells(p).includes(c)&&(v.trees||[]).some(t=>t.coord===c&&t.state==='live'))b.classList.add('highlight');if((a.mode==='spotTrap'||a.mode==='damageTrap')&&R.abilityCells(p).includes(c)&&!(v.trees||[]).some(t=>t.coord===c)&&!baseAt(v,c))b.classList.add('highlight');if(a.mode==='bard'&&ownAlive(v).some(x=>x.id!==p.id&&x.coord===c&&R.man(p.coord,c)<=p.ah))b.classList.add('highlight');
+        if(a.mode==='pyro'&&R.abilityCells(p).includes(c))b.classList.add('attack-highlight');
+        // Ao entrar em qualquer habilidade, o tabuleiro mostra o Alc. Hab. completo da peça.
+        // A validação de cadáver/árvore/aliado/casa vazia continua pertencendo ao Árbitro.
+        if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(a.mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');
+        if(a.mode==='seer'){if(!seerPreview.size&&R.abilityCells(p).includes(c))b.classList.add('highlight');else{const main=[...seerPreview][0];if(c===main||R.neighbors(main,true).includes(c))b.classList.add('highlight');}}
       }
     }
   }
@@ -326,7 +329,7 @@
     countEl.textContent=`${v.phase==='setup'?selected.length:v.ownPieces.filter(p=>p.original).length}/4`;
     myDeathsEl.textContent=`${v.ownOriginalDeaths}/3`;enemyDeathsEl.textContent=`${v.enemyOriginalDeaths}/3`;roundEl.textContent=v.phase==='play'?v.round:'—';
     phaseEl.textContent=v.phase==='setup'?'Posicionamento':v.gameOver?'Encerrada':v.turn==='enemy'?'Vez da IA':'Sua vez';
-    renderRoster(v);renderAvailable(v);renderList(historyEl,v.history,'Nenhum acontecimento.');renderList(intelEl,v.intel,'Nenhuma informação.');
+    renderRoster(v);renderAvailable(v);renderList(historyEl,Presentation.battleEvents(v.history),'Nenhum evento importante recente.');
     setupBasesEl.classList.toggle('hidden',v.phase!=='setup');if(setupInspector)setupInspector.classList.toggle('hidden',v.phase!=='setup'||!setupInspectorBody.innerHTML);baseSetupStatus.textContent=`${setupBasePos.size}/2 posicionados`;base1Btn.classList.toggle('selected',setupBaseSelected===1);base2Btn.classList.toggle('selected',setupBaseSelected===2);
     startBtn.classList.toggle('hidden',v.phase!=='setup');if(aiDifficultyEl){aiDifficultyEl.disabled=v.phase!=='setup';aiDifficultyEl.closest('.ai-difficulty')?.classList.toggle('hidden',v.phase!=='setup');}
     readyStatus.classList.toggle('hidden',v.phase!=='setup');
@@ -342,8 +345,9 @@
     advanceCombatBtn.disabled=v.pendingCombat?.canAdvance===false;
     advanceCombatBtn.textContent=v.pendingCombat?.canAdvance===false?'Posição ocupada':'Posição da derrotada';
     pyroConfirm.classList.toggle('hidden',v.activation?.mode!=='pyro');
-    if(v.gameOver){setStatus(v.result==='player'?'Você venceu.':v.result==='enemy'?'Você perdeu.':'Empate.');}
-    else if(v.turn==='enemy'&&!v.pendingCombat)statusEl.textContent='🤖 Vez da IA...'; else statusEl.textContent=status;
+    if(v.gameOver){setStatus(v.result==='player'?'Você venceu.':v.result==='enemy'?'Você perdeu.':'Empate.');const win=v.result==='player',draw=v.result==='draw';Presentation.showEndScreen({key:`classic:${v.result}:${v.round}`,mode:'classic',result:v.result,icon:draw?'⚖️':win?'🏆':'☠️',title:draw?'EMPATE':win?'VITÓRIA':'DERROTA',tone:draw?'draw':win?'victory':'defeat',reason:draw?'As duas equipes chegaram ao limite de perdas na mesma resolução.':win?'Você eliminou 3 das 4 peças originais do adversário.':'O adversário eliminou 3 das suas 4 peças originais.',round:v.round,summary:[{label:'Suas perdas',value:`${v.ownOriginalDeaths}/3`},{label:'Perdas inimigas',value:`${v.enemyOriginalDeaths}/3`},{label:'Rodadas disputadas',value:v.round}],onReplay:replay&&replay.length>1?()=>window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'}):null});}
+    else {Presentation.hideEndScreen();if(v.turn==='enemy'&&!v.pendingCombat)statusEl.textContent='🤖 Vez da IA...'; else statusEl.textContent=status;}
+    if(replayBtn)replayBtn.classList.toggle('hidden',!(v.gameOver&&replay&&replay.length>1));
     return v;
   }
 
@@ -354,11 +358,11 @@
       selected=selected.filter(n=>n!==d.name);
       for(const[k,val]of setupPos)if(val===d.name)setupPos.delete(k);
       if(setupSelected===d.name)setupSelected=null;
-      setupBaseSelected=null;setStatus(`${d.name} removido do time.`);render();return;
+      setupBaseSelected=null;setStatus(`${d.name} removido da equipe.`);render();return;
     }
     if(selected.length>=4){setStatus('Você já escolheu 4 personagens. Desmarque um antes de escolher outro.');render();return;}
     selected.push(d.name);setupSelected=null;setupBaseSelected=null;const c=autoPlacePiece(d.name);
-    setStatus(c?`${d.name} selecionado e colocado automaticamente em ${c}. Clique na peça no tabuleiro para ajustar.`:`${d.name} entrou no time, mas não encontrei uma casa livre.`);render();
+    setStatus(c?`${d.name} selecionado e posicionado automaticamente em ${c}. Clique na peça no tabuleiro para ajustar.`:`${d.name} foi adicionado à equipe, mas não encontrei uma casa livre.`);render();
   }
 
   function selectDefinition(d){
@@ -396,7 +400,7 @@
       const group=ownAtAll(v,c);
       if(group.length>1){showStackChoice(v,group);return;}
       if(group[0]){showPieceInfo(v,group[0],false);const r=player.selectPiece(group[0].id);setStatus(r.status);hideStackChoice();render();return;}
-      const vis=visibleAt(v,c);if(vis.length){showPieceInfo(v,vis[0],true);setStatus('Informações da peça inimiga legalmente revelada.');render();}
+      const vis=visibleAt(v,c);if(vis.length){showPieceInfo(v,vis[0],true);setStatus('Informações reveladas sobre a peça inimiga.');render();}
       return;
     }
     let r=null;
@@ -408,7 +412,7 @@
     else if(a.mode==='mirror')r=player.placeMirror(c);
     else if(a.mode==='awaken')r=player.awakenTree(c);
     else if(a.mode==='spotTrap'||a.mode==='damageTrap')r=player.placeTrap(c);
-    else if(a.mode==='bard'){const target=ownAtAll(v,c).find(x=>x.id!==p.id&&R.man(p.coord,x.coord)<=p.ah);if(!target){setStatus('Escolha um aliado dentro do AH do Bardo.');return;}showBardChoice(target);return;}
+    else if(a.mode==='bard'){const target=ownAtAll(v,c).find(x=>x.id!==p.id&&R.man(p.coord,x.coord)<=p.ah);if(!target){setStatus('Escolha um aliado dentro do Alc. Hab. do Bardo.');return;}showBardChoice(target);return;}
     else {
       if(clickedBase){openBasePanel(v,clickedBase);return;}
       const allOwn=ownAtAll(v,c);
@@ -416,13 +420,13 @@
       const group=allOwn.filter(x=>!x.activated);
       if(group.length>1&&!a.committed){showStackChoice(v,group);return;}
       const own=group[0];if(own&&own.id!==p.id)r=player.selectPiece(own.id);
-      else if(!allOwn.length){const vis=visibleAt(v,c);if(vis.length){showPieceInfo(v,vis[0],true);setStatus('Informações da peça inimiga legalmente revelada.');render();return;}}
+      else if(!allOwn.length){const vis=visibleAt(v,c);if(vis.length){showPieceInfo(v,vis[0],true);setStatus('Informações reveladas sobre a peça inimiga.');render();return;}}
     }
     if(r){setStatus(r.status);if(a.mode==='pyro')render();else afterMutation();}
   }
 
   function previewSeer(c){
-    if(!seerPreview.size){const v=view(),p=activePiece(v);if(!p||R.man(p.coord,c)>p.ah){setStatus(`Casa principal fora de AH${p?.ah||0}.`);return;}seerPreview=new Set([c]);seerConfirm.classList.add('hidden');setStatus('Casa principal escolhida. Selecione mais 3 casas adjacentes por lado ou diagonal.');render();return;}
+    if(!seerPreview.size){const v=view(),p=activePiece(v);if(!p||R.man(p.coord,c)>p.ah){setStatus(`Casa principal fora do Alc. Hab. ${p?.ah||0}.`);return;}seerPreview=new Set([c]);seerConfirm.classList.add('hidden');setStatus('Casa principal escolhida. Selecione mais 3 casas adjacentes por lado ou diagonal.');render();return;}
     const main=[...seerPreview][0];
     if(c===main){seerPreview.clear();seerConfirm.classList.add('hidden');setStatus('Escolha novamente a casa principal.');render();return;}
     if(!R.neighbors(main,true).includes(c)){setStatus('Essa casa não toca a casa principal.');return;}
@@ -430,11 +434,11 @@
     seerConfirm.classList.toggle('hidden',seerPreview.size!==4);setStatus(`${seerPreview.size}/4 casas selecionadas.`);render();
   }
 
-  function showBardChoice(target){bardChoiceText.textContent=`${target.icon} ${target.displayName} — escolha o bônus até o fim do próximo turno do Bardo.`;bardChoiceButtons.innerHTML='';for(const [stat,label] of [['attack','⚔️ +1 ATQ'],['range','🎯 +1 ALC'],['move','👣 +1 M'],['life','❤️ +1 Vida']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{bardChoiceBox.classList.add('hidden');const r=player.bardBuff(target.id,stat);setStatus(r.status);afterMutation();});bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');}
+  function showBardChoice(target){bardChoiceText.textContent=`${target.icon} ${target.displayName} — escolha o bônus até o fim do próximo turno do Bardo.`;bardChoiceButtons.innerHTML='';for(const [stat,label] of [['attack','⚔️ +1 ATQ'],['range','🎯 +1 ALC'],['abilityRange','✨ +1 Alc. Hab.'],['move','👣 +1 M'],['life','❤️ +1 Vida']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{bardChoiceBox.classList.add('hidden');const r=player.bardBuff(target.id,stat);setStatus(r.status);afterMutation();});bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');}
   function hideBardChoice(){bardChoiceBox.classList.add('hidden');bardChoiceButtons.innerHTML='';}
 
   function afterMutation(){
-    hideBardChoice();const v=render(),av=ai.getView();
+    hideBardChoice();const v=render(),av=ai.getView();if(replay)replay.capture(v.history?.[0]||'Ação do jogador');
     if(!v.gameOver&&(av.pendingCombat||av.doppelChoice||v.turn==='enemy'))scheduleAi(850);
   }
 
@@ -470,7 +474,7 @@
       default:r={ok:true,status:'IA aguardando.'};
     }
     aiLastResult={action:{...action},ok:r?.ok!==false,status:r?.status||''};
-    const pv=render();
+    const pv=render();if(replay){const postAi=ai.getView();replay.capture(postAi.history?.[0]||'Ação da IA');}
     if(pv.pendingCombat||pv.gameOver)return;
     if(pv.turn==='enemy')scheduleAi(300);
     else if(pv.turn==='player')setStatus(`Rodada ${pv.round}. Selecione sua próxima peça disponível.`),render();
@@ -481,12 +485,12 @@
     if(selected.length!==4||setupPos.size!==4||setupBasePos.size!==2){setStatus('Escolha e posicione exatamente 4 personagens e 2 Postos.');return;}
     const setup=selected.map(name=>({name,coord:[...setupPos].find(([,n])=>n===name)?.[0]}));const bases=[setupBasePos.get(1),setupBasePos.get(2)];
     setStatus('Você: pronto · IA: pronta. Iniciando partida...');
-    aiDifficulty=aiDifficultyEl?.value||'normal';const r=referee.startGame(setup,bases,aiDifficulty);rosterCollapsed=true;setStatus(`${r.status} Dificuldade: ${aiDifficulty==='easy'?'Fácil':aiDifficulty==='hard'?'Difícil':'Normal'}.`);render();
+    aiDifficulty=aiDifficultyEl?.value||'normal';const r=referee.startGame(setup,bases,aiDifficulty);if(replay){replay.clear();replay.capture('Início da partida');}rosterCollapsed=true;setStatus(`${r.status} Dificuldade: ${aiDifficulty==='easy'?'Fácil':aiDifficulty==='hard'?'Difícil':'Normal'}.`);render();
   });
   keepDoppelBtn.addEventListener('click',()=>{const r=player.chooseDoppelCopy(false);setStatus(r.status);render();});
   copyDoppelBtn.addEventListener('click',()=>{const r=player.chooseDoppelCopy(true);setStatus(r.status);render();});
 
-  resetBtn.addEventListener('click',()=>{previousFxView=null;pendingActionFx=[];aiLastResult=null;aiDifficulty='normal';if(aiDifficultyEl)aiDifficultyEl.value='normal';referee.reset();selected=[];setupSelected=null;setupBaseSelected=null;setupPos.clear();setupBasePos.clear();openedBaseId=null;pendingBaseBonusId=null;closeBasePanel();seerPreview.clear();seerConfirm.classList.add('hidden');pyroConfirm.classList.add('hidden');hideStackChoice();hideBardChoice();combatChoice.classList.add('hidden');rosterCollapsed=false;rosterFilter='all';filterButtons.forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));inspectedPieceId=null;pieceInfoTitle.textContent='Ficha da unidade';pieceInfoBody.innerHTML='<div class="muted empty-inspector">Clique em uma peça para ver vida, movimento, ataque, alcance, percepção e bônus.</div>';if(setupInspector){setupInspector.classList.add('hidden');setupInspectorBody.innerHTML='';}setStatus('Marque ☐ Selecionar em 4 personagens, escolha os 2 Postos e ajuste a formação no mapa.');render();});
+  resetBtn.addEventListener('click',()=>{const keepSelected=[...selected],keepPos=new Map(setupPos),keepBases=new Map(setupBasePos),keepDifficulty=aiDifficultyEl?.value||aiDifficulty||'normal';if(replay)replay.clear();previousFxView=null;pendingActionFx=[];aiLastResult=null;aiDifficulty=keepDifficulty;if(aiDifficultyEl)aiDifficultyEl.value=keepDifficulty;referee.reset();selected=keepSelected;setupSelected=null;setupBaseSelected=null;setupPos=keepPos;setupBasePos=keepBases;openedBaseId=null;pendingBaseBonusId=null;closeBasePanel();seerPreview.clear();seerConfirm.classList.add('hidden');pyroConfirm.classList.add('hidden');hideStackChoice();hideBardChoice();combatChoice.classList.add('hidden');rosterCollapsed=false;rosterFilter='all';filterButtons.forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));inspectedPieceId=null;pieceInfoTitle.textContent='Ficha da unidade';pieceInfoBody.innerHTML='<div class="muted empty-inspector">Clique em uma peça para ver vida, movimento, ataque, alcance, percepção e bônus.</div>';if(setupInspector){setupInspector.classList.add('hidden');setupInspectorBody.innerHTML='';}setStatus('Formação anterior restaurada. Ajuste se quiser e clique em ✓ Pronto para jogar novamente.');render();});
   moveBtn.addEventListener('click',()=>{const r=player.startMove();setStatus(r.status);render();});
   stopBtn.addEventListener('click',()=>{const r=player.stopMove();setStatus(r.status);afterMutation();});
   attackBtn.addEventListener('click',()=>{const r=player.startAttack();setStatus(r.status);render();});
@@ -505,6 +509,7 @@
   teamToggle.addEventListener('click',()=>{rosterCollapsed=!rosterCollapsed;render();});
   closePieceInfoBtn.addEventListener('click',()=>{inspectedPieceId=null;pieceInfoTitle.textContent='Ficha da unidade';pieceInfoBody.innerHTML='<div class="muted empty-inspector">Clique em uma peça para ver vida, movimento, ataque, alcance, percepção e bônus.</div>';});
   auditBtn.addEventListener('click',()=>auditBox.classList.toggle('hidden'));
+  if(replayBtn)replayBtn.addEventListener('click',()=>{if(replay&&replay.length)window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'});});
   filterButtons.forEach(b=>b.addEventListener('click',()=>{rosterFilter=b.dataset.filter||'all';filterButtons.forEach(x=>x.classList.toggle('active',x===b));render();}));
 
   buildBoard();render();
