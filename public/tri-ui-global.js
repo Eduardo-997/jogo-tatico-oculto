@@ -34,10 +34,10 @@ const ABILITY_TEXT={
   'Trapaceiro':'Pode se mover pelas diagonais.',
   'Fantasma':'Ataques e Confrontos Diretos vencidos possuem o inimigo em vez de causar dano. Você passa a controlar a peça e o antigo dono perde sua localização. Se o Fantasma sofrer dano, ele morre e a peça é recuperada.'
 };
-const START_TREES=[{coord:'A16',state:'live',hp:3},{coord:'B16',state:'live',hp:3},{coord:'C16',state:'live',hp:3}];
-const START_ROCKS=['A08','B08','C08'];
-const START_WATER=['A01','B01','C01'];
-const START_SWAMPS=['A09','B09','C09'];
+const START_TREES=[{coord:'A02',state:'live',hp:3},{coord:'B02',state:'live',hp:3},{coord:'C02',state:'live',hp:3}];
+const START_ROCKS=['A23','B23','C23'];
+const START_WATER=['A11','B11','C11'];
+const START_SWAMPS=['A31','B31','C31'];
 
 function E(tag,a={}){const e=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(a))e.setAttribute(k,v);return e;}
 function pts(p){return p.map(x=>x.join(',')).join(' ')}
