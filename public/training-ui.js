@@ -65,8 +65,10 @@
   }
 
   function addTree(cell,state='live'){
-    cell.classList.add('terrain-blocked');const r=document.createElement('span');r.className='scenery-rune';r.textContent=state==='dead'?'🌑':'🌳';cell.appendChild(r);
+    cell.classList.add('terrain-blocked','terrain-tree');const r=document.createElement('span');r.className='scenery-rune';r.textContent=state==='dead'?'🌑':'🌳';cell.appendChild(r);
   }
+  function addRock(cell){cell.classList.add('terrain-blocked','terrain-rock');const r=document.createElement('span');r.className='scenery-rune scenery-rock';r.textContent='🪨';r.title='Rocha — bloqueia passagem e posicionamento.';cell.appendChild(r);}
+  function addWater(cell){cell.classList.add('terrain-water');const r=document.createElement('span');r.className='scenery-rune scenery-water';r.textContent='💧';r.title="Poça d'água — terreno passável por enquanto.";cell.appendChild(r);}
   function tokenFor(p,side,setup=false){
     const d=setup?defOfName(p.name):R.defOf(p),m=document.createElement('span');m.className=`piece-token type-${d?.type||p.type||'C'}${side==='enemy'?' enemy-token':''}`;m.textContent=d?.icon||p.icon||'●';return m;
   }
@@ -81,7 +83,9 @@
   function paintSetup(){
     for(const [c,b] of cells){
       b.className='cell setup';b.innerHTML='';
-      if(R.isBlocked(c)){addTree(b,'live');continue;}
+      if((R.treeCells||[]).includes(c)){addTree(b,'live');continue;}
+      if((R.rockCells||[]).includes(c)){addRock(b);continue;}
+      if((R.waterCells||[]).includes(c))addWater(b);
       const baseHit=['player','enemy'].flatMap(side=>draftBases[side].map((coord,index)=>({side,index,coord}))).find(x=>x.coord===c);
       if(baseHit){addBaseVisual(b,baseHit.side,baseHit.index,false);if(setupPick===basePickId(baseHit.side,baseHit.index))b.classList.add('active-cell');continue;}
       const hits=[...draftPos.entries()].filter(([,x])=>x.coord===c);
@@ -126,7 +130,10 @@
   function renderInspector(q){
     const el=$('#pieceInfo');if(!q){el.innerHTML='<div class="muted empty-inspector">Clique em uma peça de qualquer lado para inspecionar e controlar.</div>';return;}
     const effects=(q.effects||[]).filter(e=>e.remaining>0).map(e=>`<span class="temp-effect-tag ${e.kind||'neutral'}">${e.icon||'⏳'} ${e.name} · ${e.remaining}</span>`).join('');
-    el.innerHTML=`<div class="row between"><div><b>${q.icon} ${q.displayName}</b><div class="small muted">Lado ${sideName(q.owner)} · ${q.typeIcon} ${R.archetypeName(q.type)}</div></div><span class="training-side-mark ${sideClass(q.owner)}">Lado ${sideName(q.owner)}</span></div><div class="piece-info-grid"><div class="info-pill">❤️ Vida<br><b>${q.hp}/${q.maxHp}</b></div><div class="info-pill">👣 Movimento<br><b>${q.m}</b></div><div class="info-pill">⚔️ Ataque<br><b>${q.a}</b></div><div class="info-pill">🎯 Alcance<br><b>${q.range}</b></div><div class="info-pill">👁 PER<br><b>${q.per}</b></div><div class="info-pill">✦ Alc. Hab.<br><b>${q.ah||0}</b></div></div>${q.form?`<div class="bonus-tags"><span class="bonus-tag">Forma: ${q.form}</span></div>`:''}${q.copied?`<div class="bonus-tags"><span class="bonus-tag">Copiou: ${q.copied}</span></div>`:''}${effects?`<div class="temporary-effects">${effects}</div>`:''}`;
+    const kind=q.summonType==='skeleton'?'Invocação: Esqueleto':q.summonType==='miniSlime'?'Divisão: Mini-Slime':q.summonType==='livingBranch'?'Invocação: Galho-Vivo':q.form==='lava'?'Forma: Golem de Lava':q.possessing?'👻 Corpo possuído':q.possessedAway?'👻 Possuído — localização perdida':q.original?'Personagem original':'Unidade';
+    const bonuses=[];if(q.bonusM)bonuses.push(`👣 +${q.bonusM} M`);if(q.bonusV)bonuses.push(`❤️ +${q.bonusV} V`);if(q.bonusA)bonuses.push(`⚔️ +${q.bonusA} ATQ`);if(q.bonusRange)bonuses.push(`🎯 +${q.bonusRange} ALC`);if(q.bonusAH)bonuses.push(`✨ +${q.bonusAH} Alc. Hab.`);if(q.radarAdvanced)bonuses.push('📡 Radar Avançado');if(q.radarExpanded)bonuses.push('📶 Radar Ampliado');
+    const trapNote=q.name==='Caçador'||q.name==='Sentinela'?'<div class="small muted" style="margin-top:7px">Armadilhas podem ser preparadas sob uma peça já presente e só ativam quando um inimigo entrar nessa casa depois.</div>':'';
+    el.innerHTML=`<div class="row between"><div><b>${q.icon} ${q.displayName}</b><div class="small muted">Lado ${sideName(q.owner)} · ${q.typeIcon} ${R.archetypeName(q.type)} · ${kind}</div></div><span class="training-side-mark ${sideClass(q.owner)}">Lado ${sideName(q.owner)}</span></div><div class="piece-info-grid"><div class="info-pill">❤️ Vida<br><b>${q.hp}/${q.maxHp}</b></div><div class="info-pill">👣 Movimento<br><b>${q.m}</b></div><div class="info-pill">⚔️ Ataque<br><b>${q.a}</b></div><div class="info-pill">🎯 Alcance<br><b>${q.range}</b></div><div class="info-pill">👁 PER<br><b>${q.per}</b></div><div class="info-pill">✦ Alc. Hab.<br><b>${q.ah||0}</b></div></div>${q.form?`<div class="bonus-tags"><span class="bonus-tag">Forma: ${q.form}</span></div>`:''}${q.copied?`<div class="bonus-tags"><span class="bonus-tag">Copiou: ${q.copied}</span></div>`:''}${bonuses.length?`<div class="bonus-tags">${bonuses.map(x=>`<span class="bonus-tag">${x}</span>`).join('')}</div>`:''}${effects?`<div class="temporary-effects">${effects}</div>`:''}${trapNote}`;
   }
 
   function render(){
@@ -137,16 +144,16 @@
   }
 
   function canMoveInto(state,p,activeSide,c,ps){
-    const t=treeAt(state,c);if(t&&!(p.name==='Druida'&&t.state==='live'))return false;if(baseAtState(state,c))return false;
+    if((state.rocks||[]).includes(c))return false;const t=treeAt(state,c);if(t&&!(p.name==='Druida'&&t.state==='live'))return false;if(baseAtState(state,c))return false;
     const foes=ps.filter(x=>x.owner!==activeSide);if(foes.length)return true;
-    const own=ps.filter(x=>x.owner===activeSide&&x.id!==p.id);if(!own.length)return true;if(own.length>=2)return false;return p.name==='Escudeiro'||own.some(x=>x.name==='Escudeiro');
+    const own=ps.filter(x=>x.owner===activeSide&&x.id!==p.id),isLinker=x=>x?.name==='Escudeiro'||(x?.name==='Doppelgänger'&&x?.copied==='Escudeiro');const follower=ps.find(x=>x.owner===activeSide&&x.alive&&x.linkedToId===p.id);if(follower&&own.length)return false;if(!own.length)return true;if(own.length>=2)return false;return isLinker(p)||own.some(isLinker);
   }
 
   function paintGame(vs=views()){
-    const pieces=allPieces(vs),v=activeView(vs),p=activePiece(vs),mode=v?.activation?.mode;
+    const pieces=allPieces(vs),v=activeView(vs),p=activePiece(vs),mode=v?.activation?.mode,siege=new Set([...(vs.player.siegeCells||[]),...(vs.enemy.siegeCells||[])]);
     const state=JSON.parse(ref.exportState(),(k,val)=>val&&val.__set?val.__set:val);
     for(const [c,b] of cells){
-      b.className='cell';b.innerHTML='';const t=treeAt(state,c);if(t)addTree(b,t.state);const base=baseAtState(state,c);if(base)addBaseVisual(b,base.owner,Number((base.id||'').slice(-1))-1,base.sabotaged);
+      b.className='cell';b.innerHTML='';if(siege.has(c))b.classList.add('revealed','siege-revealed');const t=treeAt(state,c);if(t)addTree(b,t.state);else if((state.rocks||[]).includes(c))addRock(b);else if((state.water||[]).includes(c))addWater(b);const base=baseAtState(state,c);if(base)addBaseVisual(b,base.owner,Number((base.id||'').slice(-1))-1,base.sabotaged);
       const ps=pieces.filter(x=>x.alive&&x.coord===c);
       if(ps.length){
         const first=ps[0];b.appendChild(tokenFor(first,first.owner));hpBadge(b,first.hp,first.owner==='enemy');durationBadges(b,first);b.classList.add(first.owner==='player'?'training-board-side-a':'training-board-side-b');
@@ -158,15 +165,20 @@
         if(mode==='move'&&v.activation.moveRemaining>0&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps))b.classList.add('highlight');
         if(mode==='attack'&&R.attackCells(p).includes(c))b.classList.add('attack-highlight');
         if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');
-        if(mode==='seer'&&(!seer.length?R.abilityCells(p).includes(c):(c===seer[0]||R.neighbors(seer[0],true).includes(c))))b.classList.add('highlight');
+        if(mode==='seer'&&(!seer.length?R.abilityCells(p).includes(c):(c===seer[0]||R.neighbors(seer[0],false).includes(c))))b.classList.add('highlight');
+        if(mode==='shieldLink'&&c===p.coord)b.classList.add('highlight');
         if(mode==='pyro'&&R.abilityCells(p).includes(c))b.classList.add('attack-highlight');
         if(seer.includes(c)||pyro.includes(c))b.classList.add('pyro-selected');
       }
     }
-    for(const x of state.corpses||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend','<span class="marker corpse">☠</span>');
+    for(const x of state.corpses||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend','<span class="marker corpse">☠️</span>');
     for(const x of state.mirrors||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend','<span class="marker mirror">🪞</span>');
-    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend',`<span class="marker eye">${x.kind==='spot'?'🦉':'🕳️'}</span>`);
-    for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))cells.get(c)?.insertAdjacentHTML('beforeend','<span class="marker combat-mark">⚔️</span>');
+    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend',`<span class="marker eye" title="Armadilha do Lado ${sideName(s)}">${x.kind==='spot'?'🦉':'🕳️'}</span>`);
+    for(const c of new Set([vs.player.impactCell,vs.enemy.impactCell].filter(Boolean)))cells.get(c)?.insertAdjacentHTML('beforeend','<span class="marker impact" title="Ataque ocorreu aqui">💥</span>');
+    for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))cells.get(c)?.insertAdjacentHTML('beforeend','<span class="marker combat-mark" title="Confronto Direto ocorreu aqui">⚔️</span>');
+    const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)cells.get(c)?.insertAdjacentHTML('beforeend','<span class="marker eye" title="Casa sob efeito do Vidente">👁️</span>');
+    const hints=[...(vs.player.perceptionHints||[]).map(h=>({...h,side:'player'})),...(vs.enemy.perceptionHints||[]).map(h=>({...h,side:'enemy'}))];for(const h of hints){const mark=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';cells.get(h.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint ${h.kind||'orth'}" title="PER do Lado ${sideName(h.side)}">${mark}</span>`);}
+    for(const viewer of ['player','enemy'])for(const pieceId of Object.keys(state.spotReveals?.[viewer]||{})){const target=['player','enemy'].flatMap(s=>state.pieces?.[s]||[]).find(x=>x.id===pieceId&&x.alive&&x.coord);if(target)cells.get(target.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint exact" title="Revelado ao Lado ${sideName(viewer)} pela armadilha da Sentinela">📍</span>`);}
   }
 
   function chooseStack(ps){
@@ -188,18 +200,20 @@
     else if(a.mode==='awaken')r=cl.awakenTree(c);
     else if(a.mode==='spotTrap'||a.mode==='damageTrap')r=cl.placeTrap(c);
     else if(a.mode==='bard'){const target=v.ownPieces.find(x=>x.id!==p.id&&x.alive&&x.coord===c&&R.man(p.coord,x.coord)<=p.ah);if(target){showBard(target);return;}setStatus('Escolha um aliado do mesmo lado dentro do Alc. Hab.');return;}
+    else if(a.mode==='shieldLink'){const target=v.ownPieces.find(x=>x.id!==p.id&&x.alive&&x.coord===p.coord);if(!target){setStatus('Escolha o aliado que está na mesma casa do Escudeiro.');return;}r=cl.shieldLink(target.id);}
     else{const base=baseAtView(v,c);if(base){showBase(base,v);return;}const hits=piecesAt(vs,c);if(hits.length>1)chooseStack(hits);else if(hits[0])switchSelect(hits[0]);return;}
     after(r);
   }
-  function seerClick(c){const p=activePiece(views());if(!seer.length){if(R.man(p.coord,c)>p.ah)return setStatus('Casa principal fora do Alc. Hab.');seer=[c];setStatus('Escolha mais 3 casas que toquem a principal.');render();return;}if(c===seer[0]){seer=[];render();return;}if(!R.neighbors(seer[0],true).includes(c))return setStatus('Essa casa não toca a principal.');if(seer.includes(c))seer=seer.filter(x=>x!==c);else if(seer.length<4)seer.push(c);setStatus(`${seer.length}/4 casas escolhidas.`);render();}
+  function seerClick(c){const p=activePiece(views());if(!seer.length){if(!R.abilityCells(p).includes(c))return setStatus('Casa principal fora do Alc. Hab.');seer=[c];setStatus('Agora escolha 1 casa ligada por lado à principal.');render();return;}if(c===seer[0]){seer=[];render();return;}if(!R.neighbors(seer[0],false).includes(c))return setStatus('A segunda casa precisa estar ligada por lado à principal.');seer=[seer[0],c];setStatus('2/2 casas escolhidas. Confirme a visão.');render();}
   function after(r,label=''){if(!r)return;if(r.ok){recorder.capture(label||r.status);replayBtn.classList.remove('hidden');}setStatus(r.status);render();}
 
   function handleChoices(vs){
     const pc=vs.player.pendingCombat?'player':vs.enemy.pendingCombat?'enemy':null,dc=vs.player.doppelChoice?'player':vs.enemy.doppelChoice?'enemy':null;
     if(pc){const can=vs[pc].pendingCombat.canAdvance;showPopup(`<b>⚔️ Confronto resolvido — Lado ${sideName(pc)}</b><div class="muted small" style="margin:5px 0 9px">Escolha onde o vencedor termina.</div><div class="row"><button data-stay>Posição original</button><button class="primary" data-advance ${can?'':'disabled'}>Posição derrotada</button></div>`);popup.querySelector('[data-stay]').onclick=()=>after(client(pc).chooseCombatPosition(false));const adv=popup.querySelector('[data-advance]');if(can)adv.onclick=()=>after(client(pc).chooseCombatPosition(true));return;}
     if(dc){const d=vs[dc].doppelChoice;showPopup(`<b>🎭 Doppelgänger — Lado ${sideName(dc)}</b><div class="muted small" style="margin:5px 0 9px">Manter ${d.current} ou copiar ${d.newAbility}?</div><div class="row"><button data-keep>Manter</button><button class="primary" data-copy>Copiar nova</button></div>`);popup.querySelector('[data-keep]').onclick=()=>after(client(dc).chooseDoppelCopy(false));popup.querySelector('[data-copy]').onclick=()=>after(client(dc).chooseDoppelCopy(true));return;}
+    if(activeSide&&vs[activeSide].activation?.mode==='shieldUnlink'){showPopup(`<b>🛡️ Desvincular Escudeiro?</b><div class="muted small" style="margin:5px 0 9px">Desvincular gastará o turno do Escudeiro.</div><div class="row"><button data-cancel>Cancelar</button><button class="primary" data-unlink>Desvincular</button></div>`);popup.querySelector('[data-cancel]').onclick=()=>after(client(activeSide).cancelMode());popup.querySelector('[data-unlink]').onclick=()=>after(client(activeSide).shieldLink(null));return;}
     if(activeSide&&vs[activeSide].activation?.mode==='pyro'){showPopup(`<b>🔥 Piromante</b><div class="muted small" style="margin:5px 0 9px">${pyro.length}/2 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${pyro.length?'':'disabled'}>Confirmar ataque</button><button data-cancel>Cancelar</button></div>`);if(pyro.length)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).confirmPyroAttack();pyro=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{pyro=[];after(client(activeSide).cancelMode());};return;}
-    if(activeSide&&vs[activeSide].activation?.mode==='seer'){showPopup(`<b>👁️ Vidente</b><div class="muted small" style="margin:5px 0 9px">${seer.length}/4 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${seer.length===4?'':'disabled'}>Confirmar visão</button><button data-cancel>Cancelar</button></div>`);if(seer.length===4)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).useSeer(seer);seer=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{seer=[];after(client(activeSide).cancelMode());};return;}
+    if(activeSide&&vs[activeSide].activation?.mode==='seer'){showPopup(`<b>👁️ Vidente</b><div class="muted small" style="margin:5px 0 9px">${seer.length}/2 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${seer.length===2?'':'disabled'}>Confirmar visão</button><button data-cancel>Cancelar</button></div>`);if(seer.length===2)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).useSeer(seer);seer=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{seer=[];after(client(activeSide).cancelMode());};return;}
     hidePopup();
   }
   function showPopup(html){popup.innerHTML=html;popup.classList.remove('hidden');}

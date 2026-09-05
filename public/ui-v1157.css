@@ -197,7 +197,9 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 }
 @media(max-width:980px){
   .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .controls{position:sticky;bottom:6px;z-index:35;backdrop-filter:blur(8px)}
+  /* v1.15.26 — no celular/tablet, os controles ficam no fluxo normal abaixo do tabuleiro.
+     O sticky anterior cobria as linhas inferiores (7/8) durante a rolagem. */
+  .controls{position:static;bottom:auto;z-index:auto;backdrop-filter:none}
 }
 @media(max-width:700px){
   .wrap{padding:10px!important}
@@ -290,4 +292,76 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 @media(max-width:680px){.mode-arena .arena-rules-overlay .qr-page.active{grid-template-columns:1fr}.mode-arena .arena-rules-overlay .qr-modal{padding:14px}.mode-arena .arena-rules-overlay .qr-tab{min-width:auto;flex:1}.mode-arena .arena-rules-overlay .qr-head{align-items:center}}
 
 /* v1.15.15 — marcador público de Confronto */
-.combat-mark{left:-5px;top:-7px;font-size:16px;z-index:7;pointer-events:none;filter:drop-shadow(0 1px 2px #000)}
+.combat-mark{left:-7px;top:-9px;font-size:23px!important;z-index:7;pointer-events:none;filter:drop-shadow(0 2px 3px #000)}
+.siege-revealed{box-shadow:inset 0 0 0 2px rgba(143,130,189,.55),inset 0 0 18px rgba(122,111,177,.18)!important}
+
+/* v1.15.17 — leitura de turno no Online */
+.controls button:disabled{opacity:.42;cursor:not-allowed;filter:saturate(.55);}
+.context.waiting-turn{opacity:.82;}
+
+
+/* v1.15.23 — tabuleiro 8x8 responsivo no celular (Clássico, Online e Treino). */
+@media(max-width:600px){
+  .mode-classic .board-scroll,.mode-online .board-scroll,.mode-training .board-scroll{overflow-x:hidden!important;width:100%;padding:6px!important}
+  .mode-classic .board,.mode-online .board,.mode-training .board{
+    --bns-cell:calc((100vw - 72px)/8);
+    --bns-axis:22px;
+    --bns-gap:2px;
+    width:100%!important;
+    max-width:100%!important;
+    grid-template-columns:var(--bns-axis) repeat(8,minmax(0,var(--bns-cell)))!important;
+    gap:var(--bns-gap)!important;
+  }
+  .mode-classic .cell,.mode-online .cell,.mode-training .cell{width:var(--bns-cell)!important;height:var(--bns-cell)!important;min-width:0!important;font-size:clamp(16px,5.2vw,22px)!important;border-radius:6px!important}
+  .mode-classic .rowaxis,.mode-online .rowaxis,.mode-training .rowaxis{width:var(--bns-axis)!important;height:var(--bns-cell)!important}
+  .mode-classic .axis,.mode-online .axis,.mode-training .axis{font-size:9px!important}
+  .mode-classic .base-icon,.mode-online .base-icon,.mode-training .base-icon{font-size:clamp(15px,4.8vw,20px)!important}
+  .mode-classic .base-label,.mode-online .base-label,.mode-training .base-label{font-size:6px!important;padding:0 1px!important}
+  .mode-classic .stack-second,.mode-online .stack-second,.mode-training .stack-second{font-size:12px!important}
+  .mode-classic .marker,.mode-online .marker,.mode-training .marker{font-size:10px!important}
+  .mode-classic .impact,.mode-online .impact,.mode-training .impact{font-size:13px!important;right:-2px!important;top:-3px!important}
+  .mode-classic .controls,.mode-online .controls,.mode-training .controls{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .mode-classic .controls button,.mode-online .controls button,.mode-training .controls button{font-size:11px!important;padding:7px 4px!important}
+}
+@media(max-width:390px){
+  .mode-classic .board,.mode-online .board,.mode-training .board{--bns-cell:calc((100vw - 62px)/8);--bns-axis:18px}
+}
+
+
+/* v1.15.27 — terreno adicional + correção definitiva dos controles no mobile. */
+.terrain-rock{
+  background:linear-gradient(145deg,#272824,#171817)!important;
+  box-shadow:inset 0 0 0 1px rgba(174,166,147,.22),inset 0 -7px 15px rgba(0,0,0,.24)!important;
+}
+.terrain-water{
+  background:radial-gradient(ellipse at 50% 60%,rgba(69,128,156,.30),rgba(28,55,66,.18) 52%,rgba(16,20,21,.35) 76%)!important;
+  box-shadow:inset 0 0 0 1px rgba(112,176,203,.18),inset 0 -4px 12px rgba(21,79,104,.16)!important;
+}
+.scenery-rock{font-size:34px!important;opacity:.92!important;filter:drop-shadow(0 4px 3px rgba(0,0,0,.72)) grayscale(.08)}
+.scenery-rock:before{background:radial-gradient(circle,rgba(158,151,132,.14),transparent 67%)!important}
+.scenery-water{font-size:30px!important;opacity:.55!important;filter:drop-shadow(0 2px 2px rgba(0,0,0,.45))}
+.scenery-water:before{width:38px!important;height:24px!important;border-radius:50%!important;background:radial-gradient(ellipse,rgba(78,154,190,.28),rgba(32,95,121,.10) 58%,transparent 72%)!important}
+.scenery-water:after{display:none!important}
+.mode-arena .rock-marker{pointer-events:none;paint-order:stroke;stroke:#050505;stroke-width:3;filter:drop-shadow(0 3px 2px #0008)}
+.mode-arena .water-marker{pointer-events:none;paint-order:stroke;stroke:#071116;stroke-width:2;opacity:.62;filter:drop-shadow(0 2px 2px #0007)}
+
+@media(max-width:900px){
+  .mode-classic .board-stage,.mode-online .board-stage,.mode-training .board-stage{position:relative!important;width:100%!important}
+  .mode-classic .board-popup,.mode-online .board-popup,.mode-training .board-popup{
+    position:absolute!important;left:50%!important;right:auto!important;bottom:8px!important;
+    transform:translateX(-50%)!important;margin:0!important;
+  }
+}
+@media(max-width:600px){
+  .mode-classic .board-column,.mode-online .board-column,.mode-training .board-column{overflow:visible!important}
+  .mode-classic .board-scroll,.mode-online .board-scroll,.mode-training .board-scroll{overflow-x:hidden!important;width:100%!important;padding:6px!important;margin:0 0 10px!important}
+  .mode-classic .controls,.mode-online .controls,.mode-training .controls{
+    position:static!important;inset:auto!important;transform:none!important;float:none!important;
+    display:grid!important;width:100%!important;max-width:none!important;clear:both!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;
+    margin:0!important;padding:8px!important;z-index:auto!important;backdrop-filter:none!important;
+  }
+  .mode-classic .controls button,.mode-online .controls button,.mode-training .controls button{
+    min-width:0!important;width:auto!important;font-size:11px!important;padding:7px 4px!important;
+  }
+}

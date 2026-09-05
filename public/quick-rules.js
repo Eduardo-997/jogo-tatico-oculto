@@ -19,26 +19,29 @@
       <div class="qr-content">
         <section class="qr-page active" data-page="partida">
           <div class="qr-card"><b>🏆 Objetivo</b><p>Elimine <strong>3 dos 4 personagens originais</strong> do adversário. Invocações não contam como perda original.</p></div>
-          <div class="qr-card"><b>🔄 Rodadas e ativações</b><p>Cada unidade pode agir uma vez por rodada. A vantagem numérica é limitada: um lado pode ter no máximo <strong>1 ativação a mais que o adversário</strong> naquela rodada.</p><div class="qr-example">Exemplo: em 4 × 2, o lado com 4 escolhe quais <strong>3</strong> unidades vai ativar; o lado com 2 ativa as <strong>2</strong>.</div></div>
-          <div class="qr-card"><b>🎯 Como funciona uma ativação</b><p>Escolha uma unidade → movimento opcional → ataque <strong>ou</strong> habilidade opcional → encerrar. Selecionar uma unidade ou consultar sua ficha não gasta a ativação.</p></div>
-          <div class="qr-card"><b>🌿 Turnos compartilhados</b><p>Druida e Galho-Vivo compartilham a mesma ativação. Usar um deles gasta o turno dos dois naquela rodada.</p></div>
+          <div class="qr-card"><b>🔄 Rodadas e turnos</b><p>Cada unidade pode ter um turno por rodada. Na rodada 1, quem tem a prioridade inicial é sorteado entre os dois lados; a cada nova rodada essa prioridade alterna. A vantagem numérica é limitada: um lado pode ter no máximo <strong>1 turno de unidade a mais que o adversário</strong> naquela rodada.</p><div class="qr-example">Exemplo: em 4 × 2, o lado com 4 escolhe quais <strong>3</strong> unidades vai usar; o lado com 2 usa as <strong>2</strong>.</div></div>
+          <div class="qr-card"><b>🎯 Como funciona um turno</b><p>Escolha uma unidade → movimento opcional → ataque <strong>ou</strong> habilidade opcional → encerrar. Selecionar uma unidade ou consultar sua ficha não gasta o turno.</p></div>
+          <div class="qr-card"><b>🌿 Turnos compartilhados</b><p>Druida e Galho-Vivo compartilham o mesmo turno. Usar um deles gasta o turno dos dois naquela rodada.</p></div>
         </section>
         <section class="qr-page" data-page="combate">
-          <div class="qr-card"><b>⚔️ Ataque normal</b><p>ATQ indica o dano do ataque e ALC indica até onde ele alcança. A marcação no tabuleiro mostra o alcance final, incluindo bônus ativos.</p></div>
+          <div class="qr-card"><b>👣 M — Movimento</b><p>M indica quantos passos a unidade pode percorrer no próprio turno. Cada passo segue as conexões normais do tabuleiro; personagens com exceções têm isso indicado na ficha.</p></div>
+          <div class="qr-card"><b>⚔️ ATQ — Ataque</b><p>ATQ indica quanto dano o ataque normal causa quando acerta. Ataque normal e Confronto Direto são sistemas separados.</p></div>
+          <div class="qr-card"><b>🎯 ALC — Alcance de Ataque</b><p>ALC indica a distância máxima do ataque normal. A marcação no tabuleiro sempre considera o alcance final, incluindo bônus ativos.</p></div>
+          <div class="qr-card"><b>✨ Alc. Hab. — Alcance de Habilidade</b><p>Indica a distância máxima para escolher casas ou alvos com habilidades que usam esse atributo. Ao clicar em Habilidade, o tabuleiro mostra a área disponível.</p></div>
           <div class="qr-card"><b>🤺 Confronto Direto</b><p>Entrar em uma casa ocupada por inimigo inicia Confronto Direto. Ele é separado do ataque normal e usa os arquétipos.</p></div>
           <div class="qr-card"><b>🛡️ 📜 🗡️ Arquétipos</b><p>Vanguarda vence Executor, Executor vence Estrategista e Estrategista vence Vanguarda. Coringa vence os demais arquétipos; Condenado perde para todos os outros. Arquétipos iguais empatam.</p></div>
           <div class="qr-card"><b>❤️ Sobrevivência</b><p>O vencedor do Confronto causa 1 de dano. Se o derrotado sobreviver, a invasão pode ser repelida conforme a situação.</p></div>
         </section>
         <section class="qr-page" data-page="info">
           <div class="qr-card"><b>👁️ PER — Percepção</b><p>PER define até onde a unidade detecta presença inimiga pelas conexões do mapa. Detectar presença não significa necessariamente revelar tudo.</p></div>
-          <div class="qr-card"><b>🎯 ALC — Alcance</b><p>É o alcance do ataque normal. Bônus do Bardo, Postos e outros efeitos são somados à marcação visual e ao alcance real.</p></div>
-          <div class="qr-card"><b>✨ Alc. Hab. — Alcance de Habilidade</b><p>Define a distância de habilidades que usam alcance. Ao clicar em Habilidade, o tabuleiro destaca a área de Alc. Hab. disponível.</p></div>
+          
           <div class="qr-card"><b>🕵️ Informação oculta</b><p>Você só recebe o que sua equipe poderia saber. Posições ocultas do adversário não são entregues à IA nem ao outro jogador.</p></div>
-          <div class="qr-card"><b>💥 Local de ataque inimigo</b><p>Quando um inimigo ataca, o local do ataque fica marcado com 💥 até você <strong>encerrar sua próxima ativação</strong>. Começar a agir não apaga a marca.</p></div>
+          <div class="qr-card"><b>💥 Local de ataque inimigo</b><p>Quando um inimigo ataca, o local do ataque fica marcado com 💥 até você <strong>encerrar seu próximo turno</strong>. Começar a agir não apaga a marca.</p></div>
         </section>
         <section class="qr-page" data-page="campo">
-          <div class="qr-card"><b>🏰 Postos de Operação</b><p>Cada lado começa com 2 Postos. Para sabotar um Posto inimigo, fique adjacente e gaste a ação para escolher um benefício disponível.</p></div>
-          <div class="qr-card"><b>🌳 Árvores e terreno</b><p>Árvores ocupam casas e bloqueiam movimento e posicionamento. Algumas habilidades interagem diretamente com elas.</p></div>
+          <div class="qr-card"><b>🏰 Postos de Operação</b><p>Cada lado começa com 2 Postos. Para sabotar um Posto inimigo, fique adjacente e use o turno da unidade para escolher um benefício disponível.</p></div>
+          <div class="qr-card"><b>👁️ Cerco Final</b><p>Quando os <strong>4 Postos</strong> tiverem sido sabotados, toda a <strong>borda externa do tabuleiro</strong> fica permanentemente revelada para os dois lados. Apenas unidades são reveladas por essa regra; armadilhas, Espelhos e outros elementos ocultos continuam seguindo suas próprias regras.</p></div>
+          <div class="qr-card"><b>🌳 Árvores e terreno</b><p>Árvores e rochas bloqueiam movimento e posicionamento. A água é passável por enquanto. Algumas habilidades interagem diretamente com árvores.</p></div>
           <div class="qr-card"><b>💀 Invocações e formas</b><p>Esqueleto, Mini-Slimes, Galho-Vivo e transformações seguem as regras de seus criadores/formas. Elas não contam automaticamente como personagens originais.</p></div>
           <div class="qr-card"><b>🃏 Habilidades específicas</b><p>As habilidades completas ficam nas fichas dos personagens. Esta seção resume apenas as regras gerais do jogo.</p></div>
         </section>

@@ -44,8 +44,13 @@ __gameRoot.GameRules = (() => {
   const inside=(x,y)=>x>=0&&x<8&&y>=0&&y<8;
   const man=(a,b)=>{const A=rc(a),B=rc(b);return Math.abs(A.x-B.x)+Math.abs(A.y-B.y)};
   const sameLine=(a,b)=>{const A=rc(a),B=rc(b);return A.x===B.x||A.y===B.y};
-  const blockedCells=Object.freeze(['C3','F6']);
+  const treeCells=Object.freeze(['C3','F6']);
+  const rockCells=Object.freeze(['F3','C6']);
+  const waterCells=Object.freeze(['D4','E5']);
+  const blockedCells=Object.freeze([...treeCells,...rockCells]);
   const isBlocked=c=>blockedCells.includes(c);
+  const isRock=c=>rockCells.includes(c);
+  const isWater=c=>waterCells.includes(c);
   function neighbors(c,diag=false){
     const a=rc(c),ds=diag?[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1]];
     return ds.map(([dx,dy])=>[a.x+dx,a.y+dy]).filter(([x,y])=>inside(x,y)).map(([x,y])=>coord(x,y));
@@ -117,7 +122,7 @@ __gameRoot.GameRules = (() => {
     if(A===D)return'tie';
     return((A==='R'&&D==='S')||(A==='S'&&D==='P')||(A==='P'&&D==='R'))?'att':'def';
   }
-  return Object.freeze({defs,skeletonDef,miniDef,lavaDef,branchDef,baseBonuses,byName,archetypeNames,archetypeName,rc,coord,inside,man,sameLine,blockedCells,isBlocked,neighbors,perceptionCells,defOf,attackCells,abilityCells,blastCells,directWinner});
+  return Object.freeze({defs,skeletonDef,miniDef,lavaDef,branchDef,baseBonuses,byName,archetypeNames,archetypeName,rc,coord,inside,man,sameLine,treeCells,rockCells,waterCells,blockedCells,isBlocked,isRock,isWater,neighbors,perceptionCells,defOf,attackCells,abilityCells,blastCells,directWinner});
 })();
 
 if(typeof module!=='undefined'&&module.exports) module.exports=__gameRoot.GameRules;

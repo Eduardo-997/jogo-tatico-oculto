@@ -1,9 +1,12 @@
-BATALHA NAS SOMBRAS v1.15.16 — GIT + CLOUDFLARE
+Batalha nas Sombras v1.15.27 — STAGING
 
-1. Substitua no repositório os arquivos do jogo pelos deste pacote.
-2. Mantenha a estrutura public/, src/, package.json e wrangler.jsonc.
-3. Faça commit/push normalmente.
-4. Aguarde o deploy do Cloudflare concluir.
-5. Reabra/atualize a página do Clássico Online no PC e celular.
+Versão para teste antes de promover ao repositório principal.
 
-IMPORTANTE: esta versão altera `src/worker.js` para sincronizar as regras do Clássico Online. O nome/bindings do Worker em wrangler.jsonc NÃO foram alterados.
+Mudanças principais:
+- correção definitiva da sobreposição dos controles no celular;
+- rochas adicionadas como terreno bloqueante;
+- água adicionada como terreno passável provisoriamente;
+- terreno sincronizado com IA, Replay, Clássico Online e Arena.
+
+Repositório de staging: Eduardo-997/jogo-tatico-oculto
+Repositório principal: Eduardo-997/Batalha-nas-sombras-v1

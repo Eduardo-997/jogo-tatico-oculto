@@ -17,7 +17,9 @@
     return ctx;
   }
   async function resume(){const c=ensure();if(c&&c.state==='suspended'){try{await c.resume();}catch{}}}
+  const EFFECT_GAIN=1.18; // v1.15.19: efeitos um pouco mais presentes sem alterar o volume escolhido pelo jogador.
   function gainNode(at,dur,level=0.08){
+    level*=EFFECT_GAIN;
     const g=ctx.createGain();
     g.gain.setValueAtTime(0.0001,at);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002,level),at+0.012);
