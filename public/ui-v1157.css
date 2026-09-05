@@ -412,3 +412,5 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 /* v1.15.33 — coordenadas da Arena agora ficam apenas nas bordas, estilo xadrez/batalha naval. */
 
 /* v1.15.34 — biomas da Arena menores e distribuídos em simetria rotacional. */
+
+.trait-icon{width:20px;height:20px;object-fit:contain;vertical-align:middle;filter:drop-shadow(0 0 4px rgba(82,153,255,.45))}.flying-trait{display:inline-flex;align-items:center;gap:5px}

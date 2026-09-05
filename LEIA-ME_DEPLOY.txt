@@ -1,11 +1,16 @@
-Batalha nas Sombras v1.15.37 — TESTE GIT
+Batalha nas Sombras v1.15.38 — TESTE GIT
 
-Base: v1.15.34 TESTE GIT.
+Base: v1.15.37 TESTE GIT.
 
 Principais mudanças:
-- Arena: uma única régua externa A–H / 1–8, sem repetir coordenadas por setor.
-- Personagem Coringa renomeado para Trapaceiro; o arquétipo Coringa mantém o mesmo nome e regras.
-- Compatibilidade mantida com saves/replays antigos que ainda tragam o nome Coringa.
-- Checkup geral de sintaxe, assets, versões, definições de personagens, regras principais e consistência Clássico/Online/Arena.
+- Escudeiro: Vincular e Desvincular agora usam confirmação dentro da interface, sem popup do navegador.
+- Voador: nova característica visual/mecânica. Fantasma é o primeiro personagem marcado como Voador.
+- Voador ignora o custo extra de Pântano e pode atravessar Árvores/Pedras, mas não encerrar voluntariamente o movimento sobre elas.
+- Druida e Galho-Vivo não compartilham mais ativação. O Galho-Vivo entra normalmente na contagem de unidades vivas e usa uma ativação própria quando disponível.
+- Regras reorganizadas com abas Partida, Combate, Atributos, Personagens, Informações e Biomas.
+- Aba Personagens explica Voador e os 5 arquétipos.
+- Aba Informações passou a usar as imagens reais dos marcadores/objetos do campo.
+- Removido o bloco informativo redundante do rodapé do Clássico e Clássico Online.
+- Nova arte `assets/effects/voador.png` integrada às fichas e às regras.
 
 Observação de deploy: arquivos SAVE_PROJETO, TESTES e VALIDACAO são documentação de desenvolvimento e não são necessários para o jogo funcionar no Git/Cloudflare.
