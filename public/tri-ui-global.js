@@ -32,7 +32,7 @@ const ABILITY_TEXT={
   'Sentinela':'Mantém até 2 armadilhas ocultas dentro do Alc. Hab. Pode prepará-las mesmo em casas ocupadas; elas não disparam na colocação. Um inimigo que entrar depois em uma delas fica com a posição revelada até o início do próximo turno daquela peça.',
   'Bardo':'Escolhe 1 aliado dentro do Alc. Hab. e concede +1 ATQ, ALC, Alc. Hab., M ou Vida. Mantém apenas 1 aliado inspirado; o bônus dura até o fim do próximo turno do Bardo.',
   'Trapaceiro':'Pode se mover pelas diagonais.',
-  'Fantasma':'Ataques e Confrontos Diretos vencidos possuem o inimigo em vez de causar dano. Você passa a controlar a peça e o antigo dono perde sua localização. Se o Fantasma sofrer dano, ele morre e a peça é recuperada.'
+  'Fantasma':'Ao vencer um ataque ou Confronto Direto, possui o inimigo e passa a controlar aquele corpo com a Vida, atributos e habilidades da peça possuída. O antigo dono perde sua localização. O corpo possuído recebe dano normalmente; quando ele é derrotado, o Fantasma morre e a peça original volta ao dono.'
 };
 const START_TREES=[{coord:'A02',state:'live',hp:3},{coord:'B02',state:'live',hp:3},{coord:'C02',state:'live',hp:3}];
 const START_ROCKS=['A23','B23','C23'];
