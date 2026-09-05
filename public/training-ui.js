@@ -64,14 +64,14 @@
     setupMode?paintSetup():paintGame();
   }
 
-  function addTree(cell,state='live'){cell.classList.add('terrain-tree');if(state==='live')cell.classList.add('terrain-blocked');const src=state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src)cell.appendChild(A.img(src,'scenery-art',state==='dead'?'Árvore destruída':'Árvore'));}
-  function addRock(cell){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock)cell.appendChild(A.img(A.terrain.rock,'scenery-art','Pedra'));}
+  function addTree(cell,state='live',hp=3){cell.classList.add('terrain-tree');if(state==='live')cell.classList.add('terrain-blocked');const src=state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src)cell.appendChild(A.img(src,'scenery-art',state==='dead'?'Árvore destruída':'Árvore'));if(state==='live')hpBadge(cell,Number(hp??3),false,true);}
+  function addRock(cell,hp=3){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock)cell.appendChild(A.img(A.terrain.rock,'scenery-art','Pedra'));hpBadge(cell,Number(hp??3),false,true);}
   function addWater(cell){cell.classList.add('terrain-water');if(A.terrain?.water)cell.appendChild(A.img(A.terrain.water,'scenery-art','Lago'));}
   function addSwamp(cell){cell.classList.add('terrain-swamp');if(A.terrain?.swamp)cell.appendChild(A.img(A.terrain.swamp,'scenery-art','Pântano'));}
   function tokenFor(p,side,setup=false){
     const d=setup?defOfName(p.name):R.defOf(p),m=document.createElement('span');m.className=`piece-token art-token type-${d?.type||p.type||'C'}${side==='enemy'?' enemy-token':''}`;const src=A.character?.(p.displayName||p.name);if(src)m.appendChild(A.img(src,'piece-art',p.displayName||p.name));else m.textContent=d?.icon||p.icon||'●';return m;
   }
-  function hpBadge(cell,hp,enemy=false){const b=document.createElement('span');b.className=`hp-badge${enemy?' enemy-hp':''}`;b.textContent=`♥${hp}`;cell.appendChild(b);}
+  function hpBadge(cell,hp,enemy=false,terrain=false){const b=document.createElement('span');b.className=`hp-badge${enemy?' enemy-hp':''}${terrain?' terrain-hp':''}`;b.textContent=`♥${hp}`;cell.appendChild(b);}
   function durationBadges(cell,p){const effects=(p?.effects||[]).filter(e=>Number(e.remaining)>0);if(!effects.length)return;const w=document.createElement('span');w.className='duration-badges';for(const e of effects.slice(0,2)){const b=document.createElement('span');b.className=`duration-badge ${e.kind||'neutral'}`;b.textContent=`${e.icon||'⏳'}${e.remaining}`;w.appendChild(b);}if(effects.length>2){const b=document.createElement('span');b.className='duration-badge more';b.textContent=`+${effects.length-2}`;w.appendChild(b);}cell.appendChild(w);}
 
   function addBaseVisual(cell,side,index,sabotaged=false){
@@ -152,7 +152,7 @@
     const pieces=allPieces(vs),v=activeView(vs),p=activePiece(vs),mode=v?.activation?.mode,siege=new Set([...(vs.player.siegeCells||[]),...(vs.enemy.siegeCells||[])]);
     const state=JSON.parse(ref.exportState(),(k,val)=>val&&val.__set?val.__set:val);
     for(const [c,b] of cells){
-      b.className='cell';b.innerHTML='';if(siege.has(c))b.classList.add('revealed','siege-revealed');const t=treeAt(state,c);if(t)addTree(b,t.state);else if((state.rocks||[]).includes(c))addRock(b);else if((state.water||[]).includes(c))addWater(b);else if((state.swamps||[]).includes(c))addSwamp(b);const base=baseAtState(state,c);if(base)addBaseVisual(b,base.owner,Number((base.id||'').slice(-1))-1,base.sabotaged);
+      b.className='cell';b.innerHTML='';if(siege.has(c))b.classList.add('revealed','siege-revealed');const t=treeAt(state,c);if(t)addTree(b,t.state,t.hp??3);else if((state.rocks||[]).includes(c))addRock(b,(state.rockHp||{})[c]??3);else if((state.water||[]).includes(c))addWater(b);else if((state.swamps||[]).includes(c))addSwamp(b);const base=baseAtState(state,c);if(base)addBaseVisual(b,base.owner,Number((base.id||'').slice(-1))-1,base.sabotaged);
       const ps=pieces.filter(x=>x.alive&&x.coord===c);
       if(ps.length){
         const first=ps[0];b.appendChild(tokenFor(first,first.owner));hpBadge(b,first.hp,first.owner==='enemy');durationBadges(b,first);b.classList.add(first.owner==='player'?'training-board-side-a':'training-board-side-b');
@@ -165,8 +165,8 @@
         if(mode==='move'&&v.activation.moveRemaining>=((R.swampCells||[]).includes(c)?2:1)&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps))b.classList.add('highlight');
         if(mode==='attack'&&R.attackCells(p).includes(c))b.classList.add('attack-highlight');
         if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');
-        if(mode==='seer'&&(!seer.length?R.abilityCells(p).includes(c):(c===seer[0]||R.neighbors(seer[0],false).includes(c))))b.classList.add('highlight');
-        if(mode==='shieldLink'&&c===p.coord)b.classList.add('highlight');
+        if(mode==='seer'){if(!seer.length&&R.abilityCells(p).includes(c))b.classList.add('highlight','seer-range');else if(seer.length){if(c===seer[0])b.classList.add('highlight','seer-main');else if(R.neighbors(seer[0],false).includes(c))b.classList.add('highlight','seer-next');}}
+        if(mode==='kamikaze'&&(v.activation.kamikazeCells||[]).includes(c))b.classList.add('attack-highlight','kamikaze-highlight');if(mode==='shieldLink'&&c===p.coord)b.classList.add('highlight');
         if(mode==='pyro'&&R.abilityCells(p).includes(c))b.classList.add('attack-highlight');
         if(seer.includes(c)||pyro.includes(c))b.classList.add('pyro-selected');
       }
@@ -214,6 +214,7 @@
     if(dc){const d=vs[dc].doppelChoice;showPopup(`<b>🎭 Doppelgänger — Lado ${sideName(dc)}</b><div class="muted small" style="margin:5px 0 9px">Manter ${d.current} ou copiar ${d.newAbility}?</div><div class="row"><button data-keep>Manter</button><button class="primary" data-copy>Copiar nova</button></div>`);popup.querySelector('[data-keep]').onclick=()=>after(client(dc).chooseDoppelCopy(false));popup.querySelector('[data-copy]').onclick=()=>after(client(dc).chooseDoppelCopy(true));return;}
     if(activeSide&&vs[activeSide].activation?.mode==='shieldUnlink'){showPopup(`<b>🛡️ Desvincular Escudeiro?</b><div class="muted small" style="margin:5px 0 9px">Desvincular gastará o turno do Escudeiro.</div><div class="row"><button data-cancel>Cancelar</button><button class="primary" data-unlink>Desvincular</button></div>`);popup.querySelector('[data-cancel]').onclick=()=>after(client(activeSide).cancelMode());popup.querySelector('[data-unlink]').onclick=()=>after(client(activeSide).shieldLink(null));return;}
     if(activeSide&&vs[activeSide].activation?.mode==='pyro'){showPopup(`<b>🔥 Piromante</b><div class="muted small" style="margin:5px 0 9px">${pyro.length}/2 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${pyro.length?'':'disabled'}>Confirmar ataque</button><button data-cancel>Cancelar</button></div>`);if(pyro.length)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).confirmPyroAttack();pyro=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{pyro=[];after(client(activeSide).cancelMode());};return;}
+    if(activeSide&&vs[activeSide].activation?.mode==='kamikaze'){const a=vs[activeSide].activation,n=(a.kamikazeCells||[]).length;showPopup(`<b>💥 Autodestruição — Lado ${sideName(activeSide)}</b><div class="muted small" style="margin:5px 0 9px">${n} casas marcadas serão atingidas. A explosão acerta aliados e o Kamikaze morre.</div><div class="row"><button class="primary" data-confirm>Confirmar explosão</button><button data-cancel>Cancelar</button></div>`);popup.querySelector('[data-confirm]').onclick=()=>after(client(activeSide).confirmKamikaze());popup.querySelector('[data-cancel]').onclick=()=>after(client(activeSide).cancelMode());return;}
     if(activeSide&&vs[activeSide].activation?.mode==='seer'){showPopup(`<b>👁️ Vidente</b><div class="muted small" style="margin:5px 0 9px">${seer.length}/2 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${seer.length===2?'':'disabled'}>Confirmar visão</button><button data-cancel>Cancelar</button></div>`);if(seer.length===2)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).useSeer(seer);seer=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{seer=[];after(client(activeSide).cancelMode());};return;}
     hidePopup();
   }

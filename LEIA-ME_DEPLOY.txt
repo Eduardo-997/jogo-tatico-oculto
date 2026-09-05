@@ -1,10 +1,5 @@
-Batalha nas Sombras v1.15.31 — TESTE GIT
+Batalha nas Sombras v1.15.32 — TESTE GIT
 
-Pacote para o repositório de testes "jogo-tatico-oculto".
+Base: v1.15.31 TESTE GIT.
 
-Mudanças principais:
-- Árvores e Pedras destrutíveis, com 3 de Vida.
-- Golem: Absorver Rocha com adaptação substituível (+1 Vida / Movimento / ATQ).
-- Arqueiro: M1, Alc. ATQ. 3 e habilidade Tiro Certeiro.
-- Lagos do Clássico corrigidos para D3 e E6.
-- Cenários da Arena distribuídos pelo mapa.
+Principais mudanças: Druida ATQ1; Vidente com marcação completa da primeira seleção; Ninja com Bomba de Fumaça e invisibilidade total; Kamikaze com Autodestruição ativa confirmável sem perder a explosão ao morrer; Vida visível em Árvores/Pedras; regras atualizadas com Biomas e imagens; Arena com Biomas nas 4 profundidades e coordenadas visíveis A–H / 1–4 por setor.

@@ -17,7 +17,7 @@
   const pyroConfirm=$('#pyroConfirm'),confirmPyroBtn=$('#confirmPyro'),cancelPyroBtn=$('#cancelPyro');
   const stackChoice=$('#stackChoice'),stackButtons=$('#stackButtons');
   const combatChoice=$('#combatChoice'),stayCombatBtn=$('#stayCombat'),advanceCombatBtn=$('#advanceCombat');
-  const contextZone=$('#contextZone'),boardPopup=$('#boardPopup');const doppelChoiceBox=document.createElement('div');doppelChoiceBox.className='notice hidden';doppelChoiceBox.innerHTML='<b>🎭 Doppelgänger encontrou outra habilidade</b><div id="doppelChoiceText" class="muted small" style="margin:5px 0 9px"></div><div class="row"><button id="keepDoppel">Manter atual</button><button id="copyDoppel" class="primary">Copiar nova</button></div>';boardPopup.prepend(doppelChoiceBox);const doppelChoiceText=doppelChoiceBox.querySelector('#doppelChoiceText'),keepDoppelBtn=doppelChoiceBox.querySelector('#keepDoppel'),copyDoppelBtn=doppelChoiceBox.querySelector('#copyDoppel');const bardChoiceBox=document.createElement('div');bardChoiceBox.className='notice hidden';bardChoiceBox.innerHTML='<b>🎵 Inspiração do Bardo</b><div id="bardChoiceText" class="muted small" style="margin:5px 0 9px"></div><div class="row" id="bardChoiceButtons"></div>';boardPopup.prepend(bardChoiceBox);const bardChoiceText=bardChoiceBox.querySelector('#bardChoiceText'),bardChoiceButtons=bardChoiceBox.querySelector('#bardChoiceButtons');const golemChoiceBox=document.createElement('div');golemChoiceBox.className='notice hidden';golemChoiceBox.innerHTML='<b>🗿 Absorver Rocha</b><div class="muted small" style="margin:5px 0 9px">Escolha a adaptação. Ela substitui a anterior.</div><div class="row" id="golemChoiceButtons"></div>';boardPopup.prepend(golemChoiceBox);const golemChoiceButtons=golemChoiceBox.querySelector('#golemChoiceButtons');
+  const contextZone=$('#contextZone'),boardPopup=$('#boardPopup');const doppelChoiceBox=document.createElement('div');doppelChoiceBox.className='notice hidden';doppelChoiceBox.innerHTML='<b>🎭 Doppelgänger encontrou outra habilidade</b><div id="doppelChoiceText" class="muted small" style="margin:5px 0 9px"></div><div class="row"><button id="keepDoppel">Manter atual</button><button id="copyDoppel" class="primary">Copiar nova</button></div>';boardPopup.prepend(doppelChoiceBox);const doppelChoiceText=doppelChoiceBox.querySelector('#doppelChoiceText'),keepDoppelBtn=doppelChoiceBox.querySelector('#keepDoppel'),copyDoppelBtn=doppelChoiceBox.querySelector('#copyDoppel');const bardChoiceBox=document.createElement('div');bardChoiceBox.className='notice hidden';bardChoiceBox.innerHTML='<b>🎵 Inspiração do Bardo</b><div id="bardChoiceText" class="muted small" style="margin:5px 0 9px"></div><div class="row" id="bardChoiceButtons"></div>';boardPopup.prepend(bardChoiceBox);const bardChoiceText=bardChoiceBox.querySelector('#bardChoiceText'),bardChoiceButtons=bardChoiceBox.querySelector('#bardChoiceButtons');const golemChoiceBox=document.createElement('div');golemChoiceBox.className='notice hidden';golemChoiceBox.innerHTML='<b>🗿 Absorver Rocha</b><div class="muted small" style="margin:5px 0 9px">Escolha a adaptação. Ela substitui a anterior.</div><div class="row" id="golemChoiceButtons"></div>';boardPopup.prepend(golemChoiceBox);const golemChoiceButtons=golemChoiceBox.querySelector('#golemChoiceButtons');const kamikazeBox=document.createElement('div');kamikazeBox.className='notice hidden';kamikazeBox.innerHTML='<b>💥 Autodestruição do Kamikaze</b><div class="muted small" style="margin:5px 0 9px">As casas marcadas serão atingidas. A explosão também acerta aliados e o próprio Kamikaze morre.</div><div class="row"><button class="primary" id="confirmKamikaze">Confirmar explosão</button><button id="cancelKamikaze">Cancelar</button></div>';boardPopup.prepend(kamikazeBox);const confirmKamikazeBtn=kamikazeBox.querySelector('#confirmKamikaze'),cancelKamikazeBtn=kamikazeBox.querySelector('#cancelKamikaze');
   const auditBtn=$('#auditBtn'),auditBox=$('#auditBox');
   const setupBasesEl=$('#setupBases'),base1Btn=$('#base1Btn'),base2Btn=$('#base2Btn'),baseSetupStatus=$('#baseSetupStatus');
   const teamSection=$('#teamSection'),teamTitle=$('#teamTitle'),teamToggle=$('#teamToggle'),readyStatus=$('#readyStatus');
@@ -32,9 +32,9 @@
   let status='Inspecione os personagens e marque ☐ Selecionar para montar a equipe.';
   const ABILITY_TEXT={
     "Arqueiro":"M1 e Alcance de Ataque 3. Tiro Certeiro dobra o alcance de ataque neste turno e entra em recarga por 1 turno próprio.",
-    "Ninja":"Especialista em mobilidade e alcance: M2 e ALC2. Não possui habilidade ativa.",
+    "Ninja":"Bomba de Fumaça: ao ativar, fica completamente indetectável por PER, Vidente, armadilha da Sentinela e qualquer efeito de revelação até o fim do próximo turno próprio. Recarga: 2 turnos próprios.",
     "Piromante":"Escolhe 1 ou 2 casas dentro do Alc. Hab. e resolve os dois ataques na mesma ação.",
-    "Kamikaze":"Ao morrer, causa 1 de dano em toda a área do Alc. Hab., inclusive em aliados. Aumentar o Alc. Hab. expande a explosão.",
+    "Kamikaze":"Explode ao morrer e também pode usar Autodestruição como habilidade ativa. Antes de confirmar, o jogo mostra toda a área atingida. O Alc. Hab. funciona em anéis ao redor dele: Alc. Hab. 1 atinge o primeiro anel; Alc. Hab. 2 atinge os dois primeiros anéis, e assim por diante. A explosão causa 1 de dano inclusive em aliados.",
     "Caçador":"Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Pode prepará-la mesmo em uma casa já ocupada; ela não dispara na colocação. Quando um inimigo entrar nessa casa depois, sofre 1 de dano antes de qualquer Confronto Direto. Colocar outra armadilha substitui a anterior.",
     "Paranoia":"Ao detectar inimigos com a própria PER, afeta até 2 alvos. Depois que um alvo se move, por 2 turnos a percepção dele sempre acusa uma presença, verdadeira ou falsa.",
     "Escudeiro":"Pode compartilhar casa com 1 aliado. Ao usar Vincular enquanto dividem a casa, acompanha automaticamente os movimentos desse aliado. Enquanto vinculado, não se move sozinho; use a habilidade novamente para Desvincular, gastando o turno. Também intercepta ataques e dano em área para proteger o aliado.",
@@ -43,7 +43,7 @@
     "Slime":"Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem morrer; os Mini-Slimes herdam seus bônus.",
     "Zumbi":"Na primeira morte, não conta como eliminação. Levanta-se na rodada seguinte com 1 de Vida e, depois de 3 turnos próprios, cai definitivamente. Se morrer antes disso, a eliminação é imediata.",
     "Druida":"Pode entrar em árvores vivas e não é detectado por PER enquanto estiver nelas. Desperta uma árvore dentro do Alc. Hab. como Galho-Vivo. Druida e Galho-Vivo compartilham o mesmo turno; se o Druida morrer, o Galho-Vivo volta a ser uma árvore normal.",
-    "Vidente":"Escolhe 1 casa dentro do Alc. Hab. e mais 1 casa ligada a ela por lado, revelando as 2.",
+    "Vidente":"Ao ativar, o tabuleiro mostra todas as casas possíveis dentro do Alc. Hab. Escolha a primeira casa e depois 1 casa adjacente por lado; as 2 ficam reveladas.",
     "Mago do Espelho":"Cria 1 Espelho dentro do Alc. Hab. A distância é medida em passos ortogonais; com Alc. Hab. 2, uma casa diagonal também fica ao alcance. O Espelho gera falsa presença e reflete o primeiro ataque; criar outro substitui o anterior.",
     "Necromante":"Ergue um Esqueleto usando um cadáver dentro do Alc. Hab. Limite de 1 Esqueleto vivo por Necromante.",
     "Doppelgänger":"Ao passar por um cadáver, copia sua habilidade. Habilidades ativas copiadas usam o Alc. Hab. do próprio Doppelgänger; ao encontrar outra, escolhe manter a atual ou trocar.",
@@ -238,13 +238,16 @@
     if(!p||typeof p.hp!=='number')return;
     const h=document.createElement('span');h.className=`hp-badge${enemy?' enemy-hp':''}`;h.textContent=`♥${p.hp}`;cell.appendChild(h);
   }
+  function addBiomeHpBadge(cell,hp){
+    if(typeof hp!=='number')return;const h=document.createElement('span');h.className='hp-badge terrain-hp';h.textContent=`♥${hp}`;cell.appendChild(h);
+  }
   function addScenery(cell,c,v){
     const t=(v?.trees||[]).find(x=>x.coord===c)||(v?.phase==='setup'&&TREE_CELLS.has(c)?{state:'live'}:null);
     const rock=(v?.rocks||[]).includes(c)||(v?.phase==='setup'&&ROCK_CELLS.has(c));
     const water=(v?.water||[]).includes(c)||(v?.phase==='setup'&&WATER_CELLS.has(c));
     const swamp=(v?.swamps||[]).includes(c)||(v?.phase==='setup'&&SWAMP_CELLS.has(c));
-    if(t){cell.classList.add('terrain-tree');if(t.state==='live')cell.classList.add('terrain-blocked');const src=t.state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src){const r=A.img(src,'scenery-art',t.state==='dead'?'Árvore destruída':'Árvore');r.title=t.state==='dead'?'Árvore destruída — passagem aberta; não pode ser despertada':`Árvore viva — ${t.hp??3}/3 Vida · bloqueia todos exceto o Druida`;cell.appendChild(r);}return;}
-    if(rock){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock){const r=A.img(A.terrain.rock,'scenery-art','Pedra');r.title=`Pedra — ${(v?.rockHp||{})[c]??3}/3 Vida · bloqueia passagem e posicionamento.`;cell.appendChild(r);}return;}
+    if(t){cell.classList.add('terrain-tree');if(t.state==='live')cell.classList.add('terrain-blocked');const src=t.state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src){const r=A.img(src,'scenery-art',t.state==='dead'?'Árvore destruída':'Árvore');r.title=t.state==='dead'?'Árvore destruída — passagem aberta; não pode ser despertada':`Árvore viva — ${t.hp??3}/3 Vida · bloqueia todos exceto o Druida`;cell.appendChild(r);}if(t.state==='live')addBiomeHpBadge(cell,Number(t.hp??3));return;}
+    if(rock){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock){const r=A.img(A.terrain.rock,'scenery-art','Pedra');r.title=`Pedra — ${(v?.rockHp||{})[c]??3}/3 Vida · bloqueia passagem e posicionamento.`;cell.appendChild(r);}addBiomeHpBadge(cell,Number((v?.rockHp||{})[c]??3));return;}
     if(water){cell.classList.add('terrain-water');if(A.terrain?.water){const r=A.img(A.terrain.water,'scenery-art','Lago');r.title='Lago — terreno passável sem custo extra.';cell.appendChild(r);}return;}
     if(swamp){cell.classList.add('terrain-swamp');if(A.terrain?.swamp){const r=A.img(A.terrain.swamp,'scenery-art','Pântano');r.title='Pântano — entrar custa 2 de movimento.';cell.appendChild(r);}}
   }
@@ -328,7 +331,7 @@
         // Ao entrar em qualquer habilidade, o tabuleiro mostra o Alc. Hab. completo da peça.
         // A validação de cadáver/árvore/aliado/casa continua pertencendo ao Árbitro.
         if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(a.mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');if(a.mode==='absorbRock'&&(v.rocks||[]).includes(c)&&R.neighbors(p.coord,false).includes(c))b.classList.add('highlight');
-        if(a.mode==='seer'){if(!seerPreview.size&&R.abilityCells(p).includes(c))b.classList.add('highlight');else{const main=[...seerPreview][0];if(c===main||R.neighbors(main,false).includes(c))b.classList.add('highlight');}}if(a.mode==='shieldLink'&&c===p.coord)b.classList.add('highlight');
+        if(a.mode==='seer'){if(!seerPreview.size&&R.abilityCells(p).includes(c))b.classList.add('highlight','seer-range');else{const main=[...seerPreview][0];if(c===main)b.classList.add('highlight','seer-main');else if(R.neighbors(main,false).includes(c))b.classList.add('highlight','seer-next');}}if(a.mode==='kamikaze'&&(a.kamikazeCells||[]).includes(c))b.classList.add('attack-highlight','kamikaze-highlight');if(a.mode==='shieldLink'&&c===p.coord)b.classList.add('highlight');
       }
     }
   }
@@ -353,7 +356,7 @@
     doppelChoiceBox.classList.toggle('hidden',!v.doppelChoice);if(v.doppelChoice)doppelChoiceText.textContent=`Atual: ${v.doppelChoice.current} · Novo: ${v.doppelChoice.newAbility}`;
     advanceCombatBtn.disabled=v.pendingCombat?.canAdvance===false;
     advanceCombatBtn.textContent=v.pendingCombat?.canAdvance===false?'Posição ocupada':'Posição da derrotada';
-    pyroConfirm.classList.toggle('hidden',v.activation?.mode!=='pyro');
+    pyroConfirm.classList.toggle('hidden',v.activation?.mode!=='pyro');kamikazeBox.classList.toggle('hidden',v.activation?.mode!=='kamikaze');
     if(v.gameOver){setStatus(v.result==='player'?'Você venceu.':v.result==='enemy'?'Você perdeu.':'Empate.');const win=v.result==='player',draw=v.result==='draw';Presentation.showEndScreen({key:`classic:${v.result}:${v.round}`,mode:'classic',result:v.result,icon:draw?'⚖️':win?'🏆':'☠️',title:draw?'EMPATE':win?'VITÓRIA':'DERROTA',tone:draw?'draw':win?'victory':'defeat',reason:draw?'As duas equipes chegaram ao limite de perdas na mesma resolução.':win?'Você eliminou 3 das 4 peças originais do adversário.':'O adversário eliminou 3 das suas 4 peças originais.',round:v.round,summary:[{label:'Suas perdas',value:`${v.ownOriginalDeaths}/3`},{label:'Perdas inimigas',value:`${v.enemyOriginalDeaths}/3`},{label:'Rodadas disputadas',value:v.round}],onReplay:replay&&replay.length>1?()=>window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'}):null});}
     else {Presentation.hideEndScreen();if(v.turn==='enemy'&&!v.pendingCombat)statusEl.textContent='🤖 Vez da IA...'; else statusEl.textContent=status;}
     if(replayBtn)replayBtn.classList.toggle('hidden',!(v.gameOver&&replay&&replay.length>1));
@@ -474,7 +477,7 @@
       case 'startAttack':r=ai.startAttack();break;
       case 'attack':r=ai.attack(action.to);break;
       case 'pyroSelect':r=ai.selectPyroTarget(action.to);break;
-      case 'pyroConfirm':r=ai.confirmPyroAttack();break;
+      case 'pyroConfirm':r=ai.confirmPyroAttack();break;case 'kamikazeConfirm':r=ai.confirmKamikaze();break;
       case 'startAbility':r=ai.startAbility();break;
       case 'seer':r=ai.useSeer(action.cells);break;
       case 'raise':r=ai.raiseAt(action.to);break;
@@ -513,6 +516,8 @@
   cancelSeerBtn.addEventListener('click',()=>{const r=player.cancelMode();seerPreview.clear();seerConfirm.classList.add('hidden');setStatus(r.status);render();});
   confirmPyroBtn.addEventListener('click',()=>{const v=view(),a=v.activation;immediateActionFx(v,'pyro',null,[...(a?.pyroTargets||[])]);const r=player.confirmPyroAttack();setStatus(r.status);afterMutation();});
   cancelPyroBtn.addEventListener('click',()=>{const r=player.cancelMode();setStatus(r.status);render();});
+  confirmKamikazeBtn.addEventListener('click',()=>{const r=player.confirmKamikaze();setStatus(r.status);afterMutation();});
+  cancelKamikazeBtn.addEventListener('click',()=>{const r=player.cancelMode();setStatus(r.status);render();});
   stayCombatBtn.addEventListener('click',()=>{const r=player.chooseCombatPosition(false);setStatus(r.status);afterMutation();});
   advanceCombatBtn.addEventListener('click',()=>{const r=player.chooseCombatPosition(true);setStatus(r.status);afterMutation();});
   base1Btn.addEventListener('click',()=>handleSetupBaseButton(1));
