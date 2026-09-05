@@ -18,7 +18,7 @@
     percepcao:'assets/effects/percepcao.png',vida:'assets/effects/vida.png',revelada:'assets/effects/casa-revelada.png',confronto:'assets/effects/confronto.png',buff:'assets/effects/buff.png',
     dano:'assets/effects/dano.png',cura:'assets/effects/cura.png',trapAtivada:'assets/effects/armadilha-ativada.png',espelho:'assets/effects/espelho.png',canalizacao:'assets/effects/canalizacao.png',
     vinculo:'assets/effects/vinculo.png',oculto:'assets/effects/oculto.png',explosao:'assets/effects/explosao.png',fogo:'assets/effects/fogo.png',sabotagem:'assets/effects/sabotagem.png',
-    invocacao:'assets/effects/invocacao.png',lapide:'assets/effects/lapide.png'
+    invocacao:'assets/effects/invocacao.png',lapide:'assets/effects/lapide.png',voador:'assets/effects/voador.png'
   };
   const archetypes={R:'assets/archetypes/vanguarda.png',P:'assets/archetypes/estrategista.png',S:'assets/archetypes/executor.png',J:'assets/archetypes/coringa.png',C:'assets/archetypes/condenado.png'};
   const character=name=>{const key=charMap[name]||charMap[String(name||'').trim()];return key?`assets/characters/${key}.png`:null;};

@@ -223,8 +223,7 @@ __refRoot.GameReferee = class GameReferee {
   }
 
   #other(side){return side==='player'?'enemy':'player';}
-  #activationKey(p){return p?.summonType==='livingBranch'&&p.druidId?`druid:${p.druidId}`:p?.name==='Druida'?`druid:${p.id}`:p?.id||'';}
-  #aliveActivationUnits(side){const keys=new Set();for(const p of this.#pieces(side))if(p.alive)keys.add(this.#activationKey(p));return keys.size;}
+  #aliveActivationUnits(side){return this.#pieces(side).filter(p=>p.alive).length;}
   #activationLimit(side){if(this.#s.mode==='training')return Infinity;const own=this.#aliveActivationUnits(side),opp=this.#aliveActivationUnits(this.#other(side));return Math.min(own,opp+1);}
   #hasActivationLeft(side){if(this.#s.mode==='training')return true;const used=this.#s.roundActivations?.[side]||0;if(used>=this.#activationLimit(side))return false;return this.#pieces(side).some(p=>p.alive&&!p.activated);}
   #isCorner(c){const q=this.#R.rc(c);return (q.x===0||q.x===7)&&(q.y===0||q.y===7);}
@@ -234,8 +233,8 @@ __refRoot.GameReferee = class GameReferee {
   #rockAt(c){return (this.#s.rocks||[]).includes(c);}
   #waterAt(c){return (this.#s.water||[]).includes(c);}
   #swampAt(c){return (this.#s.swamps||[]).includes(c);}
-  #moveCost(c){return this.#swampAt(c)?2:1;}
-  #treeBlocks(p,c){if(this.#rockAt(c))return true;const t=this.#treeAt(c);if(!t||t.state!=='live')return false;return !(p?.name==='Druida'&&t.state==='live');}
+  #moveCost(p,c){return this.#R.defOf(p)?.flying?1:(this.#swampAt(c)?2:1);}
+  #treeBlocks(p,c){if(this.#R.defOf(p)?.flying)return false;if(this.#rockAt(c))return true;const t=this.#treeAt(c);if(!t||t.state!=='live')return false;return !(p?.name==='Druida'&&t.state==='live');}
   #solidTerrain(c){return this.#rockAt(c)||this.#treeAt(c)?.state==='live';}
   #damageTerrain(c,n,side,attackerName='Ataque'){const tree=this.#treeAt(c);if(tree?.state==='live'){tree.hp=Math.max(0,(Number(tree.hp)||3)-Math.max(0,Number(n)||0));if(tree.hp<=0){tree.state='dead';tree.hp=0;this.#addHistory(side,`🌳 ${attackerName} destruiu uma árvore e abriu a passagem.`);this.#noteReplay('terrain',side,{terrain:'tree',coord:c,destroyed:true});}else this.#addHistory(side,`🌳 Árvore atingida: ${tree.hp}/3 Vida.`);return true;}if(this.#rockAt(c)){this.#s.rockHp=this.#s.rockHp||{};const hp=Math.max(0,(Number(this.#s.rockHp[c])||3)-Math.max(0,Number(n)||0));this.#s.rockHp[c]=hp;if(hp<=0){this.#s.rocks=this.#s.rocks.filter(x=>x!==c);delete this.#s.rockHp[c];this.#addHistory(side,`🪨 ${attackerName} destruiu uma pedra e abriu a passagem.`);this.#noteReplay('terrain',side,{terrain:'rock',coord:c,destroyed:true});}else this.#addHistory(side,`🪨 Pedra atingida: ${hp}/3 Vida.`);return true;}return false;}
   #isDruidHidden(p){return !!(p?.alive&&p.name==='Druida'&&this.#treeAt(p.coord)?.state==='live');}
@@ -244,7 +243,6 @@ __refRoot.GameReferee = class GameReferee {
   #isGhost(p){return !!p&&(p.identity==='Fantasma'||p.name==='Fantasma')&&!p.possession;}
   #abilityDistance(p,c){return this.#R.man(p.coord,c);}
   #inAbilityRange(p,c,allowSelf=false){const ah=this.#R.defOf(p).ah||0,dist=this.#abilityDistance(p,c);return (allowSelf?dist>=0:dist>0)&&dist<=ah;}
-  #shareTurnMate(p){if(!p)return null;if(p.name==='Druida')return this.#pieces(p.owner).find(x=>x.alive&&x.summonType==='livingBranch'&&x.druidId===p.id)||null;if(p.summonType==='livingBranch')return this.#rawPieceById(p.owner,p.druidId);return null;}
   #linkedShieldFor(p){if(!p)return null;return this.#pieces(p.owner).find(x=>x.alive&&x.linkedToId===p.id)||null;}
   #clearShieldLinks(p){if(!p)return;if(p.linkedToId)p.linkedToId=null;for(const q of this.#pieces(p.owner))if(q.linkedToId===p.id)q.linkedToId=null;}
   #noteReplay(type,side,data={}){const e={type,side,round:this.#s.round,...structuredClone(data)},cur=this.#s.replayEvent;if(!cur)this.#s.replayEvent=e;else if(cur.type==='sequence'&&Array.isArray(cur.events))cur.events.push(e);else this.#s.replayEvent={type:'sequence',side,round:this.#s.round,events:[cur,e]};}
@@ -289,7 +287,7 @@ __refRoot.GameReferee = class GameReferee {
     const extraEffects=[...(p.effects||[]).filter(e=>viewerSide===p.owner||e.public!==false)];
     if(p.paranoia?.revealed&&viewerSide===p.owner)extraEffects.push({id:'paranoia',name:'Paranoia',icon:'🧠',remaining:p.paranoia.remaining,kind:'debuff',tick:'turn'});
     if((p.ninjaSmokeRemaining||0)>0&&viewerSide===p.owner)extraEffects.push({id:'ninja-smoke',name:'Bomba de Fumaça',icon:'🌫️',remaining:p.ninjaSmokeRemaining,kind:'buff',tick:'turn'});
-    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemAbsorbStat:p.golemAbsorbStat||null,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
+    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,flying:!!d.flying,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemAbsorbStat:p.golemAbsorbStat||null,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
   }
 
   #getView(side){
@@ -327,7 +325,7 @@ __refRoot.GameReferee = class GameReferee {
     const p=this.#pieceById(side,id); if(!p)return this.#fail('Peça indisponível.');
     if(this.#s.mode!=='training'&&!this.#hasActivationLeft(side))return this.#fail('Seu limite de turnos desta rodada já foi atingido.');
     if(this.#s.mode!=='training'&&p.activated)return this.#fail(`${this.#R.defOf(p).name} já agiu nesta rodada.`);
-    const mate=this.#shareTurnMate(p);if(this.#s.mode!=='training'&&mate?.activated)return this.#fail('Druida e Galho-Vivo compartilham o mesmo turno nesta rodada.');
+    
     const a=this.#activation(side);
     if(a&&a.committed&&a.pieceId!==id) return this.#fail(`O turno de ${this.#R.defOf(this.#activePiece(side)).name} já foi comprometido.`);
     if(!a||a.pieceId!==id)this.#clearSpotOnTurnStart(p);
@@ -360,14 +358,14 @@ __refRoot.GameReferee = class GameReferee {
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p)return this.#fail('Selecione uma peça.');
     const d=this.#R.defOf(p); if(p.linkedToId)return this.#fail(`${this.#R.defOf(p).name} está vinculado e não pode se mover sozinho. Use a habilidade para desvincular primeiro.`); if(a.movementUsed)return this.#fail(`${d.name} já usou o movimento.`); if(d.m<=0)return this.#fail(`${d.name} tem M0 e não pode se mover.`);
-    a.mode='move';a.moveRemaining=d.m;return this.#ok(`Prévia de movimento: até ${d.m} ${d.m===1?'passo':'passos'}. Casas de pântano gastam 2 de movimento. Ainda pode cancelar sem gastar.`);
+    a.mode='move';a.moveRemaining=d.m;return this.#ok(`Prévia de movimento: até ${d.m} ${d.m===1?'passo':'passos'}.${d.flying?' Voador ignora o custo extra do Pântano e pode atravessar Árvores/Pedras sem terminar sobre elas.':' Casas de pântano gastam 2 de movimento.'} Ainda pode cancelar sem gastar.`);
   }
 
   #moveStep(side,to){
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p||a.mode!=='move')return this.#fail('Movimento não iniciado.');
-    const d=this.#R.defOf(p), cost=this.#moveCost(to);
-    if(a.moveRemaining<=0||!this.#R.neighbors(p.coord,d.diag).includes(to)||!this.#canShareCell(side,p,to)||cost>a.moveRemaining)return this.#fail(cost>1?'Pântano exige 2 de movimento; escolha outra casa ou ganhe mais mobilidade.':'Escolha uma casa válida.');
+    const d=this.#R.defOf(p), cost=this.#moveCost(p,to), solidDest=this.#solidTerrain(to);
+    if(a.moveRemaining<=0||!this.#R.neighbors(p.coord,d.diag).includes(to)||!this.#canShareCell(side,p,to)||cost>a.moveRemaining)return this.#fail(cost>1?'Pântano exige 2 de movimento; escolha outra casa ou ganhe mais mobilidade.':'Escolha uma casa válida.');if(d.flying&&solidDest&&a.moveRemaining<=cost)return this.#fail('Unidades voadoras podem atravessar Árvores e Pedras, mas não terminar o movimento sobre elas.');
     this.#commit(side);a.movementUsed=true;a.stepsTaken=(a.stepsTaken||0)+1;
     const from=p.coord,foe=this.#pieceAt(this.#other(side),to),linkedShield=this.#linkedShieldFor(p);
     p.coord=to;
@@ -383,7 +381,7 @@ __refRoot.GameReferee = class GameReferee {
 
   #stopMove(side){
     const bad=this.#validateTurn(side); if(bad)return bad;
-    const a=this.#activation(side); if(!a||a.mode!=='move')return this.#fail('Nenhum movimento em andamento.');
+    const a=this.#activation(side),p=this.#activePiece(side); if(!a||a.mode!=='move')return this.#fail('Nenhum movimento em andamento.');if(p&&this.#R.defOf(p)?.flying&&this.#solidTerrain(p.coord))return this.#fail('Unidades voadoras precisam terminar o movimento fora de Árvores e Pedras.');
     return this.#finishMove(side);
   }
 
@@ -756,7 +754,7 @@ __refRoot.GameReferee = class GameReferee {
   }
 
   #finishActivation(side){
-    const hadActivation=!!this.#activation(side),p=this.#activePiece(side);if(this.#s.mode!=='training'&&hadActivation)this.#s.roundActivations[side]=(this.#s.roundActivations?.[side]||0)+1;if(p&&p.alive){if(p.name==='Arqueiro'||p.identity==='Arqueiro'){p.sureShotActive=false;if((p.sureShotCooldown||0)>0)p.sureShotCooldown--;}if((p.ninjaSmokeCooldown||0)>0)p.ninjaSmokeCooldown--;if((p.ninjaSmokeRemaining||0)>0&&p.ninjaSmokeCooldown<2)p.ninjaSmokeRemaining--;p.activated=this.#s.mode==='training'?false:true;const mate=this.#shareTurnMate(p);if(mate?.alive)mate.activated=this.#s.mode==='training'?false:true;this.#tickPieceEffects(p,'turn');if(p.name==='Bardo'||p.identity==='Bardo')this.#expireBardAfterTurn(p);else p.turnsTaken=(p.turnsTaken||0)+1;if(p.paranoia?.revealed){p.paranoia.remaining--;if(p.paranoia.remaining<=0){p.paranoia=null;this.#addIntel(side,'🧠 O efeito de Paranoia terminou.');}}if(p.name==='Zumbi'&&p.zombieTurnsLeft>0){p.zombieTurnsLeft--;if(p.zombieTurnsLeft<=0){this.#addHistory(side,'🧟 Os 3 turnos do Zumbi terminaram; ele caiu definitivamente.');this.#kill(p,true);}}}
+    const hadActivation=!!this.#activation(side),p=this.#activePiece(side);if(this.#s.mode!=='training'&&hadActivation)this.#s.roundActivations[side]=(this.#s.roundActivations?.[side]||0)+1;if(p&&p.alive){if(p.name==='Arqueiro'||p.identity==='Arqueiro'){p.sureShotActive=false;if((p.sureShotCooldown||0)>0)p.sureShotCooldown--;}if((p.ninjaSmokeCooldown||0)>0)p.ninjaSmokeCooldown--;if((p.ninjaSmokeRemaining||0)>0&&p.ninjaSmokeCooldown<2)p.ninjaSmokeRemaining--;p.activated=this.#s.mode==='training'?false:true;this.#tickPieceEffects(p,'turn');if(p.name==='Bardo'||p.identity==='Bardo')this.#expireBardAfterTurn(p);else p.turnsTaken=(p.turnsTaken||0)+1;if(p.paranoia?.revealed){p.paranoia.remaining--;if(p.paranoia.remaining<=0){p.paranoia=null;this.#addIntel(side,'🧠 O efeito de Paranoia terminou.');}}if(p.name==='Zumbi'&&p.zombieTurnsLeft>0){p.zombieTurnsLeft--;if(p.zombieTurnsLeft<=0){this.#addHistory(side,'🧟 Os 3 turnos do Zumbi terminaram; ele caiu definitivamente.');this.#kill(p,true);}}}
     this.#s.activation[side]=null;this.#s.impact[side]=null;if(this.#s.combatHold?.[side])this.#s.combatHold[side]=false;else if(this.#s.combatMarks)this.#s.combatMarks[side]=[];if(this.#s.mode==='training'){this.#s.turn=side;return this.#ok('Ação de treino encerrada. Você pode usar qualquer peça novamente.',{training:true});}if(this.#checkEnd())return this.#ok('Partida encerrada.',{gameOver:true});this.#advanceAfterActivation(side);return this.#ok('Turno encerrado.',{turn:this.#s.turn});
   }
 

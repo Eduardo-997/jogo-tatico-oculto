@@ -214,7 +214,7 @@ function ownCoords(view){return new Set(ownAlive(view).map(p=>p.coord));}
 function baseCoords(view){return new Set((view.bases||[]).map(b=>b.coord));}
 function enemyBases(view){return (view.bases||[]).filter(b=>b.owner!=='enemy'&&!b.sabotaged);}
 function canShare(view,p,c){
-  if(isBlocked(c)||baseCoords(view).has(c))return false;
+  if((isBlocked(c)&&!p.flying)||baseCoords(view).has(c))return false;
   const ps=ownAt(view,c).filter(x=>x.id!==p.id),isLinker=x=>x?.name==='Escudeiro'||(x?.name==='Doppelgänger'&&x?.copied==='Escudeiro');
   const follower=ownAlive(view).find(x=>x.linkedToId===p.id&&x.coord===p.coord);if(follower&&ps.length)return false;
   if(!ps.length)return true;if(ps.length>=2)return false;
@@ -432,7 +432,7 @@ function bestObjective(view,p){
 }
 function movementStep(view,p,a){
   if(a.moveRemaining<=0)return {type:'stopMove'};
-  const opts=neighbors(p.coord,!!p.diag).filter(c=>canShare(view,p,c)&&((SWAMPS.has(c)?2:1)<=a.moveRemaining));
+  const opts=neighbors(p.coord,!!p.diag).filter(c=>{const solid=isBlocked(c),cost=p.flying?1:(SWAMPS.has(c)?2:1);return canShare(view,p,c)&&cost<=a.moveRemaining&&!(p.flying&&solid&&a.moveRemaining<=cost);});
   if(!opts.length)return {type:'stopMove'};
   // Se já alcançou um Posto ou uma boa oportunidade de tiro, não desperdiça passos.
   if((a.stepsTaken||0)>0){
@@ -446,7 +446,7 @@ function movementStep(view,p,a){
     if(objective)s+=(man(p.coord,objective.coord)-man(c,objective.coord))*8+objective.score*0.05;
     s+=directMoveRisk(p,c);
     // Não encosta inutilmente em nossas próprias bordas; favorece avanço e centro.
-    const q=rc(c);s+=(7-q.y)*0.34;s+=(3.5-Math.abs(q.x-3.5))*0.18;s-=SWAMPS.has(c)?1.2:0;
+    const q=rc(c);s+=(7-q.y)*0.34;s+=(3.5-Math.abs(q.x-3.5))*0.18;s-=p.flying?0:(SWAMPS.has(c)?1.2:0);
     // Caçadores aceitam mais risco, suportes preferem não pisar em casa muito suspeita.
     const role=metaOf(p).role;if(heat(c)>0.65)s+=((role==='hunter'||role==='assassin'||role==='bruiser'||p.name==='Trapaceiro')?5:-4)*heat(c);
     if(difficulty==='extreme'){

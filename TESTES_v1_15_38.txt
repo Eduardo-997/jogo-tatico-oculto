@@ -1,0 +1,26 @@
+TESTES SUGERIDOS v1.15.38
+
+1. ESCUDEIRO
+- Iniciar Vincular, selecionar um aliado e confirmar que aparece confirmação interna antes de gastar o turno.
+- Cancelar e verificar que o vínculo não é criado.
+- Com Escudeiro vinculado, usar a habilidade novamente e confirmar que Desvincular usa confirmação interna, sem popup do navegador.
+
+2. VOADOR
+- Conferir o selo/imagem Voador na ficha do Fantasma.
+- Com Fantasma M1, entrar em Pântano gastando apenas 1 de movimento.
+- Com bônus de Movimento, atravessar uma Árvore/Pedra e sair do outro lado.
+- Confirmar que não é possível encerrar voluntariamente o movimento sobre Árvore/Pedra.
+
+3. DRUIDA / GALHO-VIVO
+- Criar Galho-Vivo.
+- Na rodada seguinte, confirmar que Druida e Galho-Vivo podem ser ativados separadamente.
+- Conferir que unidades extras entram no limite de ativações e que não há teto fixo de 4.
+
+4. REGRAS
+- Abrir Regras no Clássico e conferir abas Atributos, Personagens e Informações.
+- Conferir arte do Voador e os 5 arquétipos na aba Personagens.
+- Conferir imagens dos marcadores na aba Informações.
+- Abrir Regras da Arena e repetir a conferência.
+
+5. INTERFACE
+- Confirmar que o texto redundante de biomas/Postos não aparece mais no rodapé do Clássico e Online.
