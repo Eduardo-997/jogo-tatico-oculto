@@ -29,7 +29,8 @@ function perceptionCells(c,per=1,diag=false){
 }
 function allCells(){const a=[];for(let y=0;y<8;y++)for(let x=0;x<8;x++)a.push(coord(x,y));return a;}
 const CELLS=allCells();
-const BLOCKED=new Set(['C3','F6','F3','C6']);
+const BLOCKED=new Set(['B3','G6','F2','C7']);
+const SWAMPS=new Set(['C5','F4']);
 const isBlocked=c=>BLOCKED.has(c);
 function attackCells(p){
   if(((p.a||0)<=0&&p.name!=='Fantasma')||(p.range||0)<=0)return [];
@@ -427,7 +428,7 @@ function bestObjective(view,p){
 }
 function movementStep(view,p,a){
   if(a.moveRemaining<=0)return {type:'stopMove'};
-  const opts=neighbors(p.coord,!!p.diag).filter(c=>canShare(view,p,c));
+  const opts=neighbors(p.coord,!!p.diag).filter(c=>canShare(view,p,c)&&((SWAMPS.has(c)?2:1)<=a.moveRemaining));
   if(!opts.length)return {type:'stopMove'};
   // Se já alcançou um Posto ou uma boa oportunidade de tiro, não desperdiça passos.
   if((a.stepsTaken||0)>0){
@@ -441,7 +442,7 @@ function movementStep(view,p,a){
     if(objective)s+=(man(p.coord,objective.coord)-man(c,objective.coord))*8+objective.score*0.05;
     s+=directMoveRisk(p,c);
     // Não encosta inutilmente em nossas próprias bordas; favorece avanço e centro.
-    const q=rc(c);s+=(7-q.y)*0.34;s+=(3.5-Math.abs(q.x-3.5))*0.18;
+    const q=rc(c);s+=(7-q.y)*0.34;s+=(3.5-Math.abs(q.x-3.5))*0.18;s-=SWAMPS.has(c)?1.2:0;
     // Caçadores aceitam mais risco, suportes preferem não pisar em casa muito suspeita.
     const role=metaOf(p).role;if(heat(c)>0.65)s+=((role==='hunter'||role==='assassin'||role==='bruiser'||p.name==='Coringa')?5:-4)*heat(c);
     if(difficulty==='extreme'){

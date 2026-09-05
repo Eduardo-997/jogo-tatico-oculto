@@ -33,7 +33,7 @@
     for(const d of defs){
       const picked=selected[side].some(x=>x.name===d.name),full=selected[side].length>=4&&!picked;
       const card=document.createElement('div');card.className=`char roster-card type-${d.type} training-card${picked?' chosen is-picked':''}`;
-      card.innerHTML=`<div class="roster-main"><span class="roster-icon">${d.icon}</span><span class="roster-name">${d.name}</span><span class="roster-type">${d.typeIcon}</span></div><div class="roster-state">V${d.v} · M${d.m} · ATQ${d.a} · ALC${d.range} · PER${d.per} · Alc. Hab. ${d.ah||0}</div>`;
+      card.innerHTML=`<div class="roster-main"><span class="roster-icon">${A.html?.(A.character?.(d.name),'roster-art',d.name)||d.icon}</span><span class="roster-name">${d.name}</span><span class="roster-type">${A.html?.(A.archetypes?.[d.type],'archetype-art',R.archetypeName(d.type))||d.typeIcon}</span></div><div class="roster-state">V${d.v} · M${d.m} · ATQ${d.a} · ALC${d.range} · PER${d.per} · Alc. Hab. ${d.ah||0}</div>`;
       const pick=document.createElement('button');pick.type='button';pick.className=`roster-pick${picked?' selected':''}`;pick.disabled=full;pick.textContent=picked?'☑ Selecionado':full?'Equipe completa':'☐ Selecionar';pick.addEventListener('click',e=>{e.stopPropagation();togglePiece(side,d.name);});card.appendChild(pick);
       roster.appendChild(card);
     }
@@ -64,19 +64,18 @@
     setupMode?paintSetup():paintGame();
   }
 
-  function addTree(cell,state='live'){
-    cell.classList.add('terrain-blocked','terrain-tree');const r=document.createElement('span');r.className='scenery-rune';r.textContent=state==='dead'?'🌑':'🌳';cell.appendChild(r);
-  }
-  function addRock(cell){cell.classList.add('terrain-blocked','terrain-rock');const r=document.createElement('span');r.className='scenery-rune scenery-rock';r.textContent='🪨';r.title='Rocha — bloqueia passagem e posicionamento.';cell.appendChild(r);}
-  function addWater(cell){cell.classList.add('terrain-water');const r=document.createElement('span');r.className='scenery-rune scenery-water';r.textContent='💧';r.title="Poça d'água — terreno passável por enquanto.";cell.appendChild(r);}
+  function addTree(cell,state='live'){cell.classList.add('terrain-blocked','terrain-tree');const src=state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src)cell.appendChild(A.img(src,'scenery-art',state==='dead'?'Árvore destruída':'Árvore'));}
+  function addRock(cell){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock)cell.appendChild(A.img(A.terrain.rock,'scenery-art','Pedra'));}
+  function addWater(cell){cell.classList.add('terrain-water');if(A.terrain?.water)cell.appendChild(A.img(A.terrain.water,'scenery-art','Lago'));}
+  function addSwamp(cell){cell.classList.add('terrain-swamp');if(A.terrain?.swamp)cell.appendChild(A.img(A.terrain.swamp,'scenery-art','Pântano'));}
   function tokenFor(p,side,setup=false){
-    const d=setup?defOfName(p.name):R.defOf(p),m=document.createElement('span');m.className=`piece-token type-${d?.type||p.type||'C'}${side==='enemy'?' enemy-token':''}`;m.textContent=d?.icon||p.icon||'●';return m;
+    const d=setup?defOfName(p.name):R.defOf(p),m=document.createElement('span');m.className=`piece-token art-token type-${d?.type||p.type||'C'}${side==='enemy'?' enemy-token':''}`;const src=A.character?.(p.displayName||p.name);if(src)m.appendChild(A.img(src,'piece-art',p.displayName||p.name));else m.textContent=d?.icon||p.icon||'●';return m;
   }
   function hpBadge(cell,hp,enemy=false){const b=document.createElement('span');b.className=`hp-badge${enemy?' enemy-hp':''}`;b.textContent=`♥${hp}`;cell.appendChild(b);}
   function durationBadges(cell,p){const effects=(p?.effects||[]).filter(e=>Number(e.remaining)>0);if(!effects.length)return;const w=document.createElement('span');w.className='duration-badges';for(const e of effects.slice(0,2)){const b=document.createElement('span');b.className=`duration-badge ${e.kind||'neutral'}`;b.textContent=`${e.icon||'⏳'}${e.remaining}`;w.appendChild(b);}if(effects.length>2){const b=document.createElement('span');b.className='duration-badge more';b.textContent=`+${effects.length-2}`;w.appendChild(b);}cell.appendChild(w);}
 
   function addBaseVisual(cell,side,index,sabotaged=false){
-    const icon=document.createElement('span');icon.className=`base-icon${sabotaged?' base-dead':''}`;icon.textContent=sabotaged?'🏚️':'🏰';cell.appendChild(icon);
+    const ally=side==='player',src=sabotaged?(ally?A.structures?.baseSabotagedAlly:A.structures?.baseSabotagedEnemy):(ally?A.structures?.baseAlly:A.structures?.baseEnemy);const icon=A.img?.(src,'base-art',sabotaged?'Posto Sabotado':'Posto de Operação')||document.createElement('span');if(!icon.src){icon.className=`base-icon${sabotaged?' base-dead':''}`;icon.textContent=sabotaged?'🏚️':'🏰';}cell.appendChild(icon);
     const label=document.createElement('span');label.className='base-label';label.textContent=`${sideName(side)}·P${index+1}`;cell.appendChild(label);
     cell.classList.add(side==='player'?'training-board-side-a':'training-board-side-b');
   }
@@ -153,7 +152,7 @@
     const pieces=allPieces(vs),v=activeView(vs),p=activePiece(vs),mode=v?.activation?.mode,siege=new Set([...(vs.player.siegeCells||[]),...(vs.enemy.siegeCells||[])]);
     const state=JSON.parse(ref.exportState(),(k,val)=>val&&val.__set?val.__set:val);
     for(const [c,b] of cells){
-      b.className='cell';b.innerHTML='';if(siege.has(c))b.classList.add('revealed','siege-revealed');const t=treeAt(state,c);if(t)addTree(b,t.state);else if((state.rocks||[]).includes(c))addRock(b);else if((state.water||[]).includes(c))addWater(b);const base=baseAtState(state,c);if(base)addBaseVisual(b,base.owner,Number((base.id||'').slice(-1))-1,base.sabotaged);
+      b.className='cell';b.innerHTML='';if(siege.has(c))b.classList.add('revealed','siege-revealed');const t=treeAt(state,c);if(t)addTree(b,t.state);else if((state.rocks||[]).includes(c))addRock(b);else if((state.water||[]).includes(c))addWater(b);else if((state.swamps||[]).includes(c))addSwamp(b);const base=baseAtState(state,c);if(base)addBaseVisual(b,base.owner,Number((base.id||'').slice(-1))-1,base.sabotaged);
       const ps=pieces.filter(x=>x.alive&&x.coord===c);
       if(ps.length){
         const first=ps[0];b.appendChild(tokenFor(first,first.owner));hpBadge(b,first.hp,first.owner==='enemy');durationBadges(b,first);b.classList.add(first.owner==='player'?'training-board-side-a':'training-board-side-b');
@@ -162,7 +161,7 @@
       if(p?.coord===c)b.classList.add('active-cell');
       if(p&&!mode&&base&&base.owner!==activeSide&&!base.sabotaged&&R.neighbors(base.coord,true).includes(p.coord))b.classList.add('sabotage-zone');
       if(p&&mode){
-        if(mode==='move'&&v.activation.moveRemaining>0&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps))b.classList.add('highlight');
+        if(mode==='move'&&v.activation.moveRemaining>=((R.swampCells||[]).includes(c)?2:1)&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps))b.classList.add('highlight');
         if(mode==='attack'&&R.attackCells(p).includes(c))b.classList.add('attack-highlight');
         if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');
         if(mode==='seer'&&(!seer.length?R.abilityCells(p).includes(c):(c===seer[0]||R.neighbors(seer[0],false).includes(c))))b.classList.add('highlight');

@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const R=window.GameRules;
+  const R=window.GameRules, A=window.BNSAssets||{};
   const referee=new window.GameReferee();
   const player=referee.createClient('player');
   const ai=referee.createClient('enemy');
@@ -52,9 +52,10 @@
     "Coringa":"Possui todos os arquétipos no Confronto Direto e também pode se mover pelas diagonais.",
     "Fantasma":"Ataques e Confrontos Diretos vencidos possuem o inimigo em vez de causar dano. Você passa a controlar a peça e o antigo dono perde sua localização. Se o Fantasma sofrer dano, ele morre e a peça é recuperada."
   };
-  const TREE_CELLS=new Set(R.treeCells||['C3','F6']);
-  const ROCK_CELLS=new Set(R.rockCells||['F3','C6']);
-  const WATER_CELLS=new Set(R.waterCells||['D4','E5']);
+  const TREE_CELLS=new Set(R.treeCells||['B3','G6']);
+  const ROCK_CELLS=new Set(R.rockCells||['F2','C7']);
+  const WATER_CELLS=new Set(R.waterCells||['E3','D6']);
+  const SWAMP_CELLS=new Set(R.swampCells||['C5','F4']);
   const setStatus=t=>{status=t;statusEl.textContent=t;};
   let previousFxView=null,pendingActionFx=[];
   const FX_MS=760;
@@ -222,8 +223,8 @@
   function makePieceToken(p,enemy=false){
     const m=document.createElement('span');
     const state=!enemy?(p.activated?' spent-token':' ready-token'):'';
-    m.className=`piece-token type-${p.type||'C'}${enemy?' enemy-token':''}${state?' '+state:''}`;
-    m.textContent=p.icon||'';
+    m.className=`piece-token art-token type-${p.type||'C'}${enemy?' enemy-token':''}${state?' '+state:''}`;
+    const src=A.character?.(p.displayName||p.name);if(src){const im=A.img(src,'piece-art',p.displayName||p.name);m.appendChild(im);}else m.textContent=p.icon||'';
     return m;
   }
   function addDurationBadges(cell,p,enemy=false){
@@ -241,9 +242,11 @@
     const t=(v?.trees||[]).find(x=>x.coord===c)||(v?.phase==='setup'&&TREE_CELLS.has(c)?{state:'live'}:null);
     const rock=(v?.rocks||[]).includes(c)||(v?.phase==='setup'&&ROCK_CELLS.has(c));
     const water=(v?.water||[]).includes(c)||(v?.phase==='setup'&&WATER_CELLS.has(c));
-    if(t){cell.classList.add('terrain-blocked','terrain-tree');const r=document.createElement('span');r.className='scenery-rune';r.textContent=t.state==='dead'?'🌑':'🌳';r.title=t.state==='dead'?'Árvore morta — bloqueia caminho e não pode ser despertada':'Árvore viva — bloqueia todos exceto o Druida';cell.appendChild(r);return;}
-    if(rock){cell.classList.add('terrain-blocked','terrain-rock');const r=document.createElement('span');r.className='scenery-rune scenery-rock';r.textContent='🪨';r.title='Rocha — bloqueia passagem e posicionamento.';cell.appendChild(r);return;}
-    if(water){cell.classList.add('terrain-water');const r=document.createElement('span');r.className='scenery-rune scenery-water';r.textContent='💧';r.title="Poça d'água — terreno passável por enquanto.";cell.appendChild(r);}
+    const swamp=(v?.swamps||[]).includes(c)||(v?.phase==='setup'&&SWAMP_CELLS.has(c));
+    if(t){cell.classList.add('terrain-blocked','terrain-tree');const src=t.state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src){const r=A.img(src,'scenery-art',t.state==='dead'?'Árvore destruída':'Árvore');r.title=t.state==='dead'?'Árvore morta — bloqueia caminho e não pode ser despertada':'Árvore viva — bloqueia todos exceto o Druida';cell.appendChild(r);}return;}
+    if(rock){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock){const r=A.img(A.terrain.rock,'scenery-art','Pedra');r.title='Pedra — bloqueia passagem e posicionamento.';cell.appendChild(r);}return;}
+    if(water){cell.classList.add('terrain-water');if(A.terrain?.water){const r=A.img(A.terrain.water,'scenery-art','Lago');r.title='Lago — terreno passável sem custo extra.';cell.appendChild(r);}return;}
+    if(swamp){cell.classList.add('terrain-swamp');if(A.terrain?.swamp){const r=A.img(A.terrain.swamp,'scenery-art','Pântano');r.title='Pântano — entrar custa 2 de movimento.';cell.appendChild(r);}}
   }
 
   function buildBoard(){
@@ -266,7 +269,7 @@
       const card=document.createElement('div');card.className='char roster-card type-'+d.type+(chosen?' chosen':'')+(active?' active':'')+(p?.activated?' spent-char':'');card.tabIndex=0;card.setAttribute('role','button');
       let state='';
       if(v.phase==='play'&&chosen)state=p?(p.alive?(p.activated?'✓ Já agiu':active?(v.activation.committed?'🔒 Comprometido':'◉ Selecionado'):'● Disponível'):'☠ Eliminado'):'☠ Eliminado';
-      card.innerHTML=`<div class="roster-main"><span class="roster-icon">${d.icon}</span><span class="roster-name">${d.name}</span><span class="roster-type">${d.typeIcon}</span></div>${state?`<div class="roster-state">${state}</div>`:''}`;
+      card.innerHTML=`<div class="roster-main"><span class="roster-icon">${A.html?.(A.character?.(d.name),'roster-art',d.name)||d.icon}</span><span class="roster-name">${d.name}</span><span class="roster-type">${A.html?.(A.archetypes?.[d.type],'archetype-art',R.archetypeName(d.type))||d.typeIcon}</span></div>${state?`<div class="roster-state">${state}</div>`:''}`;
       if(v.phase==='setup'){
         const pick=document.createElement('button');pick.type='button';pick.className='roster-pick'+(chosen?' selected':'');pick.textContent=chosen?'☑ Selecionado':'☐ Selecionar';
         pick.addEventListener('click',e=>{e.stopPropagation();toggleSetupCharacter(d);});card.appendChild(pick);
@@ -300,13 +303,13 @@
       const openedBase=(v.bases||[]).find(x=>x.id===openedBaseId);if(openedBase&&R.neighbors(openedBase.coord,true).includes(c))b.classList.add('sabotage-zone');
       if(v.phase==='setup'){
         const n=setupPos.get(c);if(n){const d=R.byName[n];if(d)b.appendChild(makePieceToken(d,false));if(setupSelected===n)b.classList.add('active-cell');}
-        const baseEntry=[...setupBasePos.entries()].find(([,bc])=>bc===c);if(baseEntry){const m=document.createElement('span');m.className='base-icon';m.textContent='🏰';b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=`P${baseEntry[0]}`;b.appendChild(lab);if(setupBaseSelected===baseEntry[0])b.classList.add('active-cell');}
+        const baseEntry=[...setupBasePos.entries()].find(([,bc])=>bc===c);if(baseEntry){const m=A.img?.(A.structures?.baseAlly,'base-art','Posto de Operação')||document.createElement('span');if(!m.src){m.className='base-icon';m.textContent='🏰';}b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=`P${baseEntry[0]}`;b.appendChild(lab);if(setupBaseSelected===baseEntry[0])b.classList.add('active-cell');}
       }else{
         if(seer.has(c)){const m=document.createElement('span');m.className='marker eye';m.textContent='👁️';b.appendChild(m);}
         if(seerPreview.has(c)){const m=document.createElement('span');m.className='marker previewmark';m.textContent='◉';b.appendChild(m);}
-        if(corpseAt(v,c)){const m=document.createElement('span');m.className='marker corpse';m.textContent='☠️';b.appendChild(m);}
-        if(ownMirrorAt(v,c)){const m=document.createElement('span');m.className='marker mirror';m.textContent='🪞';b.appendChild(m);}for(const t of v.ownTraps||[])if(t.coord===c){const m=document.createElement('span');m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🕳️';m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';b.appendChild(m);}
-        const base=baseAt(v,c);if(base){const m=document.createElement('span');m.className='base-icon'+(base.sabotaged?' base-dead':'');m.textContent='🏰';b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=base.owner==='player'?'SEU':'IA';b.appendChild(lab);}
+        if(corpseAt(v,c)){const m=A.img?.(A.effects?.lapide,'marker-art','Lápide')||document.createElement('span');if(!m.src){m.className='marker corpse';m.textContent='☠️';}b.appendChild(m);}
+        if(ownMirrorAt(v,c)){const m=A.img?.(A.effects?.espelho,'marker-art','Espelho')||document.createElement('span');if(!m.src){m.className='marker mirror';m.textContent='🪞';}b.appendChild(m);}for(const t of v.ownTraps||[])if(t.coord===c){const src=t.kind==='spot'?A.structures?.trapSentry:A.structures?.trapHunter;const m=A.img?.(src,'marker-art',t.kind==='spot'?'Armadilha da Sentinela':'Armadilha do Caçador')||document.createElement('span');if(!m.src){m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🕳️';}m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';b.appendChild(m);}
+        const base=baseAt(v,c);if(base){const ownBase=base.owner==='player',src=base.sabotaged?(ownBase?A.structures?.baseSabotagedAlly:A.structures?.baseSabotagedEnemy):(ownBase?A.structures?.baseAlly:A.structures?.baseEnemy);const m=A.img?.(src,'base-art',base.sabotaged?'Posto Sabotado':'Posto de Operação')||document.createElement('span');if(!m.src){m.className='base-icon'+(base.sabotaged?' base-dead':'');m.textContent='🏰';}b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=base.owner==='player'?'SEU':'IA';b.appendChild(lab);}
         const group=ownGroups.get(c)||[];
         if(group.length){
           const ordered=[...group].sort((a,b)=>(b.name==='Escudeiro')-(a.name==='Escudeiro'));
@@ -314,12 +317,12 @@
           if(ordered[1]){const s2=document.createElement('span');s2.className=`stack-second${ordered[1].activated?' spent-stack':''}`;s2.textContent=ordered[1].icon;b.appendChild(s2);}
         }
         const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}
-        if(v.impactCell===c){const m=document.createElement('span');m.className='marker impact';m.textContent='💥';b.appendChild(m);}if((v.combatCells||[]).includes(c)){const m=document.createElement('span');m.className='marker combat-mark';m.textContent='⚔️';m.title='Confronto Direto ocorreu aqui';b.appendChild(m);}
+        if(v.impactCell===c){const m=A.img?.(A.effects?.dano,'marker-art','Dano')||document.createElement('span');if(!m.src){m.className='marker impact';m.textContent='💥';}b.appendChild(m);}if((v.combatCells||[]).includes(c)){const m=A.img?.(A.effects?.confronto,'marker-art','Confronto')||document.createElement('span');if(!m.src){m.className='marker combat-mark';m.textContent='⚔️';}m.title='Confronto Direto ocorreu aqui';b.appendChild(m);}
         for(const h of v.perceptionHints||[])if(h.coord===c){const m=document.createElement('span');m.className=`presence-hint ${h.kind||'orth'}`;m.textContent=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';m.title=h.kind==='exact'?'Presença detectada nesta casa':h.kind==='diag'?'Possível presença diagonal':'Possível presença ortogonal';b.appendChild(m);}
       }
       const p=activePiece(v),a=v.activation;
       if(p&&v.turn==='player'&&!v.pendingCombat){
-        if(a.mode==='move'&&a.moveRemaining>0&&R.neighbors(p.coord,p.diag).includes(c)&&canShareUi(v,p,c))b.classList.add('highlight');
+        if(a.mode==='move'&&a.moveRemaining>=(SWAMP_CELLS.has(c)?2:1)&&R.neighbors(p.coord,p.diag).includes(c)&&canShareUi(v,p,c))b.classList.add('highlight');
         if(a.mode==='attack'&&R.attackCells(p).includes(c)&&!baseAt(v,c))b.classList.add('attack-highlight');
         if(a.mode==='pyro'&&R.abilityCells(p).includes(c))b.classList.add('attack-highlight');
         // Ao entrar em qualquer habilidade, o tabuleiro mostra o Alc. Hab. completo da peça.

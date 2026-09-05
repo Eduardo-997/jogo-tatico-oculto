@@ -1,12 +1,4 @@
-Batalha nas Sombras v1.15.27 — STAGING
+Batalha nas Sombras v1.15.29 — TESTE
 
-Versão para teste antes de promover ao repositório principal.
-
-Mudanças principais:
-- correção definitiva da sobreposição dos controles no celular;
-- rochas adicionadas como terreno bloqueante;
-- água adicionada como terreno passável provisoriamente;
-- terreno sincronizado com IA, Replay, Clássico Online e Arena.
-
-Repositório de staging: Eduardo-997/jogo-tatico-oculto
-Repositório principal: Eduardo-997/Batalha-nas-sombras-v1
+Versão para subir no repositório de teste `jogo-tatico-oculto`.
+Inclui integração visual dos assets enviados, redistribuição do terreno e Pântano com custo de 2 de movimento.

@@ -41,7 +41,7 @@
         <section class="qr-page" data-page="campo">
           <div class="qr-card"><b>🏰 Postos de Operação</b><p>Cada lado começa com 2 Postos. Para sabotar um Posto inimigo, fique adjacente e use o turno da unidade para escolher um benefício disponível.</p></div>
           <div class="qr-card"><b>👁️ Cerco Final</b><p>Quando os <strong>4 Postos</strong> tiverem sido sabotados, toda a <strong>borda externa do tabuleiro</strong> fica permanentemente revelada para os dois lados. Apenas unidades são reveladas por essa regra; armadilhas, Espelhos e outros elementos ocultos continuam seguindo suas próprias regras.</p></div>
-          <div class="qr-card"><b>🌳 Árvores e terreno</b><p>Árvores e rochas bloqueiam movimento e posicionamento. A água é passável por enquanto. Algumas habilidades interagem diretamente com árvores.</p></div>
+          <div class="qr-card"><b>🌳 Árvores e terreno</b><p>Árvores e pedras bloqueiam movimento e posicionamento. Lagos são passáveis. Pântanos custam 2 de movimento para entrar. Algumas habilidades interagem diretamente com árvores.</p></div>
           <div class="qr-card"><b>💀 Invocações e formas</b><p>Esqueleto, Mini-Slimes, Galho-Vivo e transformações seguem as regras de seus criadores/formas. Elas não contam automaticamente como personagens originais.</p></div>
           <div class="qr-card"><b>🃏 Habilidades específicas</b><p>As habilidades completas ficam nas fichas dos personagens. Esta seção resume apenas as regras gerais do jogo.</p></div>
         </section>
