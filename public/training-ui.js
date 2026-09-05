@@ -64,7 +64,7 @@
     setupMode?paintSetup():paintGame();
   }
 
-  function addTree(cell,state='live'){cell.classList.add('terrain-blocked','terrain-tree');const src=state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src)cell.appendChild(A.img(src,'scenery-art',state==='dead'?'Árvore destruída':'Árvore'));}
+  function addTree(cell,state='live'){cell.classList.add('terrain-tree');if(state==='live')cell.classList.add('terrain-blocked');const src=state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src)cell.appendChild(A.img(src,'scenery-art',state==='dead'?'Árvore destruída':'Árvore'));}
   function addRock(cell){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock)cell.appendChild(A.img(A.terrain.rock,'scenery-art','Pedra'));}
   function addWater(cell){cell.classList.add('terrain-water');if(A.terrain?.water)cell.appendChild(A.img(A.terrain.water,'scenery-art','Lago'));}
   function addSwamp(cell){cell.classList.add('terrain-swamp');if(A.terrain?.swamp)cell.appendChild(A.img(A.terrain.swamp,'scenery-art','Pântano'));}
@@ -161,6 +161,7 @@
       if(p?.coord===c)b.classList.add('active-cell');
       if(p&&!mode&&base&&base.owner!==activeSide&&!base.sabotaged&&R.neighbors(base.coord,true).includes(p.coord))b.classList.add('sabotage-zone');
       if(p&&mode){
+        if(mode==='absorbRock'&&(state.rocks||[]).includes(c)&&R.neighbors(p.coord,false).includes(c))b.classList.add('highlight');
         if(mode==='move'&&v.activation.moveRemaining>=((R.swampCells||[]).includes(c)?2:1)&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps))b.classList.add('highlight');
         if(mode==='attack'&&R.attackCells(p).includes(c))b.classList.add('attack-highlight');
         if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');
@@ -198,6 +199,7 @@
     else if(a.mode==='mirror')r=cl.placeMirror(c);
     else if(a.mode==='awaken')r=cl.awakenTree(c);
     else if(a.mode==='spotTrap'||a.mode==='damageTrap')r=cl.placeTrap(c);
+    else if(a.mode==='absorbRock'){if(!(v.rocks||[]).includes(c)||!R.neighbors(p.coord,false).includes(c)){setStatus('Escolha uma pedra adjacente ao Golem.');return;}const pick=window.prompt('Absorver Rocha: Vida, Movimento ou ATQ?','ATQ');const s=String(pick||'').toLowerCase(),stat=s.startsWith('v')?'life':s.startsWith('m')?'move':'attack';r=cl.absorbRock(c,stat);}
     else if(a.mode==='bard'){const target=v.ownPieces.find(x=>x.id!==p.id&&x.alive&&x.coord===c&&R.man(p.coord,x.coord)<=p.ah);if(target){showBard(target);return;}setStatus('Escolha um aliado do mesmo lado dentro do Alc. Hab.');return;}
     else if(a.mode==='shieldLink'){const target=v.ownPieces.find(x=>x.id!==p.id&&x.alive&&x.coord===p.coord);if(!target){setStatus('Escolha o aliado que está na mesma casa do Escudeiro.');return;}r=cl.shieldLink(target.id);}
     else{const base=baseAtView(v,c);if(base){showBase(base,v);return;}const hits=piecesAt(vs,c);if(hits.length>1)chooseStack(hits);else if(hits[0])switchSelect(hits[0]);return;}

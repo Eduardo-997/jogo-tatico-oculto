@@ -2,7 +2,7 @@
 var __gameRoot = typeof window!=='undefined' ? window : globalThis;
 __gameRoot.GameRules = (() => {
   const defs = [
-    {name:'Arqueiro',icon:'🏹',type:'S',typeIcon:'🗡️',v:1,m:0,a:1,range:99,per:1,ah:0},
+    {name:'Arqueiro',icon:'🏹',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:3,per:1,ah:0},
     {name:'Ninja',icon:'🗡️',type:'S',typeIcon:'🗡️',v:1,m:2,a:1,range:2,per:1,ah:0},
     {name:'Piromante',icon:'🔥',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:1,ah:1},
     {name:'Kamikaze',icon:'💣',type:'S',typeIcon:'🗡️',v:1,m:1,a:0,range:1,per:1,ah:1},
@@ -46,7 +46,7 @@ __gameRoot.GameRules = (() => {
   const sameLine=(a,b)=>{const A=rc(a),B=rc(b);return A.x===B.x||A.y===B.y};
   const treeCells=Object.freeze(['B3','G6']);
   const rockCells=Object.freeze(['F2','C7']);
-  const waterCells=Object.freeze(['E3','D6']);
+  const waterCells=Object.freeze(['D3','E6']);
   const swampCells=Object.freeze(['C5','F4']);
   const blockedCells=Object.freeze([...treeCells,...rockCells]);
   const isBlocked=c=>blockedCells.includes(c);
@@ -70,11 +70,14 @@ __gameRoot.GameRules = (() => {
       acc.v+=(Number(m.v)||0);acc.m+=(Number(m.m)||0);acc.a+=(Number(m.a)||0);acc.range+=(Number(m.range)||0);acc.per+=(Number(m.per)||0);acc.ah+=(Number(m.ah)||0);
       return acc;
     },{v:0,m:0,a:0,range:0,per:0,ah:0});
+    const absorb=p.golemAbsorbStat||null;
+    const rawV=Math.max(1,(base.v||0)+(p.bonusV||0)+temp.v+(absorb==='life'?1:0));
+    const rawM=Math.max(0,(base.m||0)+(p.bonusM||0)+temp.m+(absorb==='move'?1:0));
+    const rawA=Math.max(0,(base.a||0)+(p.bonusA||0)+temp.a+(absorb==='attack'?1:0));
+    let rawRange=Math.max(0,(base.range||0)+(p.bonusRange||0)+temp.range);
+    if((p.name==='Arqueiro'||p.identity==='Arqueiro')&&p.sureShotActive)rawRange*=2;
     return {...base,
-      v:Math.max(1,(base.v||0)+(p.bonusV||0)+temp.v),
-      m:Math.max(0,(base.m||0)+(p.bonusM||0)+temp.m),
-      a:Math.max(0,(base.a||0)+(p.bonusA||0)+temp.a),
-      range:Math.max(0,(base.range||0)+(p.bonusRange||0)+temp.range),
+      v:rawV,m:rawM,a:rawA,range:rawRange,
       per:Math.max(0,(base.per??1)+(p.bonusPer||0)+temp.per),
       ah:Math.max(0,(base.ah||0)+(p.bonusAH||0)+temp.ah)
     };

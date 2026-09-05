@@ -1,4 +1,10 @@
-Batalha nas Sombras v1.15.29 — TESTE
+Batalha nas Sombras v1.15.31 — TESTE GIT
 
-Versão para subir no repositório de teste `jogo-tatico-oculto`.
-Inclui integração visual dos assets enviados, redistribuição do terreno e Pântano com custo de 2 de movimento.
+Pacote para o repositório de testes "jogo-tatico-oculto".
+
+Mudanças principais:
+- Árvores e Pedras destrutíveis, com 3 de Vida.
+- Golem: Absorver Rocha com adaptação substituível (+1 Vida / Movimento / ATQ).
+- Arqueiro: M1, Alc. ATQ. 3 e habilidade Tiro Certeiro.
+- Lagos do Clássico corrigidos para D3 e E6.
+- Cenários da Arena distribuídos pelo mapa.
