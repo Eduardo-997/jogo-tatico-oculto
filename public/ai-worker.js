@@ -380,6 +380,8 @@ function effectiveAbility(p){
   return null;
 }
 function shouldUseAbility(view,p,a){
+  if(p.name==='Arqueiro')return (p.sureShotCooldown||0)<=0&&!!bestAttackTarget(view,{...p,range:(p.range||3)*2},{allowSpeculative:true});
+  if(p.name==='Golem'&&!p.form)return (view.rocks||[]).some(c=>man(p.coord,c)===1);
   const ab=effectiveAbility(p);if(!ab)return false;
   if(difficulty==='easy'&&Math.random()<diff().skipAbility)return false;
   if(ab==='shieldLink'){if(p.linkedToId)return false;return ownAt(view,p.coord).some(x=>x.id!==p.id&&x.alive);}
@@ -530,6 +532,7 @@ function decide(view,lastResult){
     if(targets.length&&heat(targets[0])>0.24)return {type:'pyroSelect',to:targets[0]};
     return {type:'pyroConfirm'};
   }
+  if(a.mode==='absorbRock'){const rocks=(view.rocks||[]).filter(c=>man(p.coord,c)===1);if(!rocks.length)return {type:'end'};let stat='attack';if((p.hp||1)<(p.maxHp||2)&&p.golemAbsorbStat!=='life')stat='life';else if(p.golemAbsorbStat==='attack')stat='move';return {type:'absorbRock',coord:rocks[0],stat};}
   if(a.mode==='shieldLink'){const target=ownAt(view,p.coord).find(x=>x.id!==p.id&&x.alive);return target?{type:'shieldLink',targetPieceId:target.id}:{type:'end'};}
   if(a.mode==='seer'){
     const best=bestSeerArea(view);if(best){memory.abilityRound[p.id]=view.round;return {type:'seer',cells:best.cells};}
