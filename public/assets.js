@@ -4,7 +4,7 @@
     'Arqueiro':'arqueiro','Ninja':'ninja','Piromante':'piromante','Kamikaze':'kamikaze','Caçador':'cacador','Paranoia':'paranoia',
     'Escudeiro':'escudeiro','Golem':'golem','Golem de Lava':'golem-de-lava','Cavaleiro':'cavaleiro','Slime':'slime','Mini-Slime':'mini-slime','Zumbi':'zumbi','Druida':'druida',
     'Vidente':'vidente','Mago do Espelho':'mago-do-espelho','Necromante':'necromante','Doppelgänger':'doppelganger','Doppelganger':'doppelganger','Sentinela':'sentinela','Bardo':'bardo',
-    'Coringa':'coringa','Joker':'coringa','Fantasma':'fantasma','Esqueleto':'esqueleto','Galho-Vivo':'galho-vivo','Galho Vivo':'galho-vivo','General':'general'
+    'Trapaceiro':'trapaceiro','Coringa':'trapaceiro','Joker':'trapaceiro','Fantasma':'fantasma','Esqueleto':'esqueleto','Galho-Vivo':'galho-vivo','Galho Vivo':'galho-vivo','General':'general'
   };
   const terrain={tree:'assets/terrain/arvore.png',deadTree:'assets/terrain/arvore-destruida.png',rock:'assets/terrain/pedra.png',swamp:'assets/terrain/pantano.png',water:'assets/terrain/lago.png'};
   const structures={

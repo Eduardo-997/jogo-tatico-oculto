@@ -17,10 +17,10 @@ __gameRoot.GameRules = (() => {
     {name:'Vidente',icon:'👁️',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:1,per:1,ah:3},
     {name:'Mago do Espelho',icon:'🔮',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:1,per:1,ah:2},
     {name:'Necromante',icon:'☠️',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1,per:1,ah:1},
-    {name:'Doppelgänger',icon:'🎭',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1,per:1,ah:1},
+    {name:'Doppelgänger',icon:'🎭',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1,per:1,ah:2},
     {name:'Sentinela',icon:'🦉',type:'P',typeIcon:'📜',v:1,m:2,a:0,range:1,per:1,ah:1},
     {name:'Bardo',icon:'🎵',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:1,per:1,ah:2},
-    {name:'Coringa',icon:'🃏',type:'J',typeIcon:'🃏',v:1,m:1,a:0,range:1,per:1,ah:0,diag:true},
+    {name:'Trapaceiro',icon:'🃏',type:'J',typeIcon:'🃏',v:1,m:1,a:0,range:1,per:1,ah:0,diag:true},
     {name:'Fantasma',icon:'👻',type:'J',typeIcon:'🃏',v:1,m:1,a:0,range:1,per:1,ah:0}
   ];
   const skeletonDef={name:'Esqueleto',icon:'💀',type:'C',typeIcon:'🦴',v:1,m:1,a:1,range:1,per:1,ah:0};
@@ -28,6 +28,7 @@ __gameRoot.GameRules = (() => {
   const lavaDef={name:'Golem de Lava',icon:'🌋',type:'R',typeIcon:'🛡️',v:1,m:0,a:1,range:1,per:1,ah:0};
   const branchDef={name:'Galho-Vivo',icon:'🌲',type:'C',typeIcon:'🦴',v:1,m:1,a:1,range:1,per:1,ah:0};
   const byName = Object.fromEntries(defs.map(d=>[d.name,d]));
+  byName.Coringa=byName.Trapaceiro; // compatibilidade com saves/clientes antigos
   const archetypeNames=Object.freeze({R:'Vanguarda',P:'Estrategista',S:'Executor',J:'Coringa',C:'Condenado'});
   const archetypeName=type=>archetypeNames[type]||type||'—';
   const baseBonuses=[

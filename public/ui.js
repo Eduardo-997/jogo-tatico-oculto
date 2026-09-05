@@ -31,15 +31,15 @@
   let rosterCollapsed=false,inspectedPieceId=null,rosterFilter='all',aiDifficulty='normal';
   let status='Inspecione os personagens e marque ☐ Selecionar para montar a equipe.';
   const ABILITY_TEXT={
-    "Arqueiro":"M1 e Alcance de Ataque 3. Tiro Certeiro dobra o alcance de ataque neste turno e entra em recarga por 1 turno próprio.",
+    "Arqueiro":"Tiro Certeiro dobra o alcance de ataque no turno em que é ativado. Recarga: 1 turno próprio.",
     "Ninja":"Bomba de Fumaça: ao ativar, fica completamente indetectável por PER, Vidente, armadilha da Sentinela e qualquer efeito de revelação até o fim do próximo turno próprio. Recarga: 2 turnos próprios.",
     "Piromante":"Escolhe 1 ou 2 casas dentro do Alc. Hab. e resolve os dois ataques na mesma ação.",
     "Kamikaze":"Explode ao morrer e também pode usar Autodestruição como habilidade ativa. Antes de confirmar, o jogo mostra toda a área atingida. O Alc. Hab. funciona em anéis ao redor dele: Alc. Hab. 1 atinge o primeiro anel; Alc. Hab. 2 atinge os dois primeiros anéis, e assim por diante. A explosão causa 1 de dano inclusive em aliados.",
     "Caçador":"Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Pode prepará-la mesmo em uma casa já ocupada; ela não dispara na colocação. Quando um inimigo entrar nessa casa depois, sofre 1 de dano antes de qualquer Confronto Direto. Colocar outra armadilha substitui a anterior.",
     "Paranoia":"Ao detectar inimigos com a própria PER, afeta até 2 alvos. Depois que um alvo se move, por 2 turnos a percepção dele sempre acusa uma presença, verdadeira ou falsa.",
-    "Escudeiro":"Pode compartilhar casa com 1 aliado. Ao usar Vincular enquanto dividem a casa, acompanha automaticamente os movimentos desse aliado. Enquanto vinculado, não se move sozinho; use a habilidade novamente para Desvincular, gastando o turno. Também intercepta ataques e dano em área para proteger o aliado.",
+    "Escudeiro":"Pode compartilhar casa com 1 aliado. Vincular escolhe um aliado dentro do Alc. Hab.; Alc. Hab. 0 alcança apenas a própria casa. Ao criar o vínculo, o Escudeiro se reúne ao aliado e passa a acompanhar automaticamente seus movimentos. Enquanto vinculado, não se move sozinho; use a habilidade novamente para Desvincular, gastando o turno. Também intercepta ataques e dano em área para proteger o aliado.",
     "Golem":"Pode consumir uma Pedra adjacente e escolher +1 Vida, +1 Movimento ou +1 ATQ. Consumir outra Pedra substitui o bônus anterior. Ao sofrer dano e sobreviver, vira Golem de Lava e mantém a adaptação.",
-    "Cavaleiro":"Não possui habilidade ativa; compensa com M3 e ataque normal.",
+    "Cavaleiro":"Não possui habilidade ativa.",
     "Slime":"Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem morrer; os Mini-Slimes herdam seus bônus.",
     "Zumbi":"Na primeira morte, não conta como eliminação. Levanta-se na rodada seguinte com 1 de Vida e, depois de 3 turnos próprios, cai definitivamente. Se morrer antes disso, a eliminação é imediata.",
     "Druida":"Pode entrar em árvores vivas e não é detectado por PER enquanto estiver nelas. Desperta uma árvore dentro do Alc. Hab. como Galho-Vivo. Druida e Galho-Vivo compartilham o mesmo turno; se o Druida morrer, o Galho-Vivo volta a ser uma árvore normal.",
@@ -49,7 +49,7 @@
     "Doppelgänger":"Ao passar por um cadáver, copia sua habilidade. Habilidades ativas copiadas usam o Alc. Hab. do próprio Doppelgänger; ao encontrar outra, escolhe manter a atual ou trocar.",
     "Sentinela":"Mantém até 2 armadilhas ocultas dentro do Alc. Hab. Pode prepará-las mesmo em casas já ocupadas; elas não disparam na colocação. Um inimigo que entrar depois em uma delas fica com a posição revelada até o início do próximo turno daquela peça.",
     "Bardo":"Escolhe 1 aliado dentro do Alc. Hab. e concede +1 ATQ, ALC, Alc. Hab., M ou Vida. Mantém apenas 1 aliado inspirado; o bônus dura até o fim do próximo turno do Bardo.",
-    "Coringa":"Possui todos os arquétipos no Confronto Direto e também pode se mover pelas diagonais.",
+    "Trapaceiro":"Pode se mover pelas diagonais.",
     "Fantasma":"Ataques e Confrontos Diretos vencidos possuem o inimigo em vez de causar dano. Você passa a controlar a peça e o antigo dono perde sua localização. Se o Fantasma sofrer dano, ele morre e a peça é recuperada."
   };
   const TREE_CELLS=new Set(R.treeCells||['B3','G6']);
@@ -331,7 +331,7 @@
         // Ao entrar em qualquer habilidade, o tabuleiro mostra o Alc. Hab. completo da peça.
         // A validação de cadáver/árvore/aliado/casa continua pertencendo ao Árbitro.
         if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(a.mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');if(a.mode==='absorbRock'&&(v.rocks||[]).includes(c)&&R.neighbors(p.coord,false).includes(c))b.classList.add('highlight');
-        if(a.mode==='seer'){if(!seerPreview.size&&R.abilityCells(p).includes(c))b.classList.add('highlight','seer-range');else{const main=[...seerPreview][0];if(c===main)b.classList.add('highlight','seer-main');else if(R.neighbors(main,false).includes(c))b.classList.add('highlight','seer-next');}}if(a.mode==='kamikaze'&&(a.kamikazeCells||[]).includes(c))b.classList.add('attack-highlight','kamikaze-highlight');if(a.mode==='shieldLink'&&c===p.coord)b.classList.add('highlight');
+        if(a.mode==='seer'){if(!seerPreview.size&&R.abilityCells(p).includes(c))b.classList.add('highlight','seer-range');else{const main=[...seerPreview][0];if(c===main)b.classList.add('highlight','seer-main');else if(R.neighbors(main,false).includes(c))b.classList.add('highlight','seer-next');}}if(a.mode==='kamikaze'&&(a.kamikazeCells||[]).includes(c))b.classList.add('attack-highlight','kamikaze-highlight');if(a.mode==='shieldLink'){const ah=p.ah||0;if(ownAtAll(v,c).some(x=>x.id!==p.id&&x.alive&&R.man(p.coord,x.coord)<=ah))b.classList.add('highlight');}
       }
     }
   }
@@ -426,7 +426,7 @@
     else if(a.mode==='spotTrap'||a.mode==='damageTrap')r=player.placeTrap(c);
     else if(a.mode==='bard'){const target=ownAtAll(v,c).find(x=>x.id!==p.id&&R.man(p.coord,x.coord)<=p.ah);if(!target){setStatus('Escolha um aliado dentro do Alc. Hab. do Bardo.');return;}showBardChoice(target);return;}
     else if(a.mode==='absorbRock'){if(!(v.rocks||[]).includes(c)||!R.neighbors(p.coord,false).includes(c)){setStatus('Escolha uma pedra adjacente ao Golem.');return;}showGolemChoice(c);return;}
-    else if(a.mode==='shieldLink'){const target=ownAtAll(v,c).find(x=>x.id!==p.id&&x.coord===p.coord);if(!target){setStatus('Escolha o aliado que está na mesma casa do Escudeiro.');return;}r=player.shieldLink(target.id);}
+    else if(a.mode==='shieldLink'){const ah=p.ah||0,target=ownAtAll(v,c).find(x=>x.id!==p.id&&x.alive&&R.man(p.coord,x.coord)<=ah);if(!target){setStatus(`Escolha um aliado dentro do Alc. Hab. ${ah}.`);return;}r=player.shieldLink(target.id);}
     else {
       if(clickedBase){openBasePanel(v,clickedBase);return;}
       const allOwn=ownAtAll(v,c);
