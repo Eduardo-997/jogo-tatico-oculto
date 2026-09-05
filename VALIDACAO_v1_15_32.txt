@@ -1,0 +1,11 @@
+VALIDAÇÃO FINAL — v1.15.32 TESTE GIT
+
+OK - Sintaxe de todos os JS em public/ e src/.
+OK - Druida ATQ 1.
+OK - Vidente: primeira seleção usa toda a área válida; segunda seleção fica adjacente à primeira.
+OK - Ninja: Bomba de Fumaça deixa indetectável; Vidente não revela; cooldown de 2 turnos próprios validado.
+OK - Kamikaze: área de Autodestruição aparece antes da confirmação; confirmação mata o Kamikaze e causa 1 de dano na área; explosão ao morrer preservada.
+OK - Árvore V3 recebe dano e expõe Vida restante.
+OK - Clássico usa somente Lagos D3 e E6.
+OK - Arena usa Biomas nas quatro linhas/profundidades e possui coordenadas visíveis por setor.
+OK - Arena: Bomba de Fumaça e Autodestruição testadas no núcleo.

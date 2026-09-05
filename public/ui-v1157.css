@@ -389,3 +389,21 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
   .base-art{width:clamp(26px,8vw,36px);height:clamp(26px,8vw,36px)}
   .marker-art{width:18px;height:18px}
 }
+
+/* v1.15.32 — leitura de biomas, Vidente, Kamikaze e coordenadas da Arena. */
+.terrain-hp{left:auto!important;right:2px!important;bottom:2px!important;background:#15120e!important;border-color:#8c6845!important;color:#ffd7c5!important;z-index:8!important}
+.cell.seer-range{outline:3px solid #6ecff6!important;outline-offset:-4px!important;box-shadow:inset 0 0 18px rgba(76,190,235,.28),0 0 8px rgba(76,190,235,.34)!important}
+.cell.seer-next{outline:3px solid #88e4ff!important;outline-offset:-4px!important;box-shadow:inset 0 0 22px rgba(90,211,255,.34)!important}
+.cell.seer-main{outline:3px solid #e9d16f!important;outline-offset:-4px!important}
+.cell.kamikaze-highlight{outline:3px solid #ef674e!important;outline-offset:-4px!important;box-shadow:inset 0 0 24px rgba(229,63,35,.34),0 0 8px rgba(229,63,35,.25)!important}
+.mode-arena .tri-cell.seer-range,.mode-arena .tri-cell.seer-next{stroke:#79ddff!important;stroke-width:4!important;filter:drop-shadow(0 0 5px rgba(92,213,255,.75))}
+.mode-arena .tri-cell.seer-main{stroke:#f0d671!important;stroke-width:4!important}
+.mode-arena .tri-cell.kamikaze-highlight{stroke:#ff6953!important;stroke-width:5!important;filter:drop-shadow(0 0 6px rgba(255,82,55,.8))}
+.mode-arena .terrain-hp-svg{font-size:10px;font-weight:900;fill:#ffd0bd;stroke:#160d08;stroke-width:3;paint-order:stroke;pointer-events:none}
+.mode-arena .arena-coordinate{font-size:7px;font-weight:800;fill:#f4e6c5;stroke:#17120c;stroke-width:2.2;paint-order:stroke;opacity:.86;letter-spacing:.15px;pointer-events:none}
+@media(max-width:680px){.hp-badge.terrain-hp{font-size:7px!important;padding:0 2px!important}.mode-arena .arena-coordinate{font-size:6.5px}.mode-arena .terrain-hp-svg{font-size:9px}}
+
+/* v1.15.32 — regras visuais, biomas e coordenadas */
+.mode-arena .arena-rules-overlay .qr-visual{display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:center}
+.mode-arena .arena-rules-overlay .qr-art{width:58px;height:58px;object-fit:cover;border-radius:9px;border:1px solid #6a5536;background:#090a0b;box-shadow:0 3px 10px #0008}
+@media(max-width:680px){.mode-arena .arena-rules-overlay .qr-visual{grid-template-columns:52px 1fr}.mode-arena .arena-rules-overlay .qr-art{width:48px;height:48px}}

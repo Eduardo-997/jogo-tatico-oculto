@@ -375,7 +375,7 @@ function bestBardChoice(view,p){
 }
 function effectiveAbility(p){
   const name=p.name==='Doppelgänger'?p.copied:p.name;
-  if(name==='Escudeiro')return'shieldLink';if(name==='Vidente')return'seer';if(name==='Necromante')return'raise';if(name==='Mago do Espelho')return'mirror';
+  if(name==='Ninja')return'smoke';if(name==='Kamikaze')return'kamikaze';if(name==='Escudeiro')return'shieldLink';if(name==='Vidente')return'seer';if(name==='Necromante')return'raise';if(name==='Mago do Espelho')return'mirror';
   if(name==='Druida')return'awaken';if(name==='Sentinela')return'spotTrap';if(name==='Caçador')return'damageTrap';if(name==='Bardo')return'bard';
   return null;
 }
@@ -384,6 +384,8 @@ function shouldUseAbility(view,p,a){
   if(p.name==='Golem'&&!p.form)return (view.rocks||[]).some(c=>man(p.coord,c)===1);
   const ab=effectiveAbility(p);if(!ab)return false;
   if(difficulty==='easy'&&Math.random()<diff().skipAbility)return false;
+  if(ab==='smoke'){if((p.ninjaSmokeCooldown||0)>0)return false;const danger=(view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=2)||neighbors(p.coord,true).some(c=>heat(c)>.75);return danger;}
+  if(ab==='kamikaze'){const ah=Math.max(1,p.ah||1);return (view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=ah);}
   if(ab==='shieldLink'){if(p.linkedToId)return false;return ownAt(view,p.coord).some(x=>x.id!==p.id&&x.alive);}
   if(ab==='raise'){
     const skeletonAlive=ownAlive(view).some(x=>x.summonType==='skeleton');return !skeletonAlive&&legalRaiseCells(view,p).length>0;
@@ -532,6 +534,7 @@ function decide(view,lastResult){
     if(targets.length&&heat(targets[0])>0.24)return {type:'pyroSelect',to:targets[0]};
     return {type:'pyroConfirm'};
   }
+  if(a.mode==='kamikaze')return {type:'kamikazeConfirm'};
   if(a.mode==='absorbRock'){const rocks=(view.rocks||[]).filter(c=>man(p.coord,c)===1);if(!rocks.length)return {type:'end'};let stat='attack';if((p.hp||1)<(p.maxHp||2)&&p.golemAbsorbStat!=='life')stat='life';else if(p.golemAbsorbStat==='attack')stat='move';return {type:'absorbRock',coord:rocks[0],stat};}
   if(a.mode==='shieldLink'){const target=ownAt(view,p.coord).find(x=>x.id!==p.id&&x.alive);return target?{type:'shieldLink',targetPieceId:target.id}:{type:'end'};}
   if(a.mode==='seer'){
