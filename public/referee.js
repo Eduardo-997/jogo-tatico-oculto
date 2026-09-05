@@ -13,7 +13,7 @@ __refRoot.GameReferee = class GameReferee {
       history:{player:[],enemy:[]}, intel:{player:[],enemy:[]}, impact:{player:null,enemy:null}, combatMarks:{player:[],enemy:[]}, combatHold:{player:false,enemy:false}, perceptionHints:{player:[],enemy:[]},
       seer:{player:new Set(),enemy:new Set()}, seerExpires:{player:false,enemy:false},
       activation:{player:null,enemy:null}, roundActivations:{player:0,enemy:0}, pendingCombat:null, doppelChoice:{player:null,enemy:null},
-      trees:[{coord:'B3',state:'live'},{coord:'G6',state:'live'}], rocks:['F2','C7'], water:['E3','D6'], swamps:['C5','F4'], traps:{player:[],enemy:[]}, spotReveals:{player:{},enemy:{}}, replayEvent:null
+      trees:[{coord:'B3',state:'live'},{coord:'G6',state:'live'}], rocks:['F2','C7'], water:['D3','E6'], swamps:['C5','F4'], traps:{player:[],enemy:[]}, spotReveals:{player:{},enemy:{}}, replayEvent:null
     };
   }
 
@@ -756,7 +756,7 @@ __refRoot.GameReferee = class GameReferee {
     return JSON.stringify(this.#s,(k,v)=>v instanceof Set?{__set:[...v]}:v);
   }
   #importState(raw){
-    if(!raw)return;this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);if(!this.#s.doppelChoice)this.#s.doppelChoice={player:null,enemy:null};if(!this.#s.roundStarter)this.#s.roundStarter='player';if(!this.#s.roundActivations)this.#s.roundActivations={player:0,enemy:0};if(!this.#s.trees)this.#s.trees=[{coord:'B3',state:'live'},{coord:'G6',state:'live'}];if(!this.#s.rocks)this.#s.rocks=['F2','C7'];if(!this.#s.water)this.#s.water=['E3','D6'];if(!this.#s.swamps)this.#s.swamps=['C5','F4'];if(!this.#s.traps)this.#s.traps={player:[],enemy:[]};if(!this.#s.spotReveals)this.#s.spotReveals={player:{},enemy:{}};if(!this.#s.combatMarks)this.#s.combatMarks={player:[],enemy:[]};if(!this.#s.combatHold)this.#s.combatHold={player:false,enemy:false};if(this.#s.replayEvent===undefined)this.#s.replayEvent=null;for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(!Array.isArray(p.effects))p.effects=[];if(p.bonusAH==null)p.bonusAH=0;if(p.turnsTaken==null)p.turnsTaken=0;if(p.linkedToId===undefined)p.linkedToId=null;}
+    if(!raw)return;this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);if(!this.#s.doppelChoice)this.#s.doppelChoice={player:null,enemy:null};if(!this.#s.roundStarter)this.#s.roundStarter='player';if(!this.#s.roundActivations)this.#s.roundActivations={player:0,enemy:0};if(!this.#s.trees)this.#s.trees=[{coord:'B3',state:'live'},{coord:'G6',state:'live'}];if(!this.#s.rocks)this.#s.rocks=['F2','C7'];if(!this.#s.water)this.#s.water=['D3','E6'];if(!this.#s.swamps)this.#s.swamps=['C5','F4'];if(!this.#s.traps)this.#s.traps={player:[],enemy:[]};if(!this.#s.spotReveals)this.#s.spotReveals={player:{},enemy:{}};if(!this.#s.combatMarks)this.#s.combatMarks={player:[],enemy:[]};if(!this.#s.combatHold)this.#s.combatHold={player:false,enemy:false};if(this.#s.replayEvent===undefined)this.#s.replayEvent=null;for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(!Array.isArray(p.effects))p.effects=[];if(p.bonusAH==null)p.bonusAH=0;if(p.turnsTaken==null)p.turnsTaken=0;if(p.linkedToId===undefined)p.linkedToId=null;}
   }
 
 };
