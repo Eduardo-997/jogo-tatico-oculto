@@ -1,4 +1,4 @@
-Batalha nas Sombras v1.15.35 — TESTE GIT
+Batalha nas Sombras v1.15.36 — TESTE GIT
 
 Base: v1.15.34 TESTE GIT.
 
