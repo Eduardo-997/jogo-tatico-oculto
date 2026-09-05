@@ -78,7 +78,7 @@ const META={
   'Doppelgänger':{type:'P',role:'trickster'},
   'Sentinela':{type:'P',role:'trapper'},
   'Bardo':{type:'P',role:'support'},
-  'Coringa':{type:'J',role:'hunter'},
+  'Trapaceiro':{type:'J',role:'hunter'},
   'Fantasma':{type:'J',role:'assassin'},
   'Esqueleto':{type:'C',role:'fighter'}
 };
@@ -355,7 +355,7 @@ function bestTrapCell(view,p){
 }
 function bardStatScore(target,stat){
   const role=metaOf(target).role;let s=0;
-  if(stat==='attack')s=(target.a<=0?4:14)+(role==='hunter'||role==='assassin'||role==='bruiser'?8:0)+(target.name==='Coringa'?8:0)-(target.name==='Kamikaze'?10:0);
+  if(stat==='attack')s=(target.a<=0?4:14)+(role==='hunter'||role==='assassin'||role==='bruiser'?8:0)+(target.name==='Trapaceiro'?8:0)-(target.name==='Kamikaze'?10:0);
   if(stat==='range')s=target.a>0&&target.range<8?12+(target.name==='Ninja'?8:0)+(target.name==='Caçador'?3:0):-999;
   if(stat==='abilityRange')s=(target.ah||0)>0?14+(['Vidente','Bardo','Druida','Caçador','Sentinela','Necromante','Mago do Espelho'].includes(target.name)?8:0):-999;
   if(stat==='move')s=10+(target.m===0?16:0)+(role==='hunter'||role==='scout'||role==='trapper'?6:0);
@@ -386,7 +386,7 @@ function shouldUseAbility(view,p,a){
   if(difficulty==='easy'&&Math.random()<diff().skipAbility)return false;
   if(ab==='smoke'){if((p.ninjaSmokeCooldown||0)>0)return false;const danger=(view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=2)||neighbors(p.coord,true).some(c=>heat(c)>.75);return danger;}
   if(ab==='kamikaze'){const ah=Math.max(1,p.ah||1);return (view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=ah);}
-  if(ab==='shieldLink'){if(p.linkedToId)return false;return ownAt(view,p.coord).some(x=>x.id!==p.id&&x.alive);}
+  if(ab==='shieldLink'){if(p.linkedToId)return false;const ah=p.ah||0;return ownAlive(view).some(x=>x.id!==p.id&&x.alive&&man(p.coord,x.coord)<=ah&&((ownAt(view,x.coord)||[]).length<2||x.coord===p.coord));}
   if(ab==='raise'){
     const skeletonAlive=ownAlive(view).some(x=>x.summonType==='skeleton');return !skeletonAlive&&legalRaiseCells(view,p).length>0;
   }
@@ -448,7 +448,7 @@ function movementStep(view,p,a){
     // Não encosta inutilmente em nossas próprias bordas; favorece avanço e centro.
     const q=rc(c);s+=(7-q.y)*0.34;s+=(3.5-Math.abs(q.x-3.5))*0.18;s-=SWAMPS.has(c)?1.2:0;
     // Caçadores aceitam mais risco, suportes preferem não pisar em casa muito suspeita.
-    const role=metaOf(p).role;if(heat(c)>0.65)s+=((role==='hunter'||role==='assassin'||role==='bruiser'||p.name==='Coringa')?5:-4)*heat(c);
+    const role=metaOf(p).role;if(heat(c)>0.65)s+=((role==='hunter'||role==='assassin'||role==='bruiser'||p.name==='Trapaceiro')?5:-4)*heat(c);
     if(difficulty==='extreme'){
       const k=knownEnemyAt(c);if(k){const r=directResult(metaOf(p).type,enemyTypeFromContact(k));s+=r>0?9:r<0?-12:-3;}
       if(role==='support'||role==='seer')s-=heat(c)*3;
@@ -462,13 +462,13 @@ function bonusTargetScore(view,bonus,p){
   const role=metaOf(p).role;let s=0;
   if(bonus==='radarAdvanced'||bonus==='radarExpanded'){
     if((bonus==='radarAdvanced'&&p.radarAdvanced)||(bonus==='radarExpanded'&&p.radarExpanded))return -999;
-    s=(p.m||0)*3+(p.per||1)*4+(role==='hunter'?8:0)+(p.name==='Coringa'?5:0);
+    s=(p.m||0)*3+(p.per||1)*4+(role==='hunter'?8:0)+(p.name==='Trapaceiro'?5:0);
   } else if(bonus==='move'){
     s=(p.m===0?28:8)+(role==='hunter'?10:0)+(p.name==='Golem'||p.displayName==='Golem de Lava'?7:0);
   } else if(bonus==='life'){
-    s=(p.maxHp<=1?16:8)+(p.hp<p.maxHp?8:0)+(p.name==='Coringa'||p.name==='Arqueiro'||p.name==='Vidente'?7:0)-(p.name==='Kamikaze'?8:0);
+    s=(p.maxHp<=1?16:8)+(p.hp<p.maxHp?8:0)+(p.name==='Trapaceiro'||p.name==='Arqueiro'||p.name==='Vidente'?7:0)-(p.name==='Kamikaze'?8:0);
   } else if(bonus==='attack'){
-    s=(p.a===0?16:12)+(p.m||0)*2+(role==='hunter'?8:0)+(p.name==='Coringa'?12:0)+(p.name==='Kamikaze'?-10:0);
+    s=(p.a===0?16:12)+(p.m||0)*2+(role==='hunter'?8:0)+(p.name==='Trapaceiro'?12:0)+(p.name==='Kamikaze'?-10:0);
   } else if(bonus==='range'){
     if(p.a<=0||p.range>=8)return -999;s=15+(p.name==='Ninja'?10:0)+(p.name==='Piromante'?5:0)+(p.m||0);
   } else if(bonus==='abilityRange'){
@@ -496,7 +496,7 @@ function pieceSelectionScore(view,p){
     const ab=effectiveAbility(p);s+=ab==='raise'?72:ab==='seer'?58:ab==='bard'?62:ab==='awaken'?54:(ab==='spotTrap'||ab==='damageTrap')?48:38;
   }
   const obj=bestObjective(view,p);if(obj&&p.m>0)s+=Math.max(0,32-man(p.coord,obj.coord)*3)+(p.m*2);
-  if(p.name==='Coringa'||p.name==='Fantasma')s+=8;if(p.name==='Cavaleiro'||p.name==='Ninja'||p.name==='Paranoia')s+=5;
+  if(p.name==='Trapaceiro'||p.name==='Fantasma')s+=8;if(p.name==='Cavaleiro'||p.name==='Ninja'||p.name==='Paranoia')s+=5;
   if(p.name==='Zumbi'&&p.zombieRevived)s+=7;
   if(p.name==='Arqueiro'&&!atk)s-=8;
   return s;
@@ -536,7 +536,7 @@ function decide(view,lastResult){
   }
   if(a.mode==='kamikaze')return {type:'kamikazeConfirm'};
   if(a.mode==='absorbRock'){const rocks=(view.rocks||[]).filter(c=>man(p.coord,c)===1);if(!rocks.length)return {type:'end'};let stat='attack';if((p.hp||1)<(p.maxHp||2)&&p.golemAbsorbStat!=='life')stat='life';else if(p.golemAbsorbStat==='attack')stat='move';return {type:'absorbRock',coord:rocks[0],stat};}
-  if(a.mode==='shieldLink'){const target=ownAt(view,p.coord).find(x=>x.id!==p.id&&x.alive);return target?{type:'shieldLink',targetPieceId:target.id}:{type:'end'};}
+  if(a.mode==='shieldLink'){const ah=p.ah||0,target=pickBest(ownAlive(view).filter(x=>x.id!==p.id&&x.alive&&man(p.coord,x.coord)<=ah&&((ownAt(view,x.coord)||[]).length<2||x.coord===p.coord)),x=>metaOf(x).role==='support'?7:metaOf(x).role==='seer'?6:4)?.item;return target?{type:'shieldLink',targetPieceId:target.id}:{type:'end'};}
   if(a.mode==='seer'){
     const best=bestSeerArea(view);if(best){memory.abilityRound[p.id]=view.round;return {type:'seer',cells:best.cells};}
     return {type:'end'};

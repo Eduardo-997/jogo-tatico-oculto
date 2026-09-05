@@ -410,3 +410,5 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 @media(max-width:680px){.mode-arena .arena-rules-overlay .qr-visual{grid-template-columns:52px 1fr}.mode-arena .arena-rules-overlay .qr-art{width:48px;height:48px}}
 
 /* v1.15.33 — coordenadas da Arena agora ficam apenas nas bordas, estilo xadrez/batalha naval. */
+
+/* v1.15.34 — biomas da Arena menores e distribuídos em simetria rotacional. */

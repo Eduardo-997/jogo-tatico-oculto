@@ -54,14 +54,25 @@
         </section>
 
         <section class="qr-page" data-page="personagens">
-          <div class="qr-card qr-visual"><div>${char('Arqueiro')}</div><div><b>🏹 Arqueiro</b><p>M1 · ATQ1 · ALC3. <strong>Tiro Certeiro:</strong> dobra o ALC do ataque no turno em que é ativado. Recarga: 1 turno próprio.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Arqueiro')}</div><div><b>🏹 Arqueiro</b><p><strong>Tiro Certeiro:</strong> dobra o ALC do ataque no turno em que é ativado. Recarga: 1 turno próprio.</p></div></div>
           <div class="qr-card qr-visual"><div>${char('Kamikaze')}</div><div><b>💣 Kamikaze</b><p>Explode ao morrer e também pode escolher <strong>Autodestruição</strong>. O jogo destaca a área e exige confirmação. Alc. Hab. 1 = 1 anel; Alc. Hab. 2 = 2 anéis; e assim por diante.</p></div></div>
           <div class="qr-card qr-visual"><div>${char('Golem')}</div><div><b>🗿 Golem</b><p><strong>Absorver Rocha:</strong> consome Pedra adjacente e escolhe +1 Vida, +1 Movimento ou +1 ATQ. Nova absorção substitui a anterior. A adaptação permanece no Golem de Lava.</p></div></div>
-          <div class="qr-card qr-visual"><div>${char('Druida')}</div><div><b>🌿 Druida</b><p>V1 · M1 · <strong>ATQ1</strong>. Pode se esconder em árvore viva contra PER e despertar uma árvore como Galho-Vivo.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Druida')}</div><div><b>🌿 Druida</b><p>Pode se esconder em árvore viva contra PER e despertar uma árvore como Galho-Vivo.</p></div></div>
           <div class="qr-card qr-visual"><div>${char('Caçador')}</div><div><b>🐾 Caçador</b><p>Prepara uma armadilha oculta de dano. Ela pode ser colocada sob uma peça, mas só dispara quando um inimigo entrar depois.</p></div></div>
           <div class="qr-card qr-visual"><div>${char('Sentinela')}</div><div><b>🦉 Sentinela</b><p>Mantém até 2 armadilhas de revelação. Bomba de Fumaça impede que a armadilha detecte o Ninja enquanto o efeito estiver ativo.</p></div></div>
           <div class="qr-card qr-visual"><div>${char('Bardo')}</div><div><b>🎵 Bardo</b><p>Inspira 1 aliado com +1 ATQ, ALC, Alc. Hab., Movimento ou Vida até o fim do próximo turno do Bardo.</p></div></div>
-          <div class="qr-card qr-visual"><div>${char('Escudeiro')}</div><div><b>🛡️ Escudeiro</b><p>Pode dividir casa com aliado, Vincular-se para acompanhar movimentos e interceptar dano enquanto protege o aliado.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Escudeiro')}</div><div><b>🛡️ Escudeiro</b><p>Pode dividir casa com aliado. <strong>Vincular</strong> escolhe um aliado dentro do Alc. Hab.; Alc. Hab. 0 alcança a própria casa. Ao vincular, o Escudeiro se reúne ao aliado, acompanha seus movimentos e o protege.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Trapaceiro')}</div><div><b>🃏 Trapaceiro</b><p>Pode se mover pelas diagonais. Seu arquétipo continua sendo <strong>Coringa</strong>, com as regras normais desse arquétipo em Confronto Direto.</p></div></div>
+
+          <div class="qr-card qr-visual"><div>${char('Piromante')}</div><div><b>🔥 Piromante</b><p>Escolhe 1 ou 2 casas dentro do Alc. Hab. e resolve os ataques na mesma ação.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Paranoia')}</div><div><b>🧠 Paranoia</b><p>Ao detectar inimigos com PER, pode causar falsas presenças na percepção deles por tempo limitado.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Cavaleiro')}</div><div><b>🐎 Cavaleiro</b><p>Não possui habilidade ativa; sua identidade está na alta mobilidade.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Slime')}</div><div><b>🟢 Slime</b><p>Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem for destruída.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Zumbi')}</div><div><b>🧟 Zumbi</b><p>A primeira morte não conta como eliminação: ele retorna na rodada seguinte e depois possui tempo limitado.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Mago do Espelho')}</div><div><b>🔮 Mago do Espelho</b><p>Cria um Espelho dentro do Alc. Hab.; ele gera falsa presença e reflete o primeiro ataque.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Necromante')}</div><div><b>☠️ Necromante</b><p>Usa um cadáver dentro do Alc. Hab. para erguer 1 Esqueleto.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Doppelgänger')}</div><div><b>🎭 Doppelgänger</b><p>Ao passar por cadáver, copia a habilidade dele. Habilidades copiadas usam o Alc. Hab. do Doppelgänger.</p></div></div>
+          <div class="qr-card qr-visual"><div>${char('Fantasma')}</div><div><b>👻 Fantasma</b><p>Ao vencer ataque ou Confronto, possui o inimigo. Se o corpo possuído sofrer dano, o Fantasma morre e o hospedeiro retorna.</p></div></div>
         </section>
       </div>
     </div>`;

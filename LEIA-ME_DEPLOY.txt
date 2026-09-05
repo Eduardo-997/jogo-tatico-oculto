@@ -1,5 +1,11 @@
-Batalha nas Sombras v1.15.33 — TESTE GIT
+Batalha nas Sombras v1.15.35 — TESTE GIT
 
-Base: v1.15.31 TESTE GIT.
+Base: v1.15.34 TESTE GIT.
 
-Principais mudanças: Druida ATQ1; Vidente com marcação completa da primeira seleção; Ninja com Bomba de Fumaça e invisibilidade total; Kamikaze com Autodestruição ativa confirmável sem perder a explosão ao morrer; Vida visível em Árvores/Pedras; regras atualizadas com Biomas e imagens; Arena com Biomas nas 4 profundidades e coordenadas visíveis A–H / 1–4 por setor.
+Principais mudanças:
+- Arena: uma única régua externa A–H / 1–8, sem repetir coordenadas por setor.
+- Personagem Coringa renomeado para Trapaceiro; o arquétipo Coringa mantém o mesmo nome e regras.
+- Compatibilidade mantida com saves/replays antigos que ainda tragam o nome Coringa.
+- Checkup geral de sintaxe, assets, versões, definições de personagens, regras principais e consistência Clássico/Online/Arena.
+
+Observação de deploy: arquivos SAVE_PROJETO, TESTES e VALIDACAO são documentação de desenvolvimento e não são necessários para o jogo funcionar no Git/Cloudflare.

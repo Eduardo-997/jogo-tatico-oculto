@@ -38,7 +38,7 @@
   `;document.head.appendChild(st);}
   function pieceIcon(p){
     if(window.TriGame?.defOf&&['A','B','C'].includes(p?.owner)){try{return window.TriGame.defOf(p)?.icon||p.icon||'●';}catch{}}
-    const d=window.GameRules?.defOf?window.GameRules.defOf(p):null;return d?.icon||p?.icon||({Arqueiro:'🏹',Ninja:'🗡️',Piromante:'🔥',Kamikaze:'💣',Caçador:'🐾',Paranoia:'🧠',Escudeiro:'🛡️',Golem:'🗿','Golem de Lava':'🌋',Cavaleiro:'🐎',Slime:'🟢','Mini-Slime':'🟢',Zumbi:'🧟',Druida:'🌿','Galho-Vivo':'🌲',Vidente:'👁️','Mago do Espelho':'🔮',Necromante:'☠️',Esqueleto:'💀','Doppelgänger':'🎭',Sentinela:'🦉',Bardo:'🎵',Coringa:'🃏',Fantasma:'👻'}[p?.name]||'●');
+    const d=window.GameRules?.defOf?window.GameRules.defOf(p):null;return d?.icon||p?.icon||({Arqueiro:'🏹',Ninja:'🗡️',Piromante:'🔥',Kamikaze:'💣',Caçador:'🐾',Paranoia:'🧠',Escudeiro:'🛡️',Golem:'🗿','Golem de Lava':'🌋',Cavaleiro:'🐎',Slime:'🟢','Mini-Slime':'🟢',Zumbi:'🧟',Druida:'🌿','Galho-Vivo':'🌲',Vidente:'👁️','Mago do Espelho':'🔮',Necromante:'☠️',Esqueleto:'💀','Doppelgänger':'🎭',Sentinela:'🦉',Bardo:'🎵',Trapaceiro:'🃏',Coringa:'🃏',Fantasma:'👻'}[p?.name]||'●');
   }
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function classicEvents(s){return [...(s.history?.player||[]).slice(0,3).map(x=>'A: '+x),...(s.history?.enemy||[]).slice(0,3).map(x=>'B: '+x)];}
