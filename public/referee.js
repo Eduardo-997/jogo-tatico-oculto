@@ -8,7 +8,7 @@ __refRoot.GameReferee = class GameReferee {
 
   reset(){
     this.#s={
-      phase:'setup', mode:null, round:1, turn:'player', roundStarter:'player', idSeq:1, gameOver:false, result:null, aiDifficulty:'normal',
+      phase:'setup', mode:null, round:1, turn:'player', roundStarter:'player', idSeq:1, gameOver:false, result:null, aiDifficulty:'normal', matchConfig:{teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}},
       pieces:{player:[],enemy:[]}, bases:[], chosenBaseBonuses:{player:[],enemy:[]}, corpses:[], mirrors:[], pendingSlimeSplits:[],
       history:{player:[],enemy:[]}, intel:{player:[],enemy:[]}, impact:{player:null,enemy:null}, combatMarks:{player:[],enemy:[]}, combatHold:{player:false,enemy:false}, perceptionHints:{player:[],enemy:[]},
       seer:{player:new Set(),enemy:new Set()}, seerExpires:{player:false,enemy:false},
@@ -41,7 +41,7 @@ __refRoot.GameReferee = class GameReferee {
       awakenTree:run((coord)=>self.#awakenTree(side,coord)),
       placeTrap:run((coord)=>self.#placeTrap(side,coord)),
       bardBuff:run((targetId,stat)=>self.#bardBuff(side,targetId,stat)),
-      absorbRock:run((coord,stat)=>self.#absorbRock(side,coord,stat)),
+      absorbRock:run(coord=>self.#absorbRock(side,coord)),
       shieldLink:run((targetId=null)=>self.#shieldLink(side,targetId)),
       endActivation:run(()=>self.#endActivationRequest(side)),
       chooseCombatPosition:run((advance)=>self.#chooseCombatPosition(side,advance)),
@@ -51,12 +51,19 @@ __refRoot.GameReferee = class GameReferee {
     });
   }
 
-  validateSetup(side,setup,bases){
+  normalizeMatchConfig(config={}){
+    const clamp=(n,a,b)=>Math.max(a,Math.min(b,Math.floor(Number(n)||a)));
+    const ps=clamp(config?.teamSize?.player??config?.playerTeamSize??4,1,8),es=clamp(config?.teamSize?.enemy??config?.enemyTeamSize??4,1,8);
+    const pl=clamp(config?.lossLimit?.player??config?.playerLossLimit??Math.min(3,ps),1,ps),el=clamp(config?.lossLimit?.enemy??config?.enemyLossLimit??Math.min(3,es),1,es);
+    return {teamSize:{player:ps,enemy:es},lossLimit:{player:pl,enemy:el}};
+  }
+
+  validateSetup(side,setup,bases,expectedCount=4){
     if(side!=='player'&&side!=='enemy') return this.#fail('Lado inválido.');
-    if(!Array.isArray(setup)||setup.length!==4) return this.#fail('É necessário posicionar exatamente 4 personagens.');
+    if(!Array.isArray(setup)||setup.length!==expectedCount) return this.#fail(`É necessário posicionar exatamente ${expectedCount} ${expectedCount===1?'personagem':'personagens'}.`);
     if(!Array.isArray(bases)||bases.length!==2) return this.#fail('É necessário posicionar exatamente 2 Postos de Operação.');
     const names=new Set(setup.map(x=>x.name)),coords=new Set(setup.map(x=>x.coord)),baseCoords=new Set(bases);
-    if(names.size!==4||coords.size!==4) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
+    if(names.size!==expectedCount||coords.size!==expectedCount) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
     if(baseCoords.size!==2) return this.#fail('Os dois Postos precisam ficar em casas diferentes.');
     const minRow=side==='player'?1:5,maxRow=side==='player'?4:8;
     for(const x of setup){
@@ -74,10 +81,12 @@ __refRoot.GameReferee = class GameReferee {
     return this.#ok('Preparação válida.');
   }
 
-  startMultiplayerGame(playerSetup,playerBases,enemySetup,enemyBases){
+  startMultiplayerGame(playerSetup,playerBases,enemySetup,enemyBases,config=null){
     if(this.#s.phase!=='setup')return this.#fail('A partida já começou.');
-    const vp=this.validateSetup('player',playerSetup,playerBases);if(!vp.ok)return vp;
-    const ve=this.validateSetup('enemy',enemySetup,enemyBases);if(!ve.ok)return ve;
+    const cfg=this.normalizeMatchConfig(config);
+    const vp=this.validateSetup('player',playerSetup,playerBases,cfg.teamSize.player);if(!vp.ok)return vp;
+    const ve=this.validateSetup('enemy',enemySetup,enemyBases,cfg.teamSize.enemy);if(!ve.ok)return ve;
+    this.#s.matchConfig=cfg;
     this.#s.pieces.player=[];this.#s.pieces.enemy=[];this.#s.bases=[];
     for(const [side,setup,bases] of [['player',playerSetup,playerBases],['enemy',enemySetup,enemyBases]]){
       for(const x of setup){const d=this.#R.byName[x.name];this.#s.pieces[side].push({id:(side==='player'?'p':'e')+this.#s.idSeq++,owner:side,name:d.name,identity:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,effects:[],bonusM:0,bonusV:0,bonusA:0,bonusRange:0,bonusAH:0,bonusRadarAdvanced:false,bonusRadarExpanded:false});}
@@ -90,13 +99,14 @@ __refRoot.GameReferee = class GameReferee {
     return this.#ok(`Partida Clássica iniciada. ${starter==='player'?'Jogador 1':'Jogador 2'} começa.`);
   }
 
-  startGame(playerSetup,playerBases,difficulty='normal'){
+  startGame(playerSetup,playerBases,difficulty='normal',config=null){
     if(this.#s.phase!=='setup') return this.#fail('A partida já começou.');
-    if(!Array.isArray(playerSetup)||playerSetup.length!==4) return this.#fail('É necessário posicionar exatamente 4 personagens.');
+    const cfg=this.normalizeMatchConfig(config),expectedCount=cfg.teamSize.player;
+    if(!Array.isArray(playerSetup)||playerSetup.length!==expectedCount) return this.#fail(`É necessário posicionar exatamente ${expectedCount} ${expectedCount===1?'personagem':'personagens'}.`);
     if(!Array.isArray(playerBases)||playerBases.length!==2) return this.#fail('É necessário posicionar exatamente 2 Postos de Operação.');
     const names=new Set(playerSetup.map(x=>x.name)), coords=new Set(playerSetup.map(x=>x.coord));
     const baseCoords=new Set(playerBases);
-    if(names.size!==4||coords.size!==4) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
+    if(names.size!==expectedCount||coords.size!==expectedCount) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
     if(baseCoords.size!==2) return this.#fail('Os dois Postos precisam ficar em casas diferentes.');
     for(const x of playerSetup){
       const d=this.#R.byName[x.name];
@@ -116,8 +126,9 @@ __refRoot.GameReferee = class GameReferee {
       return {id:'p'+this.#s.idSeq++,owner:'player',name:d.name,identity:d.name,hp:d.v,coord:x.coord,alive:true,activated:false,original:true,form:null,copied:null,mirrorCooldown:0,effects:[],bonusM:0,bonusV:0,bonusA:0,bonusRange:0,bonusAH:0,bonusRadarAdvanced:false,bonusRadarExpanded:false};
     });
     this.#s.bases=playerBases.map((coord,i)=>({id:'bp'+(i+1),owner:'player',coord,sabotaged:false}));
+    this.#s.matchConfig=cfg;
     this.#s.aiDifficulty=['easy','normal','hard','extreme'].includes(difficulty)?difficulty:'normal';
-    this.#enemySetup(this.#s.aiDifficulty);
+    this.#enemySetup(this.#s.aiDifficulty,cfg.teamSize.enemy);
     const starter=Math.random()<.5?'player':'enemy';
     this.#s.phase='play'; this.#s.mode='solo'; this.#s.round=1; this.#s.roundStarter=starter; this.#s.turn=starter; this.#s.gameOver=false; this.#s.result=null;
     this.#addHistory('player',`🎲 Partida iniciada. ${starter==='player'?'Você':'A IA'} começa a rodada 1. A prioridade inicial alterna a cada rodada.`);
@@ -172,20 +183,18 @@ __refRoot.GameReferee = class GameReferee {
     return this.#ok(`Rodada ${this.#s.round} do Treino.`);
   }
 
-  #enemySetup(difficulty='normal'){
+  #enemySetup(difficulty='normal',count=4){
     // Dificuldade nunca altera informação disponível para a IA. Aqui ela só muda
     // qualidade de composição/posicionamento inicial — especialmente os Postos.
     const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
-    let chosen;
+    count=Math.max(1,Math.min(8,Math.floor(Number(count)||4)));
+    let chosen=[];
     if(difficulty==='easy'){
-      chosen=[...this.#R.defs].sort(()=>Math.random()-.5).slice(0,4);
+      chosen=[...this.#R.defs].sort(()=>Math.random()-.5).slice(0,count);
     }else{
-      const byType=t=>this.#R.defs.filter(d=>d.type===t);
-      chosen=[pick(byType('R')),pick(byType('P')),pick(byType('S'))];
-      const remaining=this.#R.defs.filter(d=>!chosen.some(x=>x.name===d.name));
-      const joker=remaining.find(d=>d.type==='J');
-      const jokerChance=difficulty==='extreme'?0.50:difficulty==='hard'?0.38:0.30;
-      chosen.push(joker&&Math.random()<jokerChance?joker:pick(remaining));
+      const byType=t=>this.#R.defs.filter(d=>d.type===t),preferred=['R','P','S'];
+      for(const t of preferred){if(chosen.length>=count)break;const pool=byType(t).filter(d=>!chosen.some(x=>x.name===d.name));if(pool.length)chosen.push(pick(pool));}
+      while(chosen.length<count){const remaining=this.#R.defs.filter(d=>!chosen.some(x=>x.name===d.name));if(!remaining.length)break;const premium=remaining.filter(d=>['Trapaceiro','Bardo','Vidente','Caçador','Druida','Fantasma'].includes(d.name));const joker=remaining.find(d=>d.type==='J');const jokerChance=difficulty==='extreme'?0.50:difficulty==='hard'?0.38:0.30;chosen.push((joker&&Math.random()<jokerChance)?joker:(difficulty==='extreme'&&premium.length?pick(premium):pick(remaining)));}
     }
     const used=new Set([...this.#s.bases.filter(b=>b.owner==='player').map(b=>b.coord),...this.#R.blockedCells]);
     this.#s.pieces.enemy=[];
@@ -287,7 +296,7 @@ __refRoot.GameReferee = class GameReferee {
     const extraEffects=[...(p.effects||[]).filter(e=>viewerSide===p.owner||e.public!==false)];
     if(p.paranoia?.revealed&&viewerSide===p.owner)extraEffects.push({id:'paranoia',name:'Paranoia',icon:'🧠',remaining:p.paranoia.remaining,kind:'debuff',tick:'turn'});
     if((p.ninjaSmokeRemaining||0)>0&&viewerSide===p.owner)extraEffects.push({id:'ninja-smoke',name:'Bomba de Fumaça',icon:'🌫️',remaining:p.ninjaSmokeRemaining,kind:'buff',tick:'turn'});
-    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,flying:!!d.flying,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemAbsorbStat:p.golemAbsorbStat||null,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
+    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,flying:!!d.flying,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemArmor:((p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0)?1:0),golemArmorExpireAfterTurn:p.golemArmorExpireAfterTurn||0,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
   }
 
   #getView(side){
@@ -301,7 +310,7 @@ __refRoot.GameReferee = class GameReferee {
       bases:this.#s.bases.map(b=>({id:b.id,owner:b.owner,coord:b.coord,sabotaged:b.sabotaged})),
       trees:(this.#s.trees||[]).map(t=>({...t})), rocks:[...(this.#s.rocks||[])], rockHp:{...(this.#s.rockHp||{})}, water:[...(this.#s.water||[])], swamps:[...(this.#s.swamps||[])], ownTraps:(this.#s.traps?.[side]||[]).map(t=>({id:t.id,coord:t.coord,kind:t.kind})),
       chosenBaseBonuses:[...this.#s.chosenBaseBonuses[side]], baseBonusCatalog:this.#R.baseBonuses.map(b=>({...b})),
-      ownOriginalDeaths:this.#originalDeaths(side), enemyOriginalDeaths:this.#originalDeaths(other), corpses:this.#s.corpses.map(c=>({coord:c.coord})),
+      ownOriginalDeaths:this.#originalDeaths(side), enemyOriginalDeaths:this.#originalDeaths(other), matchConfig:structuredClone(this.#s.matchConfig||{teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}}), corpses:this.#s.corpses.map(c=>({coord:c.coord})),
       ownMirrors:this.#s.mirrors.filter(m=>m.owner===side).map(m=>({coord:m.coord})), seerArea:[...this.#s.seer[side]], impactCell:this.#s.impact[side], combatCells:[...(this.#s.combatMarks?.[side]||[])],
       history:[...this.#s.history[side]], intel:[...this.#s.intel[side]], perceptionHints:(this.#s.perceptionHints[side]||[]).map(h=>({...h})),
       activation:act?{...act}:null, pendingCombat:pending, doppelChoice:this.#s.doppelChoice[side]?{...this.#s.doppelChoice[side]}:null,
@@ -329,7 +338,7 @@ __refRoot.GameReferee = class GameReferee {
     const a=this.#activation(side);
     if(a&&a.committed&&a.pieceId!==id) return this.#fail(`O turno de ${this.#R.defOf(this.#activePiece(side)).name} já foi comprometido.`);
     if(!a||a.pieceId!==id)this.#clearSpotOnTurnStart(p);
-    this.#s.activation[side]={pieceId:id,committed:a?.pieceId===id?!!a.committed:false,movementUsed:a?.pieceId===id?!!a.movementUsed:false,mode:null,moveRemaining:0,stepsTaken:a?.pieceId===id?(a.stepsTaken||0):0,lastPerception:a?.pieceId===id?(a.lastPerception??null):null,mirrorBlockedCurrentActivation:false};
+    this.#s.activation[side]={pieceId:id,committed:a?.pieceId===id?!!a.committed:false,movementUsed:a?.pieceId===id?!!a.movementUsed:false,mode:null,moveRemaining:0,stepsTaken:a?.pieceId===id?(a.stepsTaken||0):0,movePath:a?.pieceId===id?[...(a.movePath||[])]:[],lastPerception:a?.pieceId===id?(a.lastPerception??null):null,mirrorBlockedCurrentActivation:false};
     return this.#ok(`${this.#R.defOf(p).name} selecionado. Ainda pode trocar enquanto não agir.`);
   }
 
@@ -368,6 +377,7 @@ __refRoot.GameReferee = class GameReferee {
     if(a.moveRemaining<=0||!this.#R.neighbors(p.coord,d.diag).includes(to)||!this.#canShareCell(side,p,to)||cost>a.moveRemaining)return this.#fail(cost>1?'Pântano exige 2 de movimento; escolha outra casa ou ganhe mais mobilidade.':'Escolha uma casa válida.');if(d.flying&&solidDest&&a.moveRemaining<=cost)return this.#fail('Unidades voadoras podem atravessar Árvores e Pedras, mas não terminar o movimento sobre elas.');
     this.#commit(side);a.movementUsed=true;a.stepsTaken=(a.stepsTaken||0)+1;
     const from=p.coord,foe=this.#pieceAt(this.#other(side),to),linkedShield=this.#linkedShieldFor(p);
+    a.movePath=a.movePath||[];if(!a.movePath.includes(from))a.movePath.push(from);
     p.coord=to;
     const trap=this.#triggerTraps(side,p,to);
     if(!p.alive||p.owner!==side){a.mode=null;a.moveRemaining=0;return this.#finishActivation(side);}
@@ -391,9 +401,10 @@ __refRoot.GameReferee = class GameReferee {
     a.mode=null;a.moveRemaining=0;
     const other=this.#other(side),d=this.#R.defOf(p),per=Math.max(0,d.per||0);
     const orth=this.#R.perceptionCells(p.coord,per,false);
+    const traversed=new Set(a.movePath||[]),orthPossible=orth.filter(c=>!traversed.has(c));
     const visibleEnemyAt=c=>{const e=this.#pieceAt(other,c);return (e&&!this.#isDruidHidden(e)&&!this.#isUndetectable(e))||this.#mirrorAt(c,other)};
     const orthHits=orth.filter(visibleEnemyAt);
-    const diagOnly=this.#R.perceptionCells(p.coord,per,true).filter(c=>!orth.includes(c));
+    const diagOnly=this.#R.perceptionCells(p.coord,per,true).filter(c=>!orth.includes(c)),diagPossible=diagOnly.filter(c=>!traversed.has(c));
     const diagHits=diagOnly.filter(visibleEnemyAt);
     const expanded=!!p.bonusRadarExpanded,advanced=!!p.bonusRadarAdvanced;
     let detected=per>0&&(orthHits.length>0||(expanded&&diagHits.length>0));
@@ -410,11 +421,11 @@ __refRoot.GameReferee = class GameReferee {
     const hints=[];
     if(per>0){
       if(advanced&&orthHits.length){for(const c of orthHits)hints.push({coord:c,kind:'exact'});}
-      else if(orthHits.length){for(const c of orth.filter(hintable))hints.push({coord:c,kind:'orth'});}
-      if(expanded&&diagHits.length){for(const c of diagOnly.filter(hintable))hints.push({coord:c,kind:'diag'});}
+      else if(orthHits.length){for(const c of orthPossible.filter(hintable))hints.push({coord:c,kind:'orth'});}
+      if(expanded&&diagHits.length){for(const c of diagPossible.filter(hintable))hints.push({coord:c,kind:'diag'});}
       if(fake){
-        const pool=orth.filter(hintable);const fakeCell=pool[Math.floor(Math.random()*Math.max(1,pool.length))];
-        if(fakeCell){if(advanced)hints.push({coord:fakeCell,kind:'exact'});else for(const c of orth.filter(hintable))hints.push({coord:c,kind:'orth'});}
+        const pool=orthPossible.filter(hintable);const fakeCell=pool[Math.floor(Math.random()*Math.max(1,pool.length))];
+        if(fakeCell){if(advanced)hints.push({coord:fakeCell,kind:'exact'});else for(const c of orthPossible.filter(hintable))hints.push({coord:c,kind:'orth'});}
       }
     }
     this.#s.perceptionHints[side]=hints.filter((h,i,a)=>a.findIndex(x=>x.coord===h.coord&&x.kind===h.kind)===i);
@@ -585,11 +596,10 @@ __refRoot.GameReferee = class GameReferee {
     if(!this.#inAbilityRange(p,c)||this.#solidTerrain(c)||this.#baseAt(c))return this.#fail('Casa inválida para a armadilha.');
     const kind=a.mode==='spotTrap'?'spot':'damage',limit=kind==='spot'?2:1;this.#commit(side);let arr=this.#s.traps[side];arr=arr.filter(t=>!(t.placerId===p.id&&t.coord===c));const owned=arr.filter(t=>t.placerId===p.id&&t.kind===kind).sort((x,y)=>x.seq-y.seq);while(owned.length>=limit){const old=owned.shift();arr=arr.filter(t=>t.id!==old.id);}arr.push({id:'t'+this.#s.idSeq++,owner:side,placerId:p.id,kind,coord:c,seq:this.#s.idSeq});this.#s.traps[side]=arr;this.#addHistory(side,kind==='spot'?'🦉 Sentinela preparou uma armadilha de revelação oculta.':'🕳️ Caçador preparou uma armadilha de dano oculta.');a.mode=null;return this.#finishActivation(side);
   }
-  #absorbRock(side,c,stat){
+  #absorbRock(side,c){
     const bad=this.#validateTurn(side);if(bad)return bad;const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='absorbRock'||this.#effectiveAbility(p)!=='absorbRock')return this.#fail('Absorção de rocha não iniciada.');
-    if(!this.#R.neighbors(p.coord,false).includes(c)||!this.#rockAt(c))return this.#fail('Escolha uma pedra adjacente.');if(!['life','move','attack'].includes(stat))return this.#fail('Escolha Vida, Movimento ou ATQ.');
-    this.#commit(side);const old=p.golemAbsorbStat||null;p.golemAbsorbStat=stat;const newMax=this.#R.defOf(p).v;if(stat==='life'&&old!=='life')p.hp=Math.min(newMax,p.hp+1);else if(old==='life'&&stat!=='life')p.hp=Math.min(p.hp,newMax);
-    this.#s.rocks=this.#s.rocks.filter(x=>x!==c);if(this.#s.rockHp)delete this.#s.rockHp[c];const label=stat==='life'?'+1 Vida':stat==='move'?'+1 Movimento':'+1 ATQ';this.#addHistory(side,`🗿 Golem consumiu uma pedra e adaptou o corpo: ${label}. O bônus anterior foi substituído.`);this.#noteReplay('ability',side,{piece:'Golem',ability:'Absorver Rocha',coord:c,text:label});a.mode=null;return this.#finishActivation(side);
+    if(!this.#R.neighbors(p.coord,false).includes(c)||!this.#rockAt(c))return this.#fail('Escolha uma pedra adjacente.');
+    this.#commit(side);p.golemArmorExpireAfterTurn=(p.turnsTaken||0)+2;this.#s.rocks=this.#s.rocks.filter(x=>x!==c);if(this.#s.rockHp)delete this.#s.rockHp[c];this.#addHistory(side,'🛡️ Golem consumiu uma pedra e recebeu 1 de Armadura até o fim do próximo turno próprio.');this.#noteReplay('ability',side,{piece:'Golem',ability:'Absorver Rocha',coord:c,text:'1 de Armadura até o fim do próximo turno próprio.'});a.mode=null;return this.#finishActivation(side);
   }
 
   #bardBuff(side,targetId,stat){
@@ -609,7 +619,7 @@ __refRoot.GameReferee = class GameReferee {
     this.#clearShieldLinks(target);
     ghost.possession={hostSide:targetSide,hostId:target.id,hostSnapshot:structuredClone(target),ghostState:{name:'Fantasma',form:ghost.form||null,copied:ghost.copied||null,bonusM:ghost.bonusM||0,bonusV:ghost.bonusV||0,bonusA:ghost.bonusA||0,bonusRange:ghost.bonusRange||0,bonusAH:ghost.bonusAH||0,effects:structuredClone(ghost.effects||[])}};
     target.alive=false;target.possessedBy=ghost.id;target.coord=null;
-    ghost.name=target.name;ghost.form=target.form||null;ghost.copied=target.copied||null;ghost.hp=target.hp;ghost.coord=coord;ghost.bonusM=target.bonusM||0;ghost.bonusV=target.bonusV||0;ghost.bonusA=target.bonusA||0;ghost.bonusRange=target.bonusRange||0;ghost.bonusAH=target.bonusAH||0;ghost.bonusPer=target.bonusPer||0;ghost.bonusRadarAdvanced=!!target.bonusRadarAdvanced;ghost.bonusRadarExpanded=!!target.bonusRadarExpanded;ghost.golemAbsorbStat=target.golemAbsorbStat||null;ghost.sureShotCooldown=target.sureShotCooldown||0;ghost.sureShotActive=!!target.sureShotActive;ghost.ninjaSmokeCooldown=target.ninjaSmokeCooldown||0;ghost.ninjaSmokeRemaining=target.ninjaSmokeRemaining||0;ghost.mirrorCooldown=target.mirrorCooldown||0;ghost.turnsTaken=target.turnsTaken||0;ghost.effects=structuredClone(target.effects||[]);
+    ghost.name=target.name;ghost.form=target.form||null;ghost.copied=target.copied||null;ghost.hp=target.hp;ghost.coord=coord;ghost.bonusM=target.bonusM||0;ghost.bonusV=target.bonusV||0;ghost.bonusA=target.bonusA||0;ghost.bonusRange=target.bonusRange||0;ghost.bonusAH=target.bonusAH||0;ghost.bonusPer=target.bonusPer||0;ghost.bonusRadarAdvanced=!!target.bonusRadarAdvanced;ghost.bonusRadarExpanded=!!target.bonusRadarExpanded;ghost.golemArmorExpireAfterTurn=target.golemArmorExpireAfterTurn||0;ghost.sureShotCooldown=target.sureShotCooldown||0;ghost.sureShotActive=!!target.sureShotActive;ghost.ninjaSmokeCooldown=target.ninjaSmokeCooldown||0;ghost.ninjaSmokeRemaining=target.ninjaSmokeRemaining||0;ghost.mirrorCooldown=target.mirrorCooldown||0;ghost.turnsTaken=target.turnsTaken||0;ghost.effects=structuredClone(target.effects||[]);
     const others=this.#piecesAt(targetSide,coord).filter(x=>x.id!==target.id);for(const ally of others){const dest=this.#R.neighbors(coord,false).find(c=>!this.#solidTerrain(c)&&!this.#baseAt(c)&&!this.#pieceAt(targetSide,c)&&!this.#pieceAt(side,c));if(dest)ally.coord=dest;}
     return true;
   }
@@ -654,8 +664,9 @@ __refRoot.GameReferee = class GameReferee {
     if(!p||!p.alive)return{dead:true,transform:false};
     const wasPossessed=!!p.possession,possessedHostName=wasPossessed?this.#R.defOf(p).name:null;
     let pending=Math.max(0,Number(n)||0);for(const e of p.effects||[]){if(!pending)break;const temp=Math.max(0,Number(e.tempLife)||0);if(!temp)continue;const used=Math.min(temp,pending);e.tempLife=temp-used;pending-=used;}
-    p.hp-=pending;if(p.name==='Golem'&&!p.form&&p.hp>0){p.form='lava';p.hp=1+(p.bonusV||0);return{dead:false,transform:true};}
-    if(p.hp<=0){if(wasPossessed){this.#breakPossession(p);return{dead:false,transform:false,possessionBroken:true,hostName:possessedHostName};}const zombieWasFirst=p.name==='Zumbi'&&p.original&&!p.zombieRevived;this.#kill(p);return{dead:!zombieWasFirst&&!p.alive,transform:false,zombieDown:zombieWasFirst};}return{dead:false,transform:false};
+    const armorActive=(p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0);const armorReduced=armorActive&&pending>0?Math.min(1,pending):0;pending-=armorReduced;
+    p.hp-=pending;if(pending>0&&p.name==='Golem'&&!p.form&&p.hp>0){p.form='lava';p.hp=1+(p.bonusV||0);return{dead:false,transform:true};}
+    if(p.hp<=0){if(wasPossessed){this.#breakPossession(p);return{dead:false,transform:false,possessionBroken:true,hostName:possessedHostName};}const zombieWasFirst=p.name==='Zumbi'&&p.original&&!p.zombieRevived;this.#kill(p);return{dead:!zombieWasFirst&&!p.alive,transform:false,zombieDown:zombieWasFirst};}return{dead:false,transform:false,armorReduced:typeof armorReduced==='number'?armorReduced:0};
   }
   #explodeKamikaze(p){
     const ah=this.#R.defOf(p).ah||1,cells=this.#R.blastCells(p.coord,ah);this.#addHistory(p.owner,`💥 Seu Kamikaze explodiu: 1 de dano em toda a área de Alc. Hab. ${ah}, com fogo amigo.`);this.#addHistory(this.#other(p.owner),'💥 Um Kamikaze inimigo explodiu nas proximidades.');for(const c of cells){for(const side of ['player','enemy']){const t=this.#protectedTarget(side,c);if(t)this.#damage(t,1);}}this.#resolveSlimeSplits();
@@ -754,7 +765,7 @@ __refRoot.GameReferee = class GameReferee {
   }
 
   #finishActivation(side){
-    const hadActivation=!!this.#activation(side),p=this.#activePiece(side);if(this.#s.mode!=='training'&&hadActivation)this.#s.roundActivations[side]=(this.#s.roundActivations?.[side]||0)+1;if(p&&p.alive){if(p.name==='Arqueiro'||p.identity==='Arqueiro'){p.sureShotActive=false;if((p.sureShotCooldown||0)>0)p.sureShotCooldown--;}if((p.ninjaSmokeCooldown||0)>0)p.ninjaSmokeCooldown--;if((p.ninjaSmokeRemaining||0)>0&&p.ninjaSmokeCooldown<2)p.ninjaSmokeRemaining--;p.activated=this.#s.mode==='training'?false:true;this.#tickPieceEffects(p,'turn');if(p.name==='Bardo'||p.identity==='Bardo')this.#expireBardAfterTurn(p);else p.turnsTaken=(p.turnsTaken||0)+1;if(p.paranoia?.revealed){p.paranoia.remaining--;if(p.paranoia.remaining<=0){p.paranoia=null;this.#addIntel(side,'🧠 O efeito de Paranoia terminou.');}}if(p.name==='Zumbi'&&p.zombieTurnsLeft>0){p.zombieTurnsLeft--;if(p.zombieTurnsLeft<=0){this.#addHistory(side,'🧟 Os 3 turnos do Zumbi terminaram; ele caiu definitivamente.');this.#kill(p,true);}}}
+    const hadActivation=!!this.#activation(side),p=this.#activePiece(side);if(this.#s.mode!=='training'&&hadActivation)this.#s.roundActivations[side]=(this.#s.roundActivations?.[side]||0)+1;if(p&&p.alive){if(p.name==='Arqueiro'||p.identity==='Arqueiro'){p.sureShotActive=false;if((p.sureShotCooldown||0)>0)p.sureShotCooldown--;}if((p.ninjaSmokeCooldown||0)>0)p.ninjaSmokeCooldown--;if((p.ninjaSmokeRemaining||0)>0&&p.ninjaSmokeCooldown<2)p.ninjaSmokeRemaining--;p.activated=this.#s.mode==='training'?false:true;this.#tickPieceEffects(p,'turn');if(p.name==='Bardo'||p.identity==='Bardo')this.#expireBardAfterTurn(p);else p.turnsTaken=(p.turnsTaken||0)+1;if((p.golemArmorExpireAfterTurn||0)>0&&(p.turnsTaken||0)>=p.golemArmorExpireAfterTurn){p.golemArmorExpireAfterTurn=0;this.#addHistory(side,'🛡️ A Armadura do Golem terminou.');}if(p.paranoia?.revealed){p.paranoia.remaining--;if(p.paranoia.remaining<=0){p.paranoia=null;this.#addIntel(side,'🧠 O efeito de Paranoia terminou.');}}if(p.name==='Zumbi'&&p.zombieTurnsLeft>0){p.zombieTurnsLeft--;if(p.zombieTurnsLeft<=0){this.#addHistory(side,'🧟 Os 3 turnos do Zumbi terminaram; ele caiu definitivamente.');this.#kill(p,true);}}}
     this.#s.activation[side]=null;this.#s.impact[side]=null;if(this.#s.combatHold?.[side])this.#s.combatHold[side]=false;else if(this.#s.combatMarks)this.#s.combatMarks[side]=[];if(this.#s.mode==='training'){this.#s.turn=side;return this.#ok('Ação de treino encerrada. Você pode usar qualquer peça novamente.',{training:true});}if(this.#checkEnd())return this.#ok('Partida encerrada.',{gameOver:true});this.#advanceAfterActivation(side);return this.#ok('Turno encerrado.',{turn:this.#s.turn});
   }
 
@@ -766,17 +777,17 @@ __refRoot.GameReferee = class GameReferee {
 
   #checkEnd(){
     if(this.#s.mode==='training')return false;
-    const pd=this.#originalDeaths('player'),ed=this.#originalDeaths('enemy');
-    if(pd>=3&&ed>=3){this.#s.gameOver=true;this.#s.result='draw';this.#addHistory('player','⚖️ As duas equipes chegaram a 3 perdas na mesma resolução.');this.#addHistory('enemy','⚖️ As duas equipes chegaram a 3 perdas na mesma resolução.');return true;}
-    if(pd>=3){this.#s.gameOver=true;this.#s.result='enemy';this.#addHistory('player','☠️ Derrota: 3 das suas 4 peças originais foram eliminadas.');this.#addHistory('enemy','🏆 Vitória: você eliminou 3 das 4 peças inimigas.');return true;}
-    if(ed>=3){this.#s.gameOver=true;this.#s.result='player';this.#addHistory('player','🏆 Vitória: você eliminou 3 das 4 peças inimigas.');this.#addHistory('enemy','☠️ Derrota: 3 das suas 4 peças originais foram eliminadas.');return true;}
+    const pd=this.#originalDeaths('player'),ed=this.#originalDeaths('enemy'),cfg=this.#s.matchConfig||{teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}},pl=cfg.lossLimit.player,el=cfg.lossLimit.enemy;
+    if(pd>=pl&&ed>=el){this.#s.gameOver=true;this.#s.result='draw';this.#addHistory('player',`⚖️ As duas equipes chegaram ao próprio limite de perdas na mesma resolução.`);this.#addHistory('enemy',`⚖️ As duas equipes chegaram ao próprio limite de perdas na mesma resolução.`);return true;}
+    if(pd>=pl){this.#s.gameOver=true;this.#s.result='enemy';this.#addHistory('player',`☠️ Derrota: ${pd}/${pl} perdas originais.`);this.#addHistory('enemy',`🏆 Vitória: o adversário atingiu ${pd}/${pl} perdas originais.`);return true;}
+    if(ed>=el){this.#s.gameOver=true;this.#s.result='player';this.#addHistory('player',`🏆 Vitória: o adversário atingiu ${ed}/${el} perdas originais.`);this.#addHistory('enemy',`☠️ Derrota: ${ed}/${el} perdas originais.`);return true;}
     return false;
   }
   exportState(){
     return JSON.stringify(this.#s,(k,v)=>v instanceof Set?{__set:[...v]}:v);
   }
   #importState(raw){
-    if(!raw)return;this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);if(!this.#s.doppelChoice)this.#s.doppelChoice={player:null,enemy:null};if(!this.#s.roundStarter)this.#s.roundStarter='player';if(!this.#s.roundActivations)this.#s.roundActivations={player:0,enemy:0};if(!this.#s.trees)this.#s.trees=[{coord:'B3',state:'live',hp:3},{coord:'G6',state:'live',hp:3}];for(const tr of this.#s.trees)if(tr.hp==null)tr.hp=tr.state==='live'?3:0;if(!this.#s.rocks)this.#s.rocks=['F2','C7'];if(!this.#s.rockHp)this.#s.rockHp=Object.fromEntries((this.#s.rocks||[]).map(c=>[c,3]));if(!this.#s.water)this.#s.water=['D3','E6'];if(!this.#s.swamps)this.#s.swamps=['C5','F4'];if(!this.#s.traps)this.#s.traps={player:[],enemy:[]};if(!this.#s.spotReveals)this.#s.spotReveals={player:{},enemy:{}};if(!this.#s.combatMarks)this.#s.combatMarks={player:[],enemy:[]};if(!this.#s.combatHold)this.#s.combatHold={player:false,enemy:false};if(this.#s.replayEvent===undefined)this.#s.replayEvent=null;for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(p.name==='Coringa')p.name='Trapaceiro';if(p.identity==='Coringa')p.identity='Trapaceiro';if(!Array.isArray(p.effects))p.effects=[];if(p.bonusAH==null)p.bonusAH=0;if(p.turnsTaken==null)p.turnsTaken=0;if(p.linkedToId===undefined)p.linkedToId=null;if(p.sureShotCooldown==null)p.sureShotCooldown=0;if(p.sureShotActive==null)p.sureShotActive=false;if(p.golemAbsorbStat===undefined)p.golemAbsorbStat=null;if(p.ninjaSmokeCooldown==null)p.ninjaSmokeCooldown=0;if(p.ninjaSmokeRemaining==null)p.ninjaSmokeRemaining=0;}
+    if(!raw)return;this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);if(!this.#s.doppelChoice)this.#s.doppelChoice={player:null,enemy:null};if(!this.#s.matchConfig)this.#s.matchConfig={teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}};if(!this.#s.roundStarter)this.#s.roundStarter='player';if(!this.#s.roundActivations)this.#s.roundActivations={player:0,enemy:0};if(!this.#s.trees)this.#s.trees=[{coord:'B3',state:'live',hp:3},{coord:'G6',state:'live',hp:3}];for(const tr of this.#s.trees)if(tr.hp==null)tr.hp=tr.state==='live'?3:0;if(!this.#s.rocks)this.#s.rocks=['F2','C7'];if(!this.#s.rockHp)this.#s.rockHp=Object.fromEntries((this.#s.rocks||[]).map(c=>[c,3]));if(!this.#s.water)this.#s.water=['D3','E6'];if(!this.#s.swamps)this.#s.swamps=['C5','F4'];if(!this.#s.traps)this.#s.traps={player:[],enemy:[]};if(!this.#s.spotReveals)this.#s.spotReveals={player:{},enemy:{}};if(!this.#s.combatMarks)this.#s.combatMarks={player:[],enemy:[]};if(!this.#s.combatHold)this.#s.combatHold={player:false,enemy:false};if(this.#s.replayEvent===undefined)this.#s.replayEvent=null;for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(p.name==='Coringa')p.name='Trapaceiro';if(p.identity==='Coringa')p.identity='Trapaceiro';if(!Array.isArray(p.effects))p.effects=[];if(p.bonusAH==null)p.bonusAH=0;if(p.turnsTaken==null)p.turnsTaken=0;if(p.linkedToId===undefined)p.linkedToId=null;if(p.sureShotCooldown==null)p.sureShotCooldown=0;if(p.sureShotActive==null)p.sureShotActive=false;if(p.golemArmorExpireAfterTurn==null)p.golemArmorExpireAfterTurn=0;p.golemAbsorbStat=null;if(p.ninjaSmokeCooldown==null)p.ninjaSmokeCooldown=0;if(p.ninjaSmokeRemaining==null)p.ninjaSmokeRemaining=0;}
   }
 
 };
