@@ -1,26 +1,21 @@
-Batalha nas Sombras v1.15.44 HOTFIX DEPLOY — TESTE GIT
+Batalha nas Sombras v1.15.45 — TESTE GIT
 
-Base: v1.15.42 TESTE GIT.
+Base: v1.15.44 HOTFIX DEPLOY TESTE GIT.
 
-Principais mudanças:
-- Dificuldade da IA passou a ser exibida como Nível 1, Nível 2, Nível 3 e Nível 4. Os identificadores internos antigos foram mantidos para compatibilidade.
-- Clássico permite configurar separadamente de 1 a 8 personagens por lado e quantas perdas originais causam derrota em cada lado.
-- Clássico Online: Jogador 1 define a configuração oficial da sala; Jogador 2 recebe e usa a mesma configuração.
-- Arena permite configurar separadamente quantidade de personagens e limite de perdas de A, B e C.
-- Arena Online: Jogador A define a configuração oficial; a IA C respeita a quantidade e o limite configurados.
-- Padrão permanece 4 personagens e derrota ao perder 3 originais.
-- Unidades criadas durante a partida continuam entrando na contagem de unidades vivas/ativações, mas não contam como perdas originais.
-- Regras de ativação foram preservadas e adaptadas às formações assimétricas.
-- IA do Clássico e da Arena considera os limites de derrota personalizados nas decisões de fim de partida.
-- Replay registra e mostra a configuração usada na partida.
-- Saves e salas antigas sem configuração explícita usam automaticamente o padrão 4/3.
-- Corrigidos casos de alvo inválido do Mago do Espelho na IA, um loop raro de movimento de unidade cercada e sincronização/restauração das configurações Online.
+Principais mudanças desta versão:
+- Golem de Lava mantém Absorver Rocha: cada Pedra consumida concede +1 Movimento permanente e cumulativo.
+- Arqueiro: Tiro Certeiro agora mostra a área ampliada e pede confirmação antes de ativar o alcance dobrado naquele turno.
+- Piromante: ataque normal atinge 1 casa; Rajada Dupla é habilidade ativa para 1 ou 2 casas dentro do Alc. Hab., com prévia, confirmação e recarga de 1 turno.
+- Paranoia: habilidade antiga removida. Nova Presença Fantasma (Alc. Hab. 3) cria exatamente 2 presenças falsas; máximo de 2 por Paranoia, removendo as mais antigas ao criar novas.
+- Presenças Fantasmas enganam Percepção, podem ser atacadas ou gerar Confronto Direto falso, e são visíveis no mapa apenas para o dono.
+- Ao atacar/enfrentar uma Presença Fantasma, a peça recebe no próximo turno próprio um Eco conhecido como falso, independentemente da posição.
+- A IA reconhece que o Eco conhecido é falso, mas continua podendo ser enganada por Presenças Fantasmas normais.
+- A casa atual da peça é marcada como origem durante habilidades; habilidades compatíveis podem usar a própria casa.
+- Textos ativos foram revisados para usar "turno" no lugar de "ativação" quando o termo é apresentado ao jogador.
+- Clássico, Treino, Arena, Online, IA e Replay foram sincronizados com as novas regras.
 
-Observação de deploy: arquivos SAVE_PROJETO, TESTES e VALIDACAO são documentação de desenvolvimento e não são necessários para o jogo funcionar no Git/Cloudflare.
-
-
-HOTFIX DEPLOY:
-- Removida de src/worker.js uma dependência CommonJS inválida para ./rules.js.
-- O Worker já incorpora GameRules no próprio arquivo; src/rules.js não existe nem é necessário.
-- A linha podia ser ignorada em execução ESM, mas ainda ser resolvida pelo bundler do Wrangler durante o deploy.
-- Nenhuma regra ou mecânica de jogo foi alterada neste hotfix.
+Deploy:
+- O hotfix que removeu o require inválido de ./rules.js em src/worker.js foi preservado.
+- package.json: npm run deploy -> wrangler deploy.
+- wrangler.jsonc mantém os Durable Objects GameRoom e TriGameRoom.
+- Arquivos SAVE_PROJETO, TESTES e VALIDACAO são documentação de desenvolvimento e não são necessários para o jogo funcionar.

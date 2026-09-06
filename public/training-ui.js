@@ -3,7 +3,7 @@
   const R=window.GameRules,ref=new window.GameReferee(),playerClient=ref.createClient('player'),enemyClient=ref.createClient('enemy'),Assets=window.BNSAssets||{};
   const $=s=>document.querySelector(s),board=$('#board'),statusEl=$('#status'),popup=$('#popup'),replayBtn=$('#replayBtn');
   const selected={player:[],enemy:[]},draftPos=new Map(),draftBases={player:['B2','G2'],enemy:['B7','G7']},cells=new Map(),rosterFilter={player:'all',enemy:'all'};
-  let setupPick=null,activeSide=null,inspected=null,seer=[],pyro=[],started=false,pendingShieldTargetId=null;
+  let setupPick=null,activeSide=null,inspected=null,seer=[],pyro=[],paranoia=[],started=false,pendingShieldTargetId=null;
   const recorder=new window.GameReplay.Recorder(()=>ref.exportState(),{kind:'training'});
   const sideName=s=>s==='player'?'A':'B', sideClass=s=>s==='player'?'a':'b', client=s=>s==='player'?playerClient:enemyClient;
   const Audio=window.GameAudio||{play:()=>{},bind:()=>{},resume:()=>{}};
@@ -15,18 +15,18 @@
   const parseBasePick=id=>{const m=/^base:(player|enemy):(0|1)$/.exec(id||'');return m?{side:m[1],index:Number(m[2])}:null;};
   const allBaseCoords=()=>[...draftBases.player,...draftBases.enemy];
   const ABILITY_TEXT={
-    'Arqueiro':'Tiro Certeiro dobra o Alcance de Ataque no turno em que é ativado. Recarga: 1 turno próprio.',
+    'Arqueiro':'Tiro Certeiro: mostra no tabuleiro o alcance dobrado antes de ativar e pede confirmação. Depois de confirmado, o próximo ataque normal usa esse alcance maior naquele turno. Recarga: 1 turno próprio.',
     'Ninja':'Bomba de Fumaça deixa a unidade completamente indetectável até o fim do próximo turno próprio. Recarga: 2 turnos próprios.',
-    'Piromante':'Escolhe 1 ou 2 casas dentro do Alc. Hab. e resolve os ataques na mesma ação.',
+    'Piromante':'Ataque normal atinge 1 casa. Rajada Dupla: escolha 1 ou 2 casas diferentes dentro do Alc. Hab., confira a prévia e confirme para atacar as selecionadas. Recarga: 1 turno próprio.',
     'Kamikaze':'Explode ao morrer e também pode usar Autodestruição. O Alc. Hab. funciona em anéis ao redor da unidade; a área é mostrada antes da confirmação.',
     'Caçador':'Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Colocar outra substitui a anterior.',
-    'Paranoia':'Ao detectar inimigos com a própria PER, pode afetar até 2 alvos e gerar falsas presenças temporárias.',
+    'Paranoia':'Presença Fantasma: escolha exatamente 2 casas dentro do Alc. Hab. 3. Você vê as presenças; os inimigos não. A PER inimiga as detecta como se fossem unidades e elas podem ser atacadas ou gerar Confronto Direto. Ao destruir ou confrontar uma, aquela peça sabe que era falsa e, no próximo turno próprio, recebe uma detecção falsa conhecida onde quer que esteja. Máximo de 2 presenças por Paranoia; ao criar novas, as mais antigas desaparecem.',
     'Escudeiro':'Vincular escolhe um aliado dentro do Alc. Hab. Alc. Hab. 0 alcança apenas a própria casa. Enquanto vinculado, acompanha e protege o aliado.',
-    'Golem':'Absorver Rocha consome uma Pedra adjacente e concede 1 de Armadura até o fim do próximo turno próprio. A Armadura reduz cada dano recebido em 1; dano reduzido a 0 não transforma o Golem em Golem de Lava.',
+    'Golem':'Absorver Rocha: consome uma Pedra adjacente. Golem normal recebe 1 de Armadura até o fim do próximo turno próprio; cada dano é reduzido em 1 e dano reduzido a 0 não o transforma. Como Golem de Lava, consumir uma Pedra concede +1 M permanente e cumulativo.',
     'Cavaleiro':'Não possui habilidade ativa.',
     'Slime':'Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem morrer.',
     'Zumbi':'Na primeira morte, levanta-se na rodada seguinte com 1 de Vida. Depois de 3 turnos próprios, cai definitivamente.',
-    'Druida':'Pode entrar em Árvores vivas sem ser detectado por PER e despertar uma delas como Galho-Vivo. Druida e Galho-Vivo usam ativações separadas.',
+    'Druida':'Pode entrar em Árvores vivas sem ser detectado por PER e despertar uma delas como Galho-Vivo. Druida e Galho-Vivo usam turnos separados.',
     'Vidente':'Escolha a primeira casa dentro do Alc. Hab. e depois 1 casa ligada por lado; as 2 ficam reveladas.',
     'Mago do Espelho':'Cria 1 Espelho dentro do Alc. Hab. O Espelho gera falsa presença e reflete o primeiro ataque.',
     'Necromante':'Ergue um Esqueleto usando um cadáver dentro do Alc. Hab. Limite de 1 Esqueleto vivo por Necromante.',
@@ -193,20 +193,20 @@
         if(mode==='absorbRock'&&(state.rocks||[]).includes(c)&&R.neighbors(p.coord,false).includes(c))b.classList.add('highlight');
         if(mode==='move'&&v.activation.moveRemaining>=(p.flying?1:((R.swampCells||[]).includes(c)?2:1))&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps)){const solid=(state.rocks||[]).includes(c)||!!treeAt(state,c);if(!(p.flying&&solid&&v.activation.moveRemaining<=1))b.classList.add('highlight');}
         if(mode==='attack'&&R.attackCells(p).includes(c))b.classList.add('attack-highlight');
-        if(['raise','mirror','awaken','spotTrap','damageTrap','bard'].includes(mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');
-        if(mode==='seer'){if(!seer.length&&R.abilityCells(p).includes(c))b.classList.add('highlight','seer-range');else if(seer.length){if(c===seer[0])b.classList.add('highlight','seer-main');else if(R.neighbors(seer[0],false).includes(c))b.classList.add('highlight','seer-next');}}
+        if(['raise','mirror','awaken','bard'].includes(mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');if(['spotTrap','damageTrap'].includes(mode)&&R.abilityCells(p,true).includes(c))b.classList.add('highlight');
+        if(mode==='seer'){if(!seer.length&&R.abilityCells(p,true).includes(c))b.classList.add('highlight','seer-range');else if(seer.length){if(c===seer[0])b.classList.add('highlight','seer-main');else if(R.neighbors(seer[0],false).includes(c))b.classList.add('highlight','seer-next');}}
         if(mode==='kamikaze'&&(v.activation.kamikazeCells||[]).includes(c))b.classList.add('attack-highlight','kamikaze-highlight');if(mode==='shieldLink'){const ah=p.ah||0;if(v.ownPieces.some(x=>x.id!==p.id&&x.alive&&x.coord===c&&R.man(p.coord,x.coord)<=ah))b.classList.add('highlight');}
-        if(mode==='pyro'&&R.abilityCells(p).includes(c))b.classList.add('attack-highlight');
-        if(seer.includes(c)||pyro.includes(c))b.classList.add('pyro-selected');
+        if(mode==='pyro'&&R.abilityCells(p).includes(c))b.classList.add('attack-highlight');if(mode==='sureShotConfirm'&&R.attackCells({...p,range:(p.range||0)*2}).includes(c))b.classList.add('attack-highlight');if(mode==='paranoiaPresence'&&R.abilityCells(p,true).includes(c))b.classList.add('highlight');
+        if(seer.includes(c)||pyro.includes(c)||paranoia.includes(c))b.classList.add('pyro-selected');const abilityModes=['pyro','sureShotConfirm','paranoiaPresence','raise','mirror','awaken','spotTrap','damageTrap','bard','absorbRock','seer','kamikaze','shieldLink','shieldUnlink'];if(abilityModes.includes(mode)&&c===p.coord)b.classList.add('ability-origin');
       }
     }
     for(const x of state.corpses||[])addFieldMarker(cells.get(x.coord),Assets.effects?.lapide,'corpse','Lápide','☠️');
     for(const x of state.mirrors||[])addFieldMarker(cells.get(x.coord),Assets.effects?.espelho,'mirror','Espelho','🪞');
-    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])addFieldMarker(cells.get(x.coord),x.kind==='spot'?Assets.structures?.trapSentry:Assets.structures?.trapHunter,'eye',`Armadilha do Lado ${sideName(s)}`,x.kind==='spot'?'🦉':'🕳️');
+    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])addFieldMarker(cells.get(x.coord),x.kind==='spot'?Assets.structures?.trapSentry:Assets.structures?.trapHunter,'eye',`Armadilha do Lado ${sideName(s)}`,x.kind==='spot'?'🦉':'🕳️');for(const s of ['player','enemy'])for(const x of state.falsePresences?.[s]||[])addFieldMarker(cells.get(x.coord),null,'false-presence-marker',`Presença Fantasma do Lado ${sideName(s)}`,'🧠');
     for(const c of new Set([vs.player.impactCell,vs.enemy.impactCell].filter(Boolean)))addFieldMarker(cells.get(c),Assets.effects?.dano,'impact','Ataque ocorreu aqui','💥');
     for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))addFieldMarker(cells.get(c),Assets.effects?.confronto,'combat-mark','Confronto Direto ocorreu aqui','⚔️');
     const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)addFieldMarker(cells.get(c),Assets.effects?.revelada,'eye','Casa revelada','👁️');
-    const hints=[...(vs.player.perceptionHints||[]).map(h=>({...h,side:'player'})),...(vs.enemy.perceptionHints||[]).map(h=>({...h,side:'enemy'}))];for(const h of hints){const mark=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';cells.get(h.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint ${h.kind||'orth'}" title="PER do Lado ${sideName(h.side)}">${mark}</span>`);}
+    const hints=[...(vs.player.perceptionHints||[]).map(h=>({...h,side:'player'})),...(vs.enemy.perceptionHints||[]).map(h=>({...h,side:'enemy'}))];for(const h of hints){const mark=h.knownFalse?'🧠':h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';cells.get(h.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint ${h.kind||'orth'}${h.knownFalse?' known-false':''}" title="${h.knownFalse?'Detecção falsa conhecida':'PER do Lado '+sideName(h.side)}">${mark}</span>`);}
     for(const viewer of ['player','enemy'])for(const pieceId of Object.keys(state.spotReveals?.[viewer]||{})){const target=['player','enemy'].flatMap(s=>state.pieces?.[s]||[]).find(x=>x.id===pieceId&&x.alive&&x.coord);if(target)addFieldMarker(cells.get(target.coord),Assets.effects?.revelada,'enemy-reveal',`Revelado ao Lado ${sideName(viewer)} pela armadilha da Sentinela`,'📍');}
   }
 
@@ -215,14 +215,14 @@
   }
   function switchSelect(piece){
     if(activeSide&&activeSide!==piece.owner){const old=client(activeSide),ov=views()[activeSide];if(ov.activation?.committed){setStatus('Termine a ação atual antes de trocar para o outro lado.');return;}if(ov.activation?.mode)old.cancelMode();if(ov.activation)old.cancelSelection();}
-    activeSide=piece.owner;seer=[];pyro=[];pendingShieldTargetId=null;const r=client(activeSide).selectPiece(piece.id);inspected=piece.id;setStatus(r.status);render();
+    activeSide=piece.owner;seer=[];pyro=[];paranoia=[];pendingShieldTargetId=null;const r=client(activeSide).selectPiece(piece.id);inspected=piece.id;setStatus(r.status);render();
   }
   function gameCell(c){
     const vs=views(),v=activeView(vs),p=activePiece(vs);if(!p){const hits=piecesAt(vs,c);if(hits.length>1)chooseStack(hits);else if(hits[0])switchSelect(hits[0]);else{const base=(vs.player.bases||[]).find(x=>x.coord===c);if(base)showBase(base,vs.player);}return;}
     const a=v.activation,cl=client(activeSide);let r=null;
     if(a.mode==='move')r=cl.moveStep(c);
     else if(a.mode==='attack')r=cl.attack(c);
-    else if(a.mode==='pyro'){r=cl.selectPyroTarget(c);if(r.ok)pyro=a.pyroTargets?.includes(c)?pyro.filter(x=>x!==c):[...new Set([...pyro,c])].slice(0,2);}
+    else if(a.mode==='pyro'){r=cl.selectPyroTarget(c);if(r.ok)pyro=a.pyroTargets?.includes(c)?pyro.filter(x=>x!==c):[...new Set([...pyro,c])].slice(0,2);}else if(a.mode==='paranoiaPresence'){r=cl.selectParanoiaTarget(c);if(r.ok)paranoia=r.paranoiaTargets||[];}
     else if(a.mode==='seer'){seerClick(c);return;}
     else if(a.mode==='raise')r=cl.raiseAt(c);
     else if(a.mode==='mirror')r=cl.placeMirror(c);
@@ -234,7 +234,7 @@
     else{const base=baseAtView(v,c);if(base){showBase(base,v);return;}const hits=piecesAt(vs,c);if(hits.length>1)chooseStack(hits);else if(hits[0])switchSelect(hits[0]);return;}
     after(r);
   }
-  function seerClick(c){const p=activePiece(views());if(!seer.length){if(!R.abilityCells(p).includes(c))return setStatus('Casa principal fora do Alc. Hab.');seer=[c];setStatus('Agora escolha 1 casa ligada por lado à principal.');render();return;}if(c===seer[0]){seer=[];render();return;}if(!R.neighbors(seer[0],false).includes(c))return setStatus('A segunda casa precisa estar ligada por lado à principal.');seer=[seer[0],c];setStatus('2/2 casas escolhidas. Confirme a visão.');render();}
+  function seerClick(c){const p=activePiece(views());if(!seer.length){if(!R.abilityCells(p,true).includes(c))return setStatus('Casa principal fora do Alc. Hab.');seer=[c];setStatus('Agora escolha 1 casa ligada por lado à principal.');render();return;}if(c===seer[0]){seer=[];render();return;}if(!R.neighbors(seer[0],false).includes(c))return setStatus('A segunda casa precisa estar ligada por lado à principal.');seer=[seer[0],c];setStatus('2/2 casas escolhidas. Confirme a visão.');render();}
   function after(r,label=''){if(!r)return;if(r.ok){recorder.capture(label||r.status);replayBtn.classList.remove('hidden');if(/Rodada/i.test(label||r.status))Audio.play('turn');else if(/Confronto/i.test(r.status))Audio.play('clash');else if(/sabotad/i.test(r.status))Audio.play('sabotage');else if(/Espelho|Vidente|Necromante|Druida|Bardo|armadilha|fumaça|desperta|ergue/i.test(r.status))Audio.play('magic');}setStatus(r.status);render();}
 
   function handleChoices(vs){
@@ -243,6 +243,8 @@
     if(dc){const d=vs[dc].doppelChoice;showPopup(`<b>🎭 Doppelgänger — Lado ${sideName(dc)}</b><div class="muted small" style="margin:5px 0 9px">Manter ${d.current} ou copiar ${d.newAbility}?</div><div class="row"><button data-keep>Manter</button><button class="primary" data-copy>Copiar nova</button></div>`);popup.querySelector('[data-keep]').onclick=()=>after(client(dc).chooseDoppelCopy(false));popup.querySelector('[data-copy]').onclick=()=>after(client(dc).chooseDoppelCopy(true));return;}
     if(activeSide&&vs[activeSide].activation?.mode==='shieldLink'&&pendingShieldTargetId){const target=vs[activeSide].ownPieces.find(x=>x.id===pendingShieldTargetId);if(target){showPopup(`<b>🛡️ Confirmar vínculo?</b><div class="muted small" style="margin:5px 0 9px">O Escudeiro irá até ${target.displayName} e passará a acompanhá-lo.</div><div class="row"><button data-cancel>Cancelar</button><button class="primary" data-link>Vincular</button></div>`);popup.querySelector('[data-cancel]').onclick=()=>{pendingShieldTargetId=null;after(client(activeSide).cancelMode());};popup.querySelector('[data-link]').onclick=()=>{const id=pendingShieldTargetId;pendingShieldTargetId=null;after(client(activeSide).shieldLink(id));};return;}}
     if(activeSide&&vs[activeSide].activation?.mode==='shieldUnlink'){showPopup(`<b>🛡️ Desvincular Escudeiro?</b><div class="muted small" style="margin:5px 0 9px">Desvincular gastará o turno do Escudeiro.</div><div class="row"><button data-cancel>Cancelar</button><button class="primary" data-unlink>Desvincular</button></div>`);popup.querySelector('[data-cancel]').onclick=()=>after(client(activeSide).cancelMode());popup.querySelector('[data-unlink]').onclick=()=>after(client(activeSide).shieldLink(null));return;}
+    if(activeSide&&vs[activeSide].activation?.mode==='sureShotConfirm'){showPopup(`<b>🏹 Tiro Certeiro</b><div class="muted small" style="margin:5px 0 9px">As casas marcadas mostram o alcance dobrado.</div><div class="row"><button class="primary" data-confirm>Confirmar habilidade</button><button data-cancel>Cancelar</button></div>`);popup.querySelector('[data-confirm]').onclick=()=>after(client(activeSide).confirmSureShot());popup.querySelector('[data-cancel]').onclick=()=>after(client(activeSide).cancelMode());return;}
+    if(activeSide&&vs[activeSide].activation?.mode==='paranoiaPresence'){paranoia=vs[activeSide].activation.paranoiaTargets||paranoia;showPopup(`<b>🧠 Presença Fantasma</b><div class="muted small" style="margin:5px 0 9px">${paranoia.length}/2 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${paranoia.length===2?'':'disabled'}>Confirmar presenças</button><button data-cancel>Cancelar</button></div>`);if(paranoia.length===2)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).confirmParanoia();paranoia=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{paranoia=[];after(client(activeSide).cancelMode());};return;}
     if(activeSide&&vs[activeSide].activation?.mode==='pyro'){showPopup(`<b>🔥 Piromante</b><div class="muted small" style="margin:5px 0 9px">${pyro.length}/2 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${pyro.length?'':'disabled'}>Confirmar ataque</button><button data-cancel>Cancelar</button></div>`);if(pyro.length)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).confirmPyroAttack();pyro=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{pyro=[];after(client(activeSide).cancelMode());};return;}
     if(activeSide&&vs[activeSide].activation?.mode==='kamikaze'){const a=vs[activeSide].activation,n=(a.kamikazeCells||[]).length;showPopup(`<b>💥 Autodestruição — Lado ${sideName(activeSide)}</b><div class="muted small" style="margin:5px 0 9px">${n} casas marcadas serão atingidas. A explosão acerta aliados e o Kamikaze morre.</div><div class="row"><button class="primary" data-confirm>Confirmar explosão</button><button data-cancel>Cancelar</button></div>`);popup.querySelector('[data-confirm]').onclick=()=>after(client(activeSide).confirmKamikaze());popup.querySelector('[data-cancel]').onclick=()=>after(client(activeSide).cancelMode());return;}
     if(activeSide&&vs[activeSide].activation?.mode==='seer'){showPopup(`<b>👁️ Vidente</b><div class="muted small" style="margin:5px 0 9px">${seer.length}/2 casas escolhidas.</div><div class="row"><button class="primary" data-confirm ${seer.length===2?'':'disabled'}>Confirmar visão</button><button data-cancel>Cancelar</button></div>`);if(seer.length===2)popup.querySelector('[data-confirm]').onclick=()=>{const r=client(activeSide).useSeer(seer);seer=[];after(r);};popup.querySelector('[data-cancel]').onclick=()=>{seer=[];after(client(activeSide).cancelMode());};return;}
@@ -265,13 +267,13 @@
   function showBard(target){showPopup(`<b>🎵 Inspirar ${target.displayName}</b><div class="row" style="margin-top:8px"><button data-stat="attack">+1 ATQ</button><button data-stat="range">+1 ALC</button><button data-stat="abilityRange">+1 Alc. Hab.</button><button data-stat="move">+1 M</button><button data-stat="life">+1 Vida</button></div>`);popup.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>after(client(activeSide).bardBuff(target.id,b.dataset.stat)));}
 
   document.querySelectorAll('[data-filter-side]').forEach(box=>{const side=box.dataset.filterSide;box.querySelectorAll('[data-filter]').forEach(btn=>btn.addEventListener('click',()=>{rosterFilter[side]=btn.dataset.filter;box.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===btn));renderRosterSide(side);}));});
-  $('#start').onclick=start;$('#reset').onclick=()=>{ref.reset();started=false;activeSide=null;setupPick=null;inspected=null;seer=[];pyro=[];pendingShieldTargetId=null;recorder.clear();$('#setup').classList.remove('hidden');$('#actionControls').classList.add('hidden');replayBtn.classList.add('hidden');setStatus('Formação anterior restaurada. Ajuste se quiser e inicie o Treino novamente.');renderSetup();};
+  $('#start').onclick=start;$('#reset').onclick=()=>{ref.reset();started=false;activeSide=null;setupPick=null;inspected=null;seer=[];pyro=[];paranoia=[];pendingShieldTargetId=null;recorder.clear();$('#setup').classList.remove('hidden');$('#actionControls').classList.add('hidden');replayBtn.classList.add('hidden');setStatus('Formação anterior restaurada. Ajuste se quiser e inicie o Treino novamente.');renderSetup();};
   $('#move').onclick=()=>activeSide?after(client(activeSide).startMove()):setStatus('Selecione uma peça.');
   $('#stop').onclick=()=>activeSide?after(client(activeSide).stopMove()):setStatus('Nenhum movimento em andamento.');
   $('#attack').onclick=()=>activeSide?after(client(activeSide).startAttack()):setStatus('Selecione uma peça.');
   $('#ability').onclick=()=>activeSide?after(client(activeSide).startAbility()):setStatus('Selecione uma peça.');
   $('#end').onclick=()=>activeSide?after(client(activeSide).endActivation()):setStatus('Selecione uma peça.');
-  $('#cancel').onclick=()=>{if(!activeSide)return setStatus('Nada para cancelar.');const v=views()[activeSide],r=v.activation?.mode?client(activeSide).cancelMode():client(activeSide).cancelSelection();seer=[];pyro=[];pendingShieldTargetId=null;after(r);};
+  $('#cancel').onclick=()=>{if(!activeSide)return setStatus('Nada para cancelar.');const v=views()[activeSide],r=v.activation?.mode?client(activeSide).cancelMode():client(activeSide).cancelSelection();seer=[];pyro=[];paranoia=[];pendingShieldTargetId=null;after(r);};
   $('#nextRound').onclick=()=>{const r=playerClient.advanceTrainingRound();after(r,'Rodada avançada manualmente');};
   replayBtn.onclick=()=>window.GameReplay.open(recorder.frames(),{title:'Replay do Treino'});
   renderSetup();

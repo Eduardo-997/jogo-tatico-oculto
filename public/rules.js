@@ -7,7 +7,7 @@ __gameRoot.GameRules = (() => {
     {name:'Piromante',icon:'🔥',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:1,ah:1},
     {name:'Kamikaze',icon:'💣',type:'S',typeIcon:'🗡️',v:1,m:1,a:0,range:1,per:1,ah:1},
     {name:'Caçador',icon:'🐾',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:1,ah:1},
-    {name:'Paranoia',icon:'🧠',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:2,ah:0},
+    {name:'Paranoia',icon:'🧠',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:2,ah:3},
     {name:'Escudeiro',icon:'🛡️',type:'R',typeIcon:'🛡️',v:2,m:1,a:0,range:1,per:1,ah:0},
     {name:'Golem',icon:'🗿',type:'R',typeIcon:'🛡️',v:2,m:1,a:0,range:1,per:1,ah:0},
     {name:'Cavaleiro',icon:'🐎',type:'R',typeIcon:'🛡️',v:1,m:3,a:1,range:1,per:1,ah:0},
@@ -94,11 +94,11 @@ __gameRoot.GameRules = (() => {
     }
     return out;
   }
-  function abilityCells(p){
+  function abilityCells(p,includeSelf=false){
     const d=defOf(p),out=[];
     // Na interface, p.ah é o Alc. Hab. final; usar esse valor evita perder bônus temporários na marcação.
     const ah=Number.isFinite(Number(p?.ah))?Number(p.ah):d.ah;
-    for(let y=0;y<8;y++)for(let x=0;x<8;x++){const c=coord(x,y);if(c!==p.coord&&man(p.coord,c)<=ah)out.push(c)}
+    for(let y=0;y<8;y++)for(let x=0;x<8;x++){const c=coord(x,y);if((includeSelf||c!==p.coord)&&man(p.coord,c)<=ah)out.push(c)}
     return out;
   }
   function blastCells(c,ah=1){
