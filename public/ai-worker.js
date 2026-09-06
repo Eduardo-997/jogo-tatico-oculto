@@ -1,6 +1,6 @@
 'use strict';
 
-// IA v2: recebe somente o snapshot filtrado do lado inimigo.
+// IA v3 tática: recebe somente o snapshot filtrado do lado inimigo.
 // Toda "memória" abaixo é construída a partir do que a própria IA viu,
 // percebeu ou tentou fazer em turnos anteriores.
 
@@ -43,10 +43,10 @@ function abilityCells(p){
 const clamp=(n,a=0,b=2)=>Math.max(a,Math.min(b,n));
 let difficulty='normal';
 const DIFFICULTY={
-  easy:{noise:5.5,memoryDecay:0.56,contactTtl:2,certaintyDecay:0.64,randomPiece:0.24,randomMove:0.24,skipAbility:0.28},
-  normal:{noise:0.18,memoryDecay:0.72,contactTtl:3,certaintyDecay:0.78,randomPiece:0,randomMove:0,skipAbility:0},
-  hard:{noise:0.03,memoryDecay:0.82,contactTtl:4,certaintyDecay:0.88,randomPiece:0,randomMove:0,skipAbility:0},
-  extreme:{noise:0.004,memoryDecay:0.91,contactTtl:6,certaintyDecay:0.95,randomPiece:0,randomMove:0,skipAbility:0}
+  easy:{noise:5.5,memoryDecay:0.56,contactTtl:2,certaintyDecay:0.64,randomPiece:0.24,randomMove:0.24,skipAbility:0.28,tactical:0.20,risk:0.25,endgame:0.25,lookahead:0},
+  normal:{noise:0.18,memoryDecay:0.74,contactTtl:4,certaintyDecay:0.82,randomPiece:0,randomMove:0,skipAbility:0,tactical:0.78,risk:0.65,endgame:0.85,lookahead:1},
+  hard:{noise:0.03,memoryDecay:0.85,contactTtl:5,certaintyDecay:0.90,randomPiece:0,randomMove:0,skipAbility:0,tactical:1.00,risk:1.08,endgame:1.12,lookahead:2},
+  extreme:{noise:0.004,memoryDecay:0.94,contactTtl:7,certaintyDecay:0.97,randomPiece:0,randomMove:0,skipAbility:0,tactical:1.28,risk:1.35,endgame:1.38,lookahead:3}
 };
 const diff=()=>DIFFICULTY[difficulty]||DIFFICULTY.normal;
 const randomItem=arr=>arr&&arr.length?arr[Math.floor(Math.random()*arr.length)]:null;
@@ -179,8 +179,9 @@ function processView(view,lastResult){
     const sig=p?`${view.round}:${p.id}:${p.coord}:${a.stepsTaken||0}:${a.lastPerception}:${p.radarAdvanced}:${p.radarExpanded}`:null;
     if(p&&a.lastPerception!==null&&sig!==memory.processedPerception){
       memory.processedPerception=sig;
-      const orth=perceptionCells(p.coord,p.per||1,false);
-      const all=perceptionCells(p.coord,p.per||1,true),diag=all.filter(c=>!orth.includes(c));
+      const traversed=new Set(a.movePath||[]);for(const c of traversed)clearHeat(c);
+      const orth=perceptionCells(p.coord,p.per||1,false).filter(c=>!traversed.has(c));
+      const all=perceptionCells(p.coord,p.per||1,true),diag=all.filter(c=>!orth.includes(c)&&!traversed.has(c));
       if(a.lastPerception===false){for(const c of orth)clearHeat(c);if(p.radarExpanded)for(const c of diag)clearHeat(c);}
       else{
         const latest=(view.intel||[])[0]||'';
@@ -235,10 +236,76 @@ function directMoveRisk(p,c){
   if(r>0)return 10;if(r===0)return -2;return p.hp>1?-5:-14;
 }
 
+function strategicPieceValue(p){
+  const role=metaOf(p).role;let v=p.original?8:3;
+  if(role==='seer'||role==='support')v+=6;if(role==='guard'||role==='tank')v+=4;if(role==='sniper'||role==='assassin')v+=5;
+  if(p.name==='Vidente'||p.name==='Bardo'||p.name==='Fantasma')v+=3;
+  return v;
+}
+function endgameState(view){const ownLimit=Math.max(1,Number(view.matchConfig?.lossLimit?.enemy)||3),enemyLimit=Math.max(1,Number(view.matchConfig?.lossLimit?.player)||3),ours=view.ownOriginalDeaths||0,theirs=view.enemyOriginalDeaths||0;return {ours,theirs,ownLimit,enemyLimit,finish:(enemyLimit-theirs)<=1,critical:(ownLimit-ours)<=1};}
+function visibleThreatAt(view,p,c){
+  let risk=0;
+  for(const e of view.visibleOpponents||[]){
+    if(!e?.coord)continue;
+    if(((e.a||0)>0||e.name==='Fantasma')&&attackCells(e).includes(c))risk+=8+(e.a||1)*3+(e.original?2:0);
+    if(cheb(e.coord,c)<=1){const r=directResult(metaOf(p).type,metaOf(e).type);risk+=r<0?11:r===0?4:-2;}
+  }
+  risk+=Math.max(0,heat(c)-.5)*5;if((p.hp||1)<=1)risk*=1.35;if(p.original)risk*=1.08;
+  return Math.max(0,risk);
+}
+function futureAttackValue(view,p,c){
+  const q={...p,coord:c},vis=new Map((view.visibleOpponents||[]).map(e=>[e.coord,e]));let best=0;
+  for(const t of attackCells(q)){
+    const e=vis.get(t);if(e){let s=18+(e.original?6:0)+(e.hp<=(q.a||0)?12:0);if(endgameState(view).finish&&e.original)s+=18;best=Math.max(best,s);}
+    else best=Math.max(best,heat(t)*10);
+  }
+  return best;
+}
+function futureAbilityValue(view,p,c){
+  const q={...p,coord:c},ab=effectiveAbility(q);if(!ab)return 0;
+  if(ab==='raise')return (view.corpses||[]).some(x=>man(c,x.coord)<=Math.max(1,q.ah||0))?16:0;
+  if(ab==='awaken')return (view.trees||[]).some(t=>t.state==='live'&&man(c,t.coord)<=Math.max(1,q.ah||0))?15:0;
+  if(ab==='spotTrap'||ab==='damageTrap')return neighbors(c,true).reduce((n,x)=>n+heat(x),0)*3;
+  if(ab==='seer')return CELLS.filter(x=>man(c,x)<=Math.max(1,q.ah||0)).reduce((n,x)=>n+heat(x),0)*.7;
+  if(ab==='bard'||ab==='shieldLink')return ownAlive(view).some(x=>x.id!==p.id&&man(c,x.coord)<=Math.max(0,q.ah||0))?11:0;
+  if(ab==='smoke')return visibleThreatAt(view,p,c)>7?8:0;
+  return 0;
+}
+function positionTacticalValue(view,p,c){
+  const role=metaOf(p).role,eg=endgameState(view);let s=futureAttackValue(view,p,c)*.65+futureAbilityValue(view,p,c)*.8;
+  if(enemyBases(view).some(b=>neighbors(b.coord,true).includes(c)))s+=20+(eg.finish?3:0);
+  const late=view.round>24?.72:view.round>14?.88:1,risk=visibleThreatAt(view,p,c)*diff().risk*late;s-=risk;
+  if((role==='support'||role==='seer'||role==='guard')&&risk>5)s-=4;
+  if(eg.critical&&p.original)s-=risk*.45;
+  if((role==='hunter'||role==='assassin'||role==='bruiser')&&heat(c)>.6)s+=heat(c)*2.4;
+  return s;
+}
+function terrainTargetScore(view,p,c){
+  const tree=(view.trees||[]).find(t=>t.coord===c&&t.state==='live'),rock=(view.rocks||[]).includes(c);if(!tree&&!rock)return 0;
+  const bases=enemyBases(view);if(!bases.length)return 0;const nearest=[...bases].sort((a,b)=>man(p.coord,a.coord)-man(p.coord,b.coord))[0];
+  let s=9;const before=man(p.coord,nearest.coord),after=man(c,nearest.coord);if(after<before)s+=7;if(man(p.coord,c)<=1)s+=3;
+  const hp=tree?(tree.hp??3):((view.rockHp||{})[c]??3);if((p.a||0)>=hp)s+=12;else if(hp<=2)s+=4;
+  const own=ownAlive(view),seen=view.visibleOpponents||[];
+  if(rock&&own.some(x=>x.name==='Golem'&&!x.form&&man(x.coord,c)<=2))s-=22;
+  if(tree&&own.some(x=>x.name==='Druida'&&man(x.coord,c)<=Math.max(2,x.ah||0)))s-=20;
+  if(rock&&seen.some(x=>x.name==='Golem'&&!x.form))s+=7;
+  if(tree&&seen.some(x=>x.name==='Druida'))s+=7;
+  return Math.max(0,s);
+}
+function activationPlanValue(view,p){
+  let s=0,eg=endgameState(view);const immediate=bestAttackTarget(view,p,{allowSpeculative:p.name==='Arqueiro'});if(immediate)s+=Math.min(75,immediate.score*.55);
+  if(shouldUseAbility(view,p,{mirrorBlockedCurrentActivation:p.name==='Mago do Espelho'&&p.mirrorCooldown===1}))s+=18;
+  if(p.m>0&&!p.linkedToId){const opts=neighbors(p.coord,!!p.diag).filter(c=>canShare(view,p,c));let best=-999;for(const c of opts)best=Math.max(best,positionTacticalValue(view,p,c));if(best>-999)s+=Math.max(0,best)*diff().tactical;}
+  if(eg.finish&&immediate?.score>=100)s+=42*diff().endgame;
+  if(eg.critical&&p.original)s-=visibleThreatAt(view,p,p.coord)*.8;
+  return s;
+}
+
 function bestAttackTarget(view,p,{allowSpeculative=true}={}){
   if((p.a||0)<=0&&p.name!=='Fantasma')return null;
   const legal=attackCells(p).filter(c=>!baseCoords(view).has(c));
   const ownSet=ownCoords(view),visMap=new Map((view.visibleOpponents||[]).map(e=>[e.coord,e]));
+  const freshPerception=view.activation?.pieceId===p.id&&view.activation?.lastPerception===true?new Map((view.perceptionHints||[]).map(h=>[h.coord,h.kind||'orth'])):new Map();
   let candidates=[];
   for(const c of legal){
     if(ownSet.has(c))continue;
@@ -247,10 +314,13 @@ function bestAttackTarget(view,p,{allowSpeculative=true}={}){
     if(visible){
       if(p.name==='Fantasma')score=132+(visible.original?14:0)+(visible.hp>=2?10:0);
       else score=120+(visible.hp<=p.a?30:0)+(visible.original?8:0);
+      if(endgameState(view).finish&&visible.original)score+=42*diff().endgame;
     }
     else if(k)score=70*(k.certainty||0.5)+h*20;
     else if(h>=0.28)score=h*38;
     else if(p.name==='Arqueiro'&&allowSpeculative){const row=Number(c.slice(1));score=h*22+(row<=4?5:0);}
+    const freshKind=freshPerception.get(c);if(freshKind)score+=freshKind==='exact'?125:freshKind==='diag'?82:92;
+    if(!visible&&!k&&h<0.28){const terrainScore=terrainTargetScore(view,p,c);if(terrainScore>0)score=Math.max(score,terrainScore);}
     if(score>0)candidates.push({c,score});
   }
   // Tática de fogo amigo: detonar Kamikaze só quando a memória indica alvo(s) ao redor e o saldo parece favorável.
@@ -285,9 +355,10 @@ function bestPyroTargets(view,p){
   scored.sort((a,b)=>b.s-a.s);return scored.slice(0,2).map(x=>x.c);
 }
 
-function bestSeerArea(view){
+function bestSeerArea(view,p){
   const visSet=new Set((view.visibleOpponents||[]).map(e=>e.coord));let best=null;
-  for(const main of CELLS){
+  const mains=p?abilityCells(p):CELLS;
+  for(const main of mains){
     const ns=neighbors(main,false);if(!ns.length)continue;
     const second=[...ns].sort((a,b)=>(heat(b)+(memory.contacts[b]?0.45:0)-(visSet.has(b)?1:0))-(heat(a)+(memory.contacts[a]?0.45:0)-(visSet.has(a)?1:0)))[0];
     if(!second)continue;const cells=[main,second];let score=0;
@@ -299,7 +370,7 @@ function bestSeerArea(view){
 }
 function legalRaiseCells(view,p){
   const ownSet=ownCoords(view),corpses=new Set((view.corpses||[]).map(c=>c.coord)),solid=new Set([...(view.trees||[]).map(t=>t.coord),...(view.rocks||[])]);
-  return neighbors(p.coord,false).filter(c=>corpses.has(c)&&!ownSet.has(c)&&!solid.has(c));
+  return abilityCells(p).filter(c=>corpses.has(c)&&!ownSet.has(c)&&!solid.has(c));
 }
 function bestRaiseCell(view,p){
   const cells=legalRaiseCells(view,p);if(!cells.length)return null;
@@ -307,14 +378,8 @@ function bestRaiseCell(view,p){
   return b?.item||cells[0];
 }
 function mirrorCandidates(view,p){
-  const ownSet=ownCoords(view),bases=baseCoords(view),mirrors=new Set((view.ownMirrors||[]).map(m=>m.coord)),solid=new Set([...(view.trees||[]).map(t=>t.coord),...(view.rocks||[])]);
-  const out=[];const q=rc(p.coord);
-  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]])for(let s=1;s<=2;s++){
-    const x=q.x+dx*s,y=q.y+dy*s;if(!inside(x,y))continue;const c=coord(x,y);
-    if(solid.has(c)||ownSet.has(c)||bases.has(c)||mirrors.has(c))continue;
-    if((memory.failedCells[c]||0)>=view.round)continue;out.push(c);
-  }
-  return out;
+  const ownSet=ownCoords(view),visibleEnemy=new Set((view.visibleOpponents||[]).filter(x=>x.coord).map(x=>x.coord)),bases=baseCoords(view),mirrors=new Set((view.ownMirrors||[]).map(m=>m.coord)),solid=new Set([...(view.trees||[]).map(t=>t.coord),...(view.rocks||[])]);
+  return abilityCells(p).filter(c=>!solid.has(c)&&!ownSet.has(c)&&!visibleEnemy.has(c)&&!bases.has(c)&&!mirrors.has(c)&&(memory.failedCells[c]||0)<view.round);
 }
 function bestMirrorCell(view,p){
   const cells=mirrorCandidates(view,p);if(!cells.length)return null;
@@ -384,7 +449,7 @@ function shouldUseAbility(view,p,a){
   if(p.name==='Golem'&&!p.form)return (view.rocks||[]).some(c=>man(p.coord,c)===1);
   const ab=effectiveAbility(p);if(!ab)return false;
   if(difficulty==='easy'&&Math.random()<diff().skipAbility)return false;
-  if(ab==='smoke'){if((p.ninjaSmokeCooldown||0)>0)return false;const danger=(view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=2)||neighbors(p.coord,true).some(c=>heat(c)>.75);return danger;}
+  if(ab==='smoke'){if((p.ninjaSmokeCooldown||0)>0)return false;const objective=bestObjective(view,p),danger=(view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=2)||neighbors(p.coord,true).some(c=>heat(c)>.70),infiltration=objective&&enemyBases(view).some(b=>b.coord===objective.coord||neighbors(b.coord,true).includes(objective.coord))&&man(p.coord,objective.coord)<=3&&neighbors(p.coord,true).some(c=>heat(c)>.45);return danger||infiltration;}
   if(ab==='kamikaze'){const ah=Math.max(1,p.ah||1);return (view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=ah);}
   if(ab==='shieldLink'){if(p.linkedToId)return false;const ah=p.ah||0;return ownAlive(view).some(x=>x.id!==p.id&&x.alive&&man(p.coord,x.coord)<=ah&&((ownAt(view,x.coord)||[]).length<2||x.coord===p.coord));}
   if(ab==='raise'){
@@ -396,7 +461,7 @@ function shouldUseAbility(view,p,a){
     return !!bestMirrorCell(view,p);
   }
   if(ab==='seer'){
-    const best=bestSeerArea(view),last=memory.abilityRound[p.id]||-99;
+    const best=bestSeerArea(view,p),last=memory.abilityRound[p.id]||-99;
     if(!best)return false;
     const hasExact=(view.visibleOpponents||[]).length>0||Object.values(memory.contacts).some(k=>(k.certainty||0)>0.85);
     const cooldown=difficulty==='extreme'?1:2;
@@ -430,9 +495,13 @@ function bestObjective(view,p){
   const result=pickBest(objectives,o=>o.score-man(p.coord,o.coord)*4.2);
   return result?.item||null;
 }
+function legalMoveOptions(view,p,remaining){
+  const left=Math.max(0,Number(remaining)||0);
+  return neighbors(p.coord,!!p.diag).filter(c=>{const solid=isBlocked(c),cost=p.flying?1:(SWAMPS.has(c)?2:1);return canShare(view,p,c)&&cost<=left&&!(p.flying&&solid&&left<=cost);});
+}
 function movementStep(view,p,a){
   if(a.moveRemaining<=0)return {type:'stopMove'};
-  const opts=neighbors(p.coord,!!p.diag).filter(c=>{const solid=isBlocked(c),cost=p.flying?1:(SWAMPS.has(c)?2:1);return canShare(view,p,c)&&cost<=a.moveRemaining&&!(p.flying&&solid&&a.moveRemaining<=cost);});
+  const opts=legalMoveOptions(view,p,a.moveRemaining);
   if(!opts.length)return {type:'stopMove'};
   // Se já alcançou um Posto ou uma boa oportunidade de tiro, não desperdiça passos.
   if((a.stepsTaken||0)>0){
@@ -449,6 +518,12 @@ function movementStep(view,p,a){
     const q=rc(c);s+=(7-q.y)*0.34;s+=(3.5-Math.abs(q.x-3.5))*0.18;s-=p.flying?0:(SWAMPS.has(c)?1.2:0);
     // Caçadores aceitam mais risco, suportes preferem não pisar em casa muito suspeita.
     const role=metaOf(p).role;if(heat(c)>0.65)s+=((role==='hunter'||role==='assassin'||role==='bruiser'||p.name==='Trapaceiro')?5:-4)*heat(c);
+    s+=positionTacticalValue(view,p,c)*diff().tactical;
+    if(diff().lookahead>1&&objective){
+      const second=(p.diag?neighbors(c,true):neighbors(c,false)).filter(n=>canShare(view,{...p,coord:c},n));let best2=-999;
+      for(const n of second){let q=(man(c,objective.coord)-man(n,objective.coord))*4+positionTacticalValue(view,p,n)*.45;if(!p.flying&&SWAMPS.has(n))q-=1;best2=Math.max(best2,q);}
+      if(best2>-999)s+=best2*(diff().lookahead===3?.55:.35);
+    }
     if(difficulty==='extreme'){
       const k=knownEnemyAt(c);if(k){const r=directResult(metaOf(p).type,enemyTypeFromContact(k));s+=r>0?9:r<0?-12:-3;}
       if(role==='support'||role==='seer')s-=heat(c)*3;
@@ -496,6 +571,8 @@ function pieceSelectionScore(view,p){
     const ab=effectiveAbility(p);s+=ab==='raise'?72:ab==='seer'?58:ab==='bard'?62:ab==='awaken'?54:(ab==='spotTrap'||ab==='damageTrap')?48:38;
   }
   const obj=bestObjective(view,p);if(obj&&p.m>0)s+=Math.max(0,32-man(p.coord,obj.coord)*3)+(p.m*2);
+  s+=activationPlanValue(view,p);
+  const eg=endgameState(view);if(eg.critical&&p.original&&['Vidente','Bardo','Arqueiro'].includes(p.name))s+=4;if(eg.finish&&atk?.score>=100)s+=28*diff().endgame;
   if(p.name==='Trapaceiro'||p.name==='Fantasma')s+=8;if(p.name==='Cavaleiro'||p.name==='Ninja'||p.name==='Paranoia')s+=5;
   if(p.name==='Zumbi'&&p.zombieRevived)s+=7;
   if(p.name==='Arqueiro'&&!atk)s-=8;
@@ -535,10 +612,10 @@ function decide(view,lastResult){
     return {type:'pyroConfirm'};
   }
   if(a.mode==='kamikaze')return {type:'kamikazeConfirm'};
-  if(a.mode==='absorbRock'){const rocks=(view.rocks||[]).filter(c=>man(p.coord,c)===1);if(!rocks.length)return {type:'end'};let stat='attack';if((p.hp||1)<(p.maxHp||2)&&p.golemAbsorbStat!=='life')stat='life';else if(p.golemAbsorbStat==='attack')stat='move';return {type:'absorbRock',coord:rocks[0],stat};}
-  if(a.mode==='shieldLink'){const ah=p.ah||0,target=pickBest(ownAlive(view).filter(x=>x.id!==p.id&&x.alive&&man(p.coord,x.coord)<=ah&&((ownAt(view,x.coord)||[]).length<2||x.coord===p.coord)),x=>metaOf(x).role==='support'?7:metaOf(x).role==='seer'?6:4)?.item;return target?{type:'shieldLink',targetPieceId:target.id}:{type:'end'};}
+  if(a.mode==='absorbRock'){const rocks=(view.rocks||[]).filter(c=>man(p.coord,c)===1);if(!rocks.length)return {type:'end'};return {type:'absorbRock',coord:rocks[0]};}
+  if(a.mode==='shieldLink'){const ah=p.ah||0,target=pickBest(ownAlive(view).filter(x=>x.id!==p.id&&x.alive&&man(p.coord,x.coord)<=ah&&((ownAt(view,x.coord)||[]).length<2||x.coord===p.coord)),x=>strategicPieceValue(x)+(x.maxHp<=1?6:0)+(x.hp<x.maxHp?4:0)+futureAttackValue(view,x,x.coord)*.15)?.item;return target?{type:'shieldLink',targetPieceId:target.id}:{type:'end'};}
   if(a.mode==='seer'){
-    const best=bestSeerArea(view);if(best){memory.abilityRound[p.id]=view.round;return {type:'seer',cells:best.cells};}
+    const best=bestSeerArea(view,p);if(best){memory.abilityRound[p.id]=view.round;return {type:'seer',cells:best.cells};}
     return {type:'end'};
   }
   if(a.mode==='raise'){
@@ -571,7 +648,7 @@ function decide(view,lastResult){
   if(shouldUseAbility(view,p,a))return {type:'startAbility'};
 
   // Movimento é usado para alcançar Postos, contatos e regiões ainda relevantes.
-  if(!a.movementUsed&&p.m>0&&!p.linkedToId)return {type:'startMove'};
+  if(!a.movementUsed&&p.m>0&&!p.linkedToId&&legalMoveOptions(view,p,p.m).length)return {type:'startMove'};
 
   // Depois de terminar o movimento, percepção pode ter criado um alvo provável.
   const afterMoveAttack=bestAttackTarget(view,p,{allowSpeculative:p.name==='Arqueiro'||p.name==='Fantasma'||a.lastPerception===true});
@@ -597,4 +674,4 @@ if(typeof self!=='undefined')self.onmessage=e=>{
   self.postMessage({id,action,debug:{round:view?.round,knownContacts:Object.keys(memory.contacts).length}});
 };
 
-if(typeof module!=='undefined'&&module.exports)module.exports={decide,processView,resetMemory,rememberIssued,memory};
+if(typeof module!=='undefined'&&module.exports)module.exports={decide,processView,resetMemory,rememberIssued,memory,setDifficulty:d=>{difficulty=['easy','normal','hard','extreme'].includes(d)?d:'normal';}};

@@ -1,16 +1,26 @@
-Batalha nas Sombras v1.15.38 — TESTE GIT
+Batalha nas Sombras v1.15.44 HOTFIX DEPLOY — TESTE GIT
 
-Base: v1.15.37 TESTE GIT.
+Base: v1.15.42 TESTE GIT.
 
 Principais mudanças:
-- Escudeiro: Vincular e Desvincular agora usam confirmação dentro da interface, sem popup do navegador.
-- Voador: nova característica visual/mecânica. Fantasma é o primeiro personagem marcado como Voador.
-- Voador ignora o custo extra de Pântano e pode atravessar Árvores/Pedras, mas não encerrar voluntariamente o movimento sobre elas.
-- Druida e Galho-Vivo não compartilham mais ativação. O Galho-Vivo entra normalmente na contagem de unidades vivas e usa uma ativação própria quando disponível.
-- Regras reorganizadas com abas Partida, Combate, Atributos, Personagens, Informações e Biomas.
-- Aba Personagens explica Voador e os 5 arquétipos.
-- Aba Informações passou a usar as imagens reais dos marcadores/objetos do campo.
-- Removido o bloco informativo redundante do rodapé do Clássico e Clássico Online.
-- Nova arte `assets/effects/voador.png` integrada às fichas e às regras.
+- Dificuldade da IA passou a ser exibida como Nível 1, Nível 2, Nível 3 e Nível 4. Os identificadores internos antigos foram mantidos para compatibilidade.
+- Clássico permite configurar separadamente de 1 a 8 personagens por lado e quantas perdas originais causam derrota em cada lado.
+- Clássico Online: Jogador 1 define a configuração oficial da sala; Jogador 2 recebe e usa a mesma configuração.
+- Arena permite configurar separadamente quantidade de personagens e limite de perdas de A, B e C.
+- Arena Online: Jogador A define a configuração oficial; a IA C respeita a quantidade e o limite configurados.
+- Padrão permanece 4 personagens e derrota ao perder 3 originais.
+- Unidades criadas durante a partida continuam entrando na contagem de unidades vivas/ativações, mas não contam como perdas originais.
+- Regras de ativação foram preservadas e adaptadas às formações assimétricas.
+- IA do Clássico e da Arena considera os limites de derrota personalizados nas decisões de fim de partida.
+- Replay registra e mostra a configuração usada na partida.
+- Saves e salas antigas sem configuração explícita usam automaticamente o padrão 4/3.
+- Corrigidos casos de alvo inválido do Mago do Espelho na IA, um loop raro de movimento de unidade cercada e sincronização/restauração das configurações Online.
 
 Observação de deploy: arquivos SAVE_PROJETO, TESTES e VALIDACAO são documentação de desenvolvimento e não são necessários para o jogo funcionar no Git/Cloudflare.
+
+
+HOTFIX DEPLOY:
+- Removida de src/worker.js uma dependência CommonJS inválida para ./rules.js.
+- O Worker já incorpora GameRules no próprio arquivo; src/rules.js não existe nem é necessário.
+- A linha podia ser ignorada em execução ESM, mas ainda ser resolvida pelo bundler do Wrangler durante o deploy.
+- Nenhuma regra ou mecânica de jogo foi alterada neste hotfix.
