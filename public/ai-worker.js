@@ -182,8 +182,14 @@ function processView(view,lastResult){
       const traversed=new Set(a.movePath||[]);for(const c of traversed)clearHeat(c);
       const orth=perceptionCells(p.coord,p.per||1,false).filter(c=>!traversed.has(c));
       const all=perceptionCells(p.coord,p.per||1,true),diag=all.filter(c=>!orth.includes(c)&&!traversed.has(c));
+      const hints=(view.perceptionHints||[]).filter(h=>!traversed.has(h.coord));
+      const realHints=hints.filter(h=>!h.knownFalse),falseHints=hints.filter(h=>h.knownFalse);
+      for(const h of falseHints)clearHeat(h.coord); // o Eco é explicitamente conhecido como falso
       if(a.lastPerception===false){for(const c of orth)clearHeat(c);if(p.radarExpanded)for(const c of diag)clearHeat(c);}
-      else{
+      else if(realHints.length){
+        for(const h of realHints){if(h.kind==='exact')rememberContact(h.coord,null,1,view.round);else addHeat(h.coord,h.kind==='diag'?0.38:0.42);}
+      } else if(!falseHints.length){
+        // Compatibilidade com snapshots antigos que não enviavam perceptionHints.
         const latest=(view.intel||[])[0]||'';
         if(/presença ortogonal em/i.test(latest))for(const c of parseCoordList(latest))rememberContact(c,null,1,view.round);
         else{
@@ -305,7 +311,7 @@ function bestAttackTarget(view,p,{allowSpeculative=true}={}){
   if((p.a||0)<=0&&p.name!=='Fantasma')return null;
   const legal=attackCells(p).filter(c=>!baseCoords(view).has(c));
   const ownSet=ownCoords(view),visMap=new Map((view.visibleOpponents||[]).map(e=>[e.coord,e]));
-  const freshPerception=view.activation?.pieceId===p.id&&view.activation?.lastPerception===true?new Map((view.perceptionHints||[]).map(h=>[h.coord,h.kind||'orth'])):new Map();
+  const freshPerception=view.activation?.pieceId===p.id&&view.activation?.lastPerception===true?new Map((view.perceptionHints||[]).filter(h=>!h.knownFalse).map(h=>[h.coord,h.kind||'orth'])):new Map();
   let candidates=[];
   for(const c of legal){
     if(ownSet.has(c))continue;
@@ -440,15 +446,18 @@ function bestBardChoice(view,p){
 }
 function effectiveAbility(p){
   const name=p.name==='Doppelgänger'?p.copied:p.name;
+  if(name==='Arqueiro')return'sureShot';if(name==='Piromante')return'pyroBurst';if(name==='Paranoia')return'phantomPresence';if(name==='Golem')return'absorbRock';
   if(name==='Ninja')return'smoke';if(name==='Kamikaze')return'kamikaze';if(name==='Escudeiro')return'shieldLink';if(name==='Vidente')return'seer';if(name==='Necromante')return'raise';if(name==='Mago do Espelho')return'mirror';
   if(name==='Druida')return'awaken';if(name==='Sentinela')return'spotTrap';if(name==='Caçador')return'damageTrap';if(name==='Bardo')return'bard';
   return null;
 }
 function shouldUseAbility(view,p,a){
   if(p.name==='Arqueiro')return (p.sureShotCooldown||0)<=0&&!!bestAttackTarget(view,{...p,range:(p.range||3)*2},{allowSpeculative:true});
-  if(p.name==='Golem'&&!p.form)return (view.rocks||[]).some(c=>man(p.coord,c)===1);
+  if(p.name==='Golem')return (view.rocks||[]).some(c=>man(p.coord,c)===1);
   const ab=effectiveAbility(p);if(!ab)return false;
   if(difficulty==='easy'&&Math.random()<diff().skipAbility)return false;
+  if(ab==='pyroBurst'){if((p.pyroCooldown||0)>0)return false;return bestPyroTargets(view,p).some(c=>heat(c)>0.18||(view.visibleOpponents||[]).some(e=>e.coord===c));}
+  if(ab==='phantomPresence'){const legal=abilityCells(p).filter(c=>!isBlocked(c)&&!(view.bases||[]).some(b=>b.coord===c));return legal.length>=2;}
   if(ab==='smoke'){if((p.ninjaSmokeCooldown||0)>0)return false;const objective=bestObjective(view,p),danger=(view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=2)||neighbors(p.coord,true).some(c=>heat(c)>.70),infiltration=objective&&enemyBases(view).some(b=>b.coord===objective.coord||neighbors(b.coord,true).includes(objective.coord))&&man(p.coord,objective.coord)<=3&&neighbors(p.coord,true).some(c=>heat(c)>.45);return danger||infiltration;}
   if(ab==='kamikaze'){const ah=Math.max(1,p.ah||1);return (view.visibleOpponents||[]).some(e=>cheb(p.coord,e.coord)<=ah);}
   if(ab==='shieldLink'){if(p.linkedToId)return false;const ah=p.ah||0;return ownAlive(view).some(x=>x.id!==p.id&&x.alive&&man(p.coord,x.coord)<=ah&&((ownAt(view,x.coord)||[]).length<2||x.coord===p.coord));}
@@ -604,12 +613,20 @@ function decide(view,lastResult){
     const target=bestAttackTarget(view,p,{allowSpeculative:p.name==='Arqueiro'||a.lastPerception===true});
     return target?{type:'attack',to:target.c}:{type:'end'};
   }
+  if(a.mode==='sureShotConfirm')return {type:'sureShotConfirm'};
   if(a.mode==='pyro'){
     const picked=Array.isArray(a.pyroTargets)?a.pyroTargets:[],targets=bestPyroTargets(view,p).filter(c=>!picked.includes(c));
     if(picked.length>=2)return {type:'pyroConfirm'};
     if(!picked.length){const to=targets[0];return to?{type:'pyroSelect',to}:{type:'end'};}
     if(targets.length&&heat(targets[0])>0.24)return {type:'pyroSelect',to:targets[0]};
     return {type:'pyroConfirm'};
+  }
+  if(a.mode==='paranoiaPresence'){
+    const picked=Array.isArray(a.paranoiaTargets)?a.paranoiaTargets:[];
+    if(picked.length>=2)return {type:'paranoiaConfirm'};
+    const legal=[p.coord,...abilityCells(p)].filter(c=>!picked.includes(c)&&!isBlocked(c)&&!(view.bases||[]).some(b=>b.coord===c));
+    const choice=pickBest(legal,c=>heat(c)*18+neighbors(c,true).reduce((q,n)=>q+heat(n),0)*3+(8-Number(c.slice(1)))*.25);
+    return choice?{type:'paranoiaSelect',to:choice.item}:{type:'end'};
   }
   if(a.mode==='kamikaze')return {type:'kamikazeConfirm'};
   if(a.mode==='absorbRock'){const rocks=(view.rocks||[]).filter(c=>man(p.coord,c)===1);if(!rocks.length)return {type:'end'};return {type:'absorbRock',coord:rocks[0]};}
@@ -660,7 +677,7 @@ function decide(view,lastResult){
 }
 
 function rememberIssued(action,view){
-  if(!action||['wait','select','startMove','stopMove','startAttack','startAbility','end','combatChoice','sabotage','pyroSelect'].includes(action.type)){
+  if(!action||['wait','select','startMove','stopMove','startAttack','startAbility','end','combatChoice','sabotage','pyroSelect','paranoiaSelect','sureShotConfirm'].includes(action.type)){
     memory.lastAction=action&&action.type==='sabotage'?{...action,pieceId:view.activation?.pieceId}:null;return;
   }
   memory.lastAction={...action,pieceId:view.activation?.pieceId,round:view.round};

@@ -20,8 +20,8 @@
       <div class="qr-content">
         <section class="qr-page active" data-page="partida">
           <div class="qr-card"><b>🏆 Objetivo</b><p>A quantidade de personagens originais e o número de perdas necessárias para derrotar cada lado são definidos nas <strong>Configurações da Partida</strong>. O padrão continua sendo 4 personagens e derrota ao perder 3 originais. Unidades criadas durante a partida não contam como perdas originais.</p></div>
-          <div class="qr-card"><b>🔄 Rodadas e ativações</b><p>Cada unidade viva pode agir no máximo uma vez por rodada. O limite do lado é <strong>suas unidades vivas</strong> ou <strong>unidades vivas do adversário + 1</strong>, valendo o menor número. Invocações, divisões e outras unidades extras entram nessa contagem enquanto estiverem vivas.</p><div class="qr-example">Ex.: você tem 6 unidades vivas e o adversário tem 4 → pode ativar 5. Se tiver 3 contra 5 → ativa as 3.</div></div>
-          <div class="qr-card"><b>🎯 Turno da unidade</b><p>Selecione uma unidade → movimento opcional → ataque <strong>ou</strong> habilidade → encerre. Algumas habilidades encerram a ativação imediatamente.</p></div>
+          <div class="qr-card"><b>🔄 Rodadas e turnos</b><p>Cada unidade viva pode agir no máximo uma vez por rodada. O limite do lado é <strong>suas unidades vivas</strong> ou <strong>unidades vivas do adversário + 1</strong>, valendo o menor número. Invocações, divisões e outras unidades extras entram nessa contagem enquanto estiverem vivas.</p><div class="qr-example">Ex.: você tem 6 unidades vivas e o adversário tem 4 → até 5 unidades suas podem ter turno na rodada. Se tiver 3 contra 5 → as 3 podem agir.</div></div>
+          <div class="qr-card"><b>🎯 Turno da unidade</b><p>Selecione uma unidade → movimento opcional → ataque <strong>ou</strong> habilidade → encerre. Algumas habilidades encerram o turno imediatamente.</p></div>
           ${visual(A.structures?.baseAlly,'🏰 Postos de Operação','Cada lado começa com 2. Sabotar um Posto permite escolher um benefício disponível para uma unidade aliada.','Posto de Operação')}
           <div class="qr-card"><b>👁️ Cerco Final</b><p>Quando todos os Postos ativos forem sabotados, a borda externa do tabuleiro passa a revelar unidades permanentemente. Efeitos de ocultação continuam seguindo suas próprias regras.</p></div>
         </section>
@@ -49,13 +49,17 @@
           ${visual(A.archetypes?.S,'🗡️ Executor','Vence Estrategista e perde para Vanguarda.','Executor')}
           ${visual(A.archetypes?.J,'🃏 Coringa','Vence Vanguarda, Estrategista e Executor. Empata com outro Coringa.','Coringa')}
           ${visual(A.archetypes?.C,'🦴 Condenado','Perde para os demais arquétipos e empata com outro Condenado.','Condenado')}
-          <div class="qr-card"><b>🧩 Unidades extras</b><p>Invocações, divisões e outras unidades criadas entram normalmente na contagem de unidades vivas e de ativações. A condição de vitória considera apenas as unidades originais que começaram a partida e o limite de perdas configurado.</p></div>
+          <div class="qr-card"><b>🎯 Habilidades com prévia</b><p>Tiro Certeiro do Arqueiro mostra o alcance dobrado antes da confirmação. A Rajada Dupla do Piromante escolhe 1 ou 2 casas dentro do Alc. Hab. e também pede confirmação.</p></div>
+          <div class="qr-card"><b>🧠 Presença Fantasma</b><p>Paranoia escolhe exatamente 2 casas dentro do Alc. Hab. 3. O dono vê as presenças; os inimigos não. Elas podem provocar PER, ser atacadas ou gerar Confronto Direto. Quem destrói ou confronta uma recebe, no próximo turno próprio, um Eco conhecido como falso. Máximo de 2 por Paranoia; novas presenças substituem as mais antigas.</p></div>
+          <div class="qr-card"><b>🗿 Absorver Rocha</b><p>Golem normal consome uma Pedra adjacente e ganha 1 de Armadura até o fim do próximo turno próprio. Golem de Lava pode usar a mesma habilidade para ganhar +1 M permanente e cumulativo.</p></div>
+          <div class="qr-card"><b>🧩 Unidades extras</b><p>Invocações, divisões e outras unidades criadas entram normalmente na contagem de unidades vivas e de turnos. A condição de vitória considera apenas as unidades originais que começaram a partida e o limite de perdas configurado.</p></div>
         </section>
 
         <section class="qr-page" data-page="info">
           ${visual(A.effects?.dano,'Impacto de ataque','Marca uma casa onde ocorreu impacto de ataque ou dano visível para você.','Impacto de ataque')}
           ${visual(A.effects?.confronto,'Confronto Direto','Indica que houve um Confronto Direto naquela casa.','Confronto Direto')}
           ${visual(A.effects?.presenca,'Presença detectada','Indica que a Percepção encontrou presença em uma região possível. Isso não significa, por si só, posição exata.','Presença detectada')}
+          <div class="qr-card"><b>🧠 Eco conhecido como falso</b><p>Depois de atacar ou confrontar uma Presença Fantasma, a mesma peça recebe uma detecção falsa no próximo turno próprio. Esse Eco é marcado como falso: o jogador e a IA sabem que não representa uma presença real.</p></div>
           ${visual(A.effects?.revelada,'Casa revelada','A casa está sendo observada por um efeito de revelação e pode mostrar unidades que normalmente estariam ocultas.','Casa revelada')}
           ${visual(A.effects?.lapide,'Lápide','Indica um cadáver existente naquela casa. Alguns efeitos podem interagir com cadáveres.','Lápide')}
           ${visual(A.effects?.espelho,'Espelho','Objeto criado no campo. O dono conhece sua posição; para o adversário ele continua seguindo as regras de informação oculta.','Espelho')}
