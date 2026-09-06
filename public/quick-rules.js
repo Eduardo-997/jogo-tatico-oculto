@@ -19,7 +19,7 @@
       </div>
       <div class="qr-content">
         <section class="qr-page active" data-page="partida">
-          <div class="qr-card"><b>🏆 Objetivo</b><p>Elimine <strong>3 dos 4 personagens originais</strong> do adversário. Unidades criadas durante a partida não contam como perdas originais.</p></div>
+          <div class="qr-card"><b>🏆 Objetivo</b><p>A quantidade de personagens originais e o número de perdas necessárias para derrotar cada lado são definidos nas <strong>Configurações da Partida</strong>. O padrão continua sendo 4 personagens e derrota ao perder 3 originais. Unidades criadas durante a partida não contam como perdas originais.</p></div>
           <div class="qr-card"><b>🔄 Rodadas e ativações</b><p>Cada unidade viva pode agir no máximo uma vez por rodada. O limite do lado é <strong>suas unidades vivas</strong> ou <strong>unidades vivas do adversário + 1</strong>, valendo o menor número. Invocações, divisões e outras unidades extras entram nessa contagem enquanto estiverem vivas.</p><div class="qr-example">Ex.: você tem 6 unidades vivas e o adversário tem 4 → pode ativar 5. Se tiver 3 contra 5 → ativa as 3.</div></div>
           <div class="qr-card"><b>🎯 Turno da unidade</b><p>Selecione uma unidade → movimento opcional → ataque <strong>ou</strong> habilidade → encerre. Algumas habilidades encerram a ativação imediatamente.</p></div>
           ${visual(A.structures?.baseAlly,'🏰 Postos de Operação','Cada lado começa com 2. Sabotar um Posto permite escolher um benefício disponível para uma unidade aliada.','Posto de Operação')}
@@ -49,7 +49,7 @@
           ${visual(A.archetypes?.S,'🗡️ Executor','Vence Estrategista e perde para Vanguarda.','Executor')}
           ${visual(A.archetypes?.J,'🃏 Coringa','Vence Vanguarda, Estrategista e Executor. Empata com outro Coringa.','Coringa')}
           ${visual(A.archetypes?.C,'🦴 Condenado','Perde para os demais arquétipos e empata com outro Condenado.','Condenado')}
-          <div class="qr-card"><b>🧩 Unidades extras</b><p>Invocações, divisões e outras unidades criadas entram normalmente na contagem de unidades vivas e de ativações. A condição de vitória continua considerando apenas as 4 unidades originais.</p></div>
+          <div class="qr-card"><b>🧩 Unidades extras</b><p>Invocações, divisões e outras unidades criadas entram normalmente na contagem de unidades vivas e de ativações. A condição de vitória considera apenas as unidades originais que começaram a partida e o limite de perdas configurado.</p></div>
         </section>
 
         <section class="qr-page" data-page="info">

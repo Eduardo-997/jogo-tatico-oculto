@@ -1,17 +1,41 @@
 'use strict';
 (() => {
-  const R=window.GameRules,ref=new window.GameReferee(),A=ref.createClient('player'),B=ref.createClient('enemy');
+  const R=window.GameRules,ref=new window.GameReferee(),playerClient=ref.createClient('player'),enemyClient=ref.createClient('enemy'),Assets=window.BNSAssets||{};
   const $=s=>document.querySelector(s),board=$('#board'),statusEl=$('#status'),popup=$('#popup'),replayBtn=$('#replayBtn');
-  const selected={player:[],enemy:[]},draftPos=new Map(),draftBases={player:['B2','G3'],enemy:['B7','G6']},cells=new Map(),rosterFilter={player:'all',enemy:'all'};
+  const selected={player:[],enemy:[]},draftPos=new Map(),draftBases={player:['B2','G2'],enemy:['B7','G7']},cells=new Map(),rosterFilter={player:'all',enemy:'all'};
   let setupPick=null,activeSide=null,inspected=null,seer=[],pyro=[],started=false,pendingShieldTargetId=null;
   const recorder=new window.GameReplay.Recorder(()=>ref.exportState(),{kind:'training'});
-  const sideName=s=>s==='player'?'A':'B', sideClass=s=>s==='player'?'a':'b', client=s=>s==='player'?A:B;
+  const sideName=s=>s==='player'?'A':'B', sideClass=s=>s==='player'?'a':'b', client=s=>s==='player'?playerClient:enemyClient;
+  const Audio=window.GameAudio||{play:()=>{},bind:()=>{},resume:()=>{}};
+  Audio.bind($('#soundToggle'),$('#volumeControl'));
   const setStatus=t=>{if(statusEl)statusEl.textContent=t;};
   const defOfName=n=>R.byName[n];
   const uniqueId=(side,name)=>`${side}-${name}-${Math.random().toString(36).slice(2,7)}`;
   const basePickId=(side,index)=>`base:${side}:${index}`;
   const parseBasePick=id=>{const m=/^base:(player|enemy):(0|1)$/.exec(id||'');return m?{side:m[1],index:Number(m[2])}:null;};
   const allBaseCoords=()=>[...draftBases.player,...draftBases.enemy];
+  const ABILITY_TEXT={
+    'Arqueiro':'Tiro Certeiro dobra o Alcance de Ataque no turno em que é ativado. Recarga: 1 turno próprio.',
+    'Ninja':'Bomba de Fumaça deixa a unidade completamente indetectável até o fim do próximo turno próprio. Recarga: 2 turnos próprios.',
+    'Piromante':'Escolhe 1 ou 2 casas dentro do Alc. Hab. e resolve os ataques na mesma ação.',
+    'Kamikaze':'Explode ao morrer e também pode usar Autodestruição. O Alc. Hab. funciona em anéis ao redor da unidade; a área é mostrada antes da confirmação.',
+    'Caçador':'Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Colocar outra substitui a anterior.',
+    'Paranoia':'Ao detectar inimigos com a própria PER, pode afetar até 2 alvos e gerar falsas presenças temporárias.',
+    'Escudeiro':'Vincular escolhe um aliado dentro do Alc. Hab. Alc. Hab. 0 alcança apenas a própria casa. Enquanto vinculado, acompanha e protege o aliado.',
+    'Golem':'Absorver Rocha consome uma Pedra adjacente e concede 1 de Armadura até o fim do próximo turno próprio. A Armadura reduz cada dano recebido em 1; dano reduzido a 0 não transforma o Golem em Golem de Lava.',
+    'Cavaleiro':'Não possui habilidade ativa.',
+    'Slime':'Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem morrer.',
+    'Zumbi':'Na primeira morte, levanta-se na rodada seguinte com 1 de Vida. Depois de 3 turnos próprios, cai definitivamente.',
+    'Druida':'Pode entrar em Árvores vivas sem ser detectado por PER e despertar uma delas como Galho-Vivo. Druida e Galho-Vivo usam ativações separadas.',
+    'Vidente':'Escolha a primeira casa dentro do Alc. Hab. e depois 1 casa ligada por lado; as 2 ficam reveladas.',
+    'Mago do Espelho':'Cria 1 Espelho dentro do Alc. Hab. O Espelho gera falsa presença e reflete o primeiro ataque.',
+    'Necromante':'Ergue um Esqueleto usando um cadáver dentro do Alc. Hab. Limite de 1 Esqueleto vivo por Necromante.',
+    'Doppelgänger':'Ao passar por um cadáver, copia sua habilidade. Habilidades copiadas usam o Alc. Hab. do próprio Doppelgänger.',
+    'Sentinela':'Mantém até 2 armadilhas ocultas de revelação dentro do Alc. Hab.',
+    'Bardo':'Escolhe 1 aliado dentro do Alc. Hab. e concede +1 ATQ, ALC, Alc. Hab., M ou Vida temporariamente.',
+    'Trapaceiro':'Pode se mover pelas diagonais.',
+    'Fantasma':'É Voador. Ao possuir um inimigo, assume a Vida, atributos e habilidades daquele corpo até ele ser derrotado.'
+  };
 
   function setupCandidates(side){
     const rows=side==='player'?[1,2,3,4]:[8,7,6,5],out=[];
@@ -29,17 +53,17 @@
   function renderRosterSide(side){
     const suffix=sideName(side),roster=$(`#roster${suffix}`),list=$(`#list${suffix}`);if(!roster||!list)return;
     roster.innerHTML='';
-    const defs=R.defs.filter(d=>rosterFilter[side]==='all'||d.type===rosterFilter[side]);
+    const defs=R.defs.filter(d=>rosterFilter[side]==='all'||(rosterFilter[side]==='flying'?!!d.flying:d.type===rosterFilter[side]));
     for(const d of defs){
       const picked=selected[side].some(x=>x.name===d.name),full=selected[side].length>=4&&!picked;
       const card=document.createElement('div');card.className=`char roster-card type-${d.type} training-card${picked?' chosen is-picked':''}`;
-      card.innerHTML=`<div class="roster-main"><span class="roster-icon">${A.html?.(A.character?.(d.name),'roster-art',d.name)||d.icon}</span><span class="roster-name">${d.name}</span><span class="roster-type">${A.html?.(A.archetypes?.[d.type],'archetype-art',R.archetypeName(d.type))||d.typeIcon}</span></div><div class="roster-state">V${d.v} · M${d.m} · ATQ${d.a} · ALC${d.range} · PER${d.per} · Alc. Hab. ${d.ah||0}</div>`;
+      card.innerHTML=`<div class="roster-main"><span class="roster-icon">${Assets.html?.(Assets.character?.(d.name),'roster-art',d.name)||d.icon}</span><span class="roster-name">${d.name}</span><span class="roster-type">${Assets.html?.(Assets.archetypes?.[d.type],'archetype-art',R.archetypeName(d.type))||d.typeIcon}</span></div><div class="roster-state">V${d.v} · M${d.m} · ATQ${d.a} · ALC${d.range} · PER${d.per} · Alc. Hab. ${d.ah||0}</div>`;
       const pick=document.createElement('button');pick.type='button';pick.className=`roster-pick${picked?' selected':''}`;pick.disabled=full;pick.textContent=picked?'☑ Selecionado':full?'Equipe completa':'☐ Selecionar';pick.addEventListener('click',e=>{e.stopPropagation();togglePiece(side,d.name);});card.appendChild(pick);
       roster.appendChild(card);
     }
     list.innerHTML='';
     for(const x of selected[side]){
-      const d=defOfName(x.name),pos=draftPos.get(x.id)?.coord||'—',b=document.createElement('button');b.type='button';b.className=`training-chip side-${sideClass(side)}${setupPick===x.id?' primary':''}`;b.textContent=`${d.icon} ${x.name} · ${pos}`;b.title='Clique para escolher esta peça e reposicioná-la no mapa';b.addEventListener('click',()=>{setupPick=x.id;renderSetup();});list.appendChild(b);
+      const d=defOfName(x.name),pos=draftPos.get(x.id)?.coord||'—',b=document.createElement('button');b.type='button';b.className=`training-chip side-${sideClass(side)}${setupPick===x.id?' primary':''}`;b.innerHTML=`${Assets.html?.(Assets.character?.(x.name),'training-chip-art',x.name)||d.icon} <span>${x.name} · ${pos}</span>`;b.title='Clique para escolher esta peça e reposicioná-la no mapa';b.addEventListener('click',()=>{setupPick=x.id;renderSetup();});list.appendChild(b);
     }
     const bases=$(`#bases${suffix}`);if(bases){bases.innerHTML='';draftBases[side].forEach((coord,index)=>{const id=basePickId(side,index),b=document.createElement('button');b.type='button';b.className=`training-chip training-base-chip side-${sideClass(side)}${setupPick===id?' primary':''}`;b.textContent=`🏰 Posto ${index+1} · ${coord}`;b.title='Clique para escolher este Posto e reposicioná-lo no seu lado do mapa';b.addEventListener('click',()=>{setupPick=id;renderSetup();});bases.appendChild(b);});}
   }
@@ -64,18 +88,18 @@
     setupMode?paintSetup():paintGame();
   }
 
-  function addTree(cell,state='live',hp=3){cell.classList.add('terrain-tree');if(state==='live')cell.classList.add('terrain-blocked');const src=state==='dead'?A.terrain?.deadTree:A.terrain?.tree;if(src)cell.appendChild(A.img(src,'scenery-art',state==='dead'?'Árvore destruída':'Árvore'));if(state==='live')hpBadge(cell,Number(hp??3),false,true);}
-  function addRock(cell,hp=3){cell.classList.add('terrain-blocked','terrain-rock');if(A.terrain?.rock)cell.appendChild(A.img(A.terrain.rock,'scenery-art','Pedra'));hpBadge(cell,Number(hp??3),false,true);}
-  function addWater(cell){cell.classList.add('terrain-water');if(A.terrain?.water)cell.appendChild(A.img(A.terrain.water,'scenery-art','Lago'));}
-  function addSwamp(cell){cell.classList.add('terrain-swamp');if(A.terrain?.swamp)cell.appendChild(A.img(A.terrain.swamp,'scenery-art','Pântano'));}
+  function addTree(cell,state='live',hp=3){cell.classList.add('terrain-tree');if(state==='live')cell.classList.add('terrain-blocked');const src=state==='dead'?Assets.terrain?.deadTree:Assets.terrain?.tree;if(src)cell.appendChild(Assets.img(src,'scenery-art',state==='dead'?'Árvore destruída':'Árvore'));if(state==='live')hpBadge(cell,Number(hp??3),false,true);}
+  function addRock(cell,hp=3){cell.classList.add('terrain-blocked','terrain-rock');if(Assets.terrain?.rock)cell.appendChild(Assets.img(Assets.terrain.rock,'scenery-art','Pedra'));hpBadge(cell,Number(hp??3),false,true);}
+  function addWater(cell){cell.classList.add('terrain-water');if(Assets.terrain?.water)cell.appendChild(Assets.img(Assets.terrain.water,'scenery-art','Lago'));}
+  function addSwamp(cell){cell.classList.add('terrain-swamp');if(Assets.terrain?.swamp)cell.appendChild(Assets.img(Assets.terrain.swamp,'scenery-art','Pântano'));}
   function tokenFor(p,side,setup=false){
-    const d=setup?defOfName(p.name):R.defOf(p),m=document.createElement('span');m.className=`piece-token art-token type-${d?.type||p.type||'C'}${side==='enemy'?' enemy-token':''}`;const src=A.character?.(p.displayName||p.name);if(src)m.appendChild(A.img(src,'piece-art',p.displayName||p.name));else m.textContent=d?.icon||p.icon||'●';return m;
+    const d=setup?defOfName(p.name):R.defOf(p),m=document.createElement('span');m.className=`piece-token art-token type-${d?.type||p.type||'C'}${side==='enemy'?' enemy-token':''}`;const src=Assets.character?.(p.displayName||p.name);if(src)m.appendChild(Assets.img(src,'piece-art',p.displayName||p.name));else m.textContent=d?.icon||p.icon||'●';return m;
   }
   function hpBadge(cell,hp,enemy=false,terrain=false){const b=document.createElement('span');b.className=`hp-badge${enemy?' enemy-hp':''}${terrain?' terrain-hp':''}`;b.textContent=`♥${hp}`;cell.appendChild(b);}
   function durationBadges(cell,p){const effects=(p?.effects||[]).filter(e=>Number(e.remaining)>0);if(!effects.length)return;const w=document.createElement('span');w.className='duration-badges';for(const e of effects.slice(0,2)){const b=document.createElement('span');b.className=`duration-badge ${e.kind||'neutral'}`;b.textContent=`${e.icon||'⏳'}${e.remaining}`;w.appendChild(b);}if(effects.length>2){const b=document.createElement('span');b.className='duration-badge more';b.textContent=`+${effects.length-2}`;w.appendChild(b);}cell.appendChild(w);}
 
   function addBaseVisual(cell,side,index,sabotaged=false){
-    const ally=side==='player',src=sabotaged?(ally?A.structures?.baseSabotagedAlly:A.structures?.baseSabotagedEnemy):(ally?A.structures?.baseAlly:A.structures?.baseEnemy);const icon=A.img?.(src,'base-art',sabotaged?'Posto Sabotado':'Posto de Operação')||document.createElement('span');if(!icon.src){icon.className=`base-icon${sabotaged?' base-dead':''}`;icon.textContent=sabotaged?'🏚️':'🏰';}cell.appendChild(icon);
+    const ally=side==='player',src=sabotaged?(ally?Assets.structures?.baseSabotagedAlly:Assets.structures?.baseSabotagedEnemy):(ally?Assets.structures?.baseAlly:Assets.structures?.baseEnemy);const icon=Assets.img?.(src,'base-art',sabotaged?'Posto Sabotado':'Posto de Operação')||document.createElement('span');if(!icon.src){icon.className=`base-icon${sabotaged?' base-dead':''}`;icon.textContent=sabotaged?'🏚️':'🏰';}cell.appendChild(icon);
     const label=document.createElement('span');label.className='base-label';label.textContent=`${sideName(side)}·P${index+1}`;cell.appendChild(label);
     cell.classList.add(side==='player'?'training-board-side-a':'training-board-side-b');
   }
@@ -85,6 +109,7 @@
       if((R.treeCells||[]).includes(c)){addTree(b,'live');continue;}
       if((R.rockCells||[]).includes(c)){addRock(b);continue;}
       if((R.waterCells||[]).includes(c))addWater(b);
+      if((R.swampCells||[]).includes(c))addSwamp(b);
       const baseHit=['player','enemy'].flatMap(side=>draftBases[side].map((coord,index)=>({side,index,coord}))).find(x=>x.coord===c);
       if(baseHit){addBaseVisual(b,baseHit.side,baseHit.index,false);if(setupPick===basePickId(baseHit.side,baseHit.index))b.classList.add('active-cell');continue;}
       const hits=[...draftPos.entries()].filter(([,x])=>x.coord===c);
@@ -112,7 +137,7 @@
     started=true;$('#setup').classList.add('hidden');$('#actionControls').classList.remove('hidden');$('#phase').textContent='Treino ativo';buildBoard(false);recorder.clear();recorder.capture('Início do Treino');replayBtn.classList.remove('hidden');setStatus(r.status);render();
   }
 
-  function views(){return {player:A.getView(),enemy:B.getView()};}
+  function views(){return {player:playerClient.getView(),enemy:enemyClient.getView()};}
   function allPieces(vs){return [...vs.player.ownPieces.map(p=>({...p,owner:'player'})),...vs.enemy.ownPieces.map(p=>({...p,owner:'enemy'}))];}
   function activeView(vs){return activeSide?vs[activeSide]:null;}
   function activePiece(vs){const v=activeView(vs);return v?.activation?v.ownPieces.find(p=>p.id===v.activation.pieceId):null;}
@@ -130,9 +155,9 @@
     const el=$('#pieceInfo');if(!q){el.innerHTML='<div class="muted empty-inspector">Clique em uma peça de qualquer lado para inspecionar e controlar.</div>';return;}
     const effects=(q.effects||[]).filter(e=>e.remaining>0).map(e=>`<span class="temp-effect-tag ${e.kind||'neutral'}">${e.icon||'⏳'} ${e.name} · ${e.remaining}</span>`).join('');
     const kind=q.summonType==='skeleton'?'Invocação: Esqueleto':q.summonType==='miniSlime'?'Divisão: Mini-Slime':q.summonType==='livingBranch'?'Invocação: Galho-Vivo':q.form==='lava'?'Forma: Golem de Lava':q.possessing?'👻 Corpo possuído':q.possessedAway?'👻 Possuído — localização perdida':q.original?'Personagem original':'Unidade';
-    const bonuses=[];if(q.bonusM)bonuses.push(`👣 +${q.bonusM} M`);if(q.bonusV)bonuses.push(`❤️ +${q.bonusV} V`);if(q.bonusA)bonuses.push(`⚔️ +${q.bonusA} ATQ`);if(q.bonusRange)bonuses.push(`🎯 +${q.bonusRange} ALC`);if(q.bonusAH)bonuses.push(`✨ +${q.bonusAH} Alc. Hab.`);if(q.radarAdvanced)bonuses.push('📡 Radar Avançado');if(q.radarExpanded)bonuses.push('📶 Radar Ampliado');
+    const bonuses=[];if(q.bonusM)bonuses.push(`👣 +${q.bonusM} M`);if(q.bonusV)bonuses.push(`❤️ +${q.bonusV} V`);if(q.bonusA)bonuses.push(`⚔️ +${q.bonusA} ATQ`);if(q.bonusRange)bonuses.push(`🎯 +${q.bonusRange} ALC`);if(q.bonusAH)bonuses.push(`✨ +${q.bonusAH} Alc. Hab.`);if(q.golemArmor)bonuses.push('🛡️ Armadura 1');if(q.radarAdvanced)bonuses.push('📡 Radar Avançado');if(q.radarExpanded)bonuses.push('📶 Radar Ampliado');
     const trapNote=q.name==='Caçador'||q.name==='Sentinela'?'<div class="small muted" style="margin-top:7px">Armadilhas podem ser preparadas sob uma peça já presente e só ativam quando um inimigo entrar nessa casa depois.</div>':'';
-    el.innerHTML=`<div class="row between"><div><b>${q.icon} ${q.displayName}</b><div class="small muted">Lado ${sideName(q.owner)} · ${q.typeIcon} ${R.archetypeName(q.type)} · ${kind}</div></div><span class="training-side-mark ${sideClass(q.owner)}">Lado ${sideName(q.owner)}</span></div><div class="piece-info-grid"><div class="info-pill">❤️ Vida<br><b>${q.hp}/${q.maxHp}</b></div><div class="info-pill">👣 Movimento<br><b>${q.m}</b></div><div class="info-pill">⚔️ Ataque<br><b>${q.a}</b></div><div class="info-pill">🎯 Alcance<br><b>${q.range}</b></div><div class="info-pill">👁 PER<br><b>${q.per}</b></div><div class="info-pill">✦ Alc. Hab.<br><b>${q.ah||0}</b></div></div>${q.flying&&A.effects?.voador?`<div class="bonus-tags"><span class="bonus-tag flying-trait"><img class="trait-icon" src="${A.effects.voador}" alt="Voador"> Voador</span></div>`:''}${q.form?`<div class="bonus-tags"><span class="bonus-tag">Forma: ${q.form}</span></div>`:''}${q.copied?`<div class="bonus-tags"><span class="bonus-tag">Copiou: ${q.copied}</span></div>`:''}${bonuses.length?`<div class="bonus-tags">${bonuses.map(x=>`<span class="bonus-tag">${x}</span>`).join('')}</div>`:''}${effects?`<div class="temporary-effects">${effects}</div>`:''}${trapNote}`;
+    el.innerHTML=`<div class="row between training-inspector-head"><div class="training-inspector-ident">${Assets.html?.(Assets.character?.(q.displayName||q.name),'training-inspector-art',q.displayName||q.name)||`<span class="training-inspector-fallback">${q.icon}</span>`}<div><b>${q.displayName}</b><div class="small muted">Lado ${sideName(q.owner)} · ${Assets.html?.(Assets.archetypes?.[q.type],'training-inspector-archetype',R.archetypeName(q.type))||q.typeIcon} ${R.archetypeName(q.type)} · ${kind}</div></div></div><span class="training-side-mark ${sideClass(q.owner)}">Lado ${sideName(q.owner)}</span></div><div class="piece-info-grid"><div class="info-pill">❤️ Vida<br><b>${q.hp}/${q.maxHp}</b></div><div class="info-pill">👣 Movimento<br><b>${q.m}</b></div><div class="info-pill">⚔️ Ataque<br><b>${q.a}</b></div><div class="info-pill">🎯 Alcance<br><b>${q.range}</b></div><div class="info-pill">👁 PER<br><b>${q.per}</b></div><div class="info-pill">✦ Alc. Hab.<br><b>${q.ah||0}</b></div></div>${ABILITY_TEXT[q.displayName||q.name]?`<div class="training-ability-box"><b>Habilidade</b><div class="small muted">${ABILITY_TEXT[q.displayName||q.name]}</div></div>`:''}${q.flying&&Assets.effects?.voador?`<div class="bonus-tags"><span class="bonus-tag flying-trait"><img class="trait-icon" src="${Assets.effects.voador}" alt="Voador"> Voador</span></div>`:''}${q.form?`<div class="bonus-tags"><span class="bonus-tag">Forma: ${q.form}</span></div>`:''}${q.copied?`<div class="bonus-tags"><span class="bonus-tag">Copiou: ${q.copied}</span></div>`:''}${bonuses.length?`<div class="bonus-tags">${bonuses.map(x=>`<span class="bonus-tag">${x}</span>`).join('')}</div>`:''}${effects?`<div class="temporary-effects">${effects}</div>`:''}${trapNote}`;
   }
 
   function render(){
@@ -140,6 +165,10 @@
     paintGame(vs);renderFeed($('#historyA'),vs.player.history);renderFeed($('#historyB'),vs.enemy.history);$('#intel').innerHTML=`<div class="training-feed-label">Lado A</div>${feedHtml(vs.player.intel,'intel')}<div class="training-feed-label">Lado B</div>${feedHtml(vs.enemy.intel,'intel')}`;
     if(inspected){const q=allPieces(vs).find(x=>x.id===inspected);renderInspector(q||null);}else renderInspector(null);
     handleChoices(vs);return vs;
+  }
+
+  function addFieldMarker(cell,src,cls,title,fallback){
+    if(!cell)return;const wrap=document.createElement('span');wrap.className=`marker ${cls||''}`.trim();wrap.title=title||'';if(src)wrap.appendChild(Assets.img(src,'marker-art',title||''));else wrap.textContent=fallback||'•';cell.appendChild(wrap);
   }
 
   function canMoveInto(state,p,activeSide,c,ps){
@@ -156,7 +185,7 @@
       const ps=pieces.filter(x=>x.alive&&x.coord===c);
       if(ps.length){
         const first=ps[0];b.appendChild(tokenFor(first,first.owner));hpBadge(b,first.hp,first.owner==='enemy');durationBadges(b,first);b.classList.add(first.owner==='player'?'training-board-side-a':'training-board-side-b');
-        if(ps[1]){const s=document.createElement('span');s.className='stack-second';s.textContent=ps[1].icon;s.title=`Lado ${sideName(ps[1].owner)} · ${ps[1].displayName}`;b.appendChild(s);}
+        if(ps[1]){const s=document.createElement('span');s.className='stack-second art-stack';const src=Assets.character?.(ps[1].displayName||ps[1].name);if(src)s.appendChild(Assets.img(src,'piece-art',ps[1].displayName||ps[1].name));else s.textContent=ps[1].icon;s.title=`Lado ${sideName(ps[1].owner)} · ${ps[1].displayName}`;b.appendChild(s);}
       }
       if(p?.coord===c)b.classList.add('active-cell');
       if(p&&!mode&&base&&base.owner!==activeSide&&!base.sabotaged&&R.neighbors(base.coord,true).includes(p.coord))b.classList.add('sabotage-zone');
@@ -171,14 +200,14 @@
         if(seer.includes(c)||pyro.includes(c))b.classList.add('pyro-selected');
       }
     }
-    for(const x of state.corpses||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend','<span class="marker corpse">☠️</span>');
-    for(const x of state.mirrors||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend','<span class="marker mirror">🪞</span>');
-    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])cells.get(x.coord)?.insertAdjacentHTML('beforeend',`<span class="marker eye" title="Armadilha do Lado ${sideName(s)}">${x.kind==='spot'?'🦉':'🕳️'}</span>`);
-    for(const c of new Set([vs.player.impactCell,vs.enemy.impactCell].filter(Boolean)))cells.get(c)?.insertAdjacentHTML('beforeend','<span class="marker impact" title="Ataque ocorreu aqui">💥</span>');
-    for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))cells.get(c)?.insertAdjacentHTML('beforeend','<span class="marker combat-mark" title="Confronto Direto ocorreu aqui">⚔️</span>');
-    const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)cells.get(c)?.insertAdjacentHTML('beforeend','<span class="marker eye" title="Casa sob efeito do Vidente">👁️</span>');
+    for(const x of state.corpses||[])addFieldMarker(cells.get(x.coord),Assets.effects?.lapide,'corpse','Lápide','☠️');
+    for(const x of state.mirrors||[])addFieldMarker(cells.get(x.coord),Assets.effects?.espelho,'mirror','Espelho','🪞');
+    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])addFieldMarker(cells.get(x.coord),x.kind==='spot'?Assets.structures?.trapSentry:Assets.structures?.trapHunter,'eye',`Armadilha do Lado ${sideName(s)}`,x.kind==='spot'?'🦉':'🕳️');
+    for(const c of new Set([vs.player.impactCell,vs.enemy.impactCell].filter(Boolean)))addFieldMarker(cells.get(c),Assets.effects?.dano,'impact','Ataque ocorreu aqui','💥');
+    for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))addFieldMarker(cells.get(c),Assets.effects?.confronto,'combat-mark','Confronto Direto ocorreu aqui','⚔️');
+    const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)addFieldMarker(cells.get(c),Assets.effects?.revelada,'eye','Casa revelada','👁️');
     const hints=[...(vs.player.perceptionHints||[]).map(h=>({...h,side:'player'})),...(vs.enemy.perceptionHints||[]).map(h=>({...h,side:'enemy'}))];for(const h of hints){const mark=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';cells.get(h.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint ${h.kind||'orth'}" title="PER do Lado ${sideName(h.side)}">${mark}</span>`);}
-    for(const viewer of ['player','enemy'])for(const pieceId of Object.keys(state.spotReveals?.[viewer]||{})){const target=['player','enemy'].flatMap(s=>state.pieces?.[s]||[]).find(x=>x.id===pieceId&&x.alive&&x.coord);if(target)cells.get(target.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint exact" title="Revelado ao Lado ${sideName(viewer)} pela armadilha da Sentinela">📍</span>`);}
+    for(const viewer of ['player','enemy'])for(const pieceId of Object.keys(state.spotReveals?.[viewer]||{})){const target=['player','enemy'].flatMap(s=>state.pieces?.[s]||[]).find(x=>x.id===pieceId&&x.alive&&x.coord);if(target)addFieldMarker(cells.get(target.coord),Assets.effects?.revelada,'enemy-reveal',`Revelado ao Lado ${sideName(viewer)} pela armadilha da Sentinela`,'📍');}
   }
 
   function chooseStack(ps){
@@ -186,7 +215,7 @@
   }
   function switchSelect(piece){
     if(activeSide&&activeSide!==piece.owner){const old=client(activeSide),ov=views()[activeSide];if(ov.activation?.committed){setStatus('Termine a ação atual antes de trocar para o outro lado.');return;}if(ov.activation?.mode)old.cancelMode();if(ov.activation)old.cancelSelection();}
-    activeSide=piece.owner;seer=[];pyro=[];const r=client(activeSide).selectPiece(piece.id);inspected=piece.id;setStatus(r.status);render();
+    activeSide=piece.owner;seer=[];pyro=[];pendingShieldTargetId=null;const r=client(activeSide).selectPiece(piece.id);inspected=piece.id;setStatus(r.status);render();
   }
   function gameCell(c){
     const vs=views(),v=activeView(vs),p=activePiece(vs);if(!p){const hits=piecesAt(vs,c);if(hits.length>1)chooseStack(hits);else if(hits[0])switchSelect(hits[0]);else{const base=(vs.player.bases||[]).find(x=>x.coord===c);if(base)showBase(base,vs.player);}return;}
@@ -199,14 +228,14 @@
     else if(a.mode==='mirror')r=cl.placeMirror(c);
     else if(a.mode==='awaken')r=cl.awakenTree(c);
     else if(a.mode==='spotTrap'||a.mode==='damageTrap')r=cl.placeTrap(c);
-    else if(a.mode==='absorbRock'){if(!(v.rocks||[]).includes(c)||!R.neighbors(p.coord,false).includes(c)){setStatus('Escolha uma pedra adjacente ao Golem.');return;}const pick=window.prompt('Absorver Rocha: Vida, Movimento ou ATQ?','ATQ');const s=String(pick||'').toLowerCase(),stat=s.startsWith('v')?'life':s.startsWith('m')?'move':'attack';r=cl.absorbRock(c,stat);}
+    else if(a.mode==='absorbRock'){if(!(v.rocks||[]).includes(c)||!R.neighbors(p.coord,false).includes(c)){setStatus('Escolha uma pedra adjacente ao Golem.');return;}r=cl.absorbRock(c);}
     else if(a.mode==='bard'){const target=v.ownPieces.find(x=>x.id!==p.id&&x.alive&&x.coord===c&&R.man(p.coord,x.coord)<=p.ah);if(target){showBard(target);return;}setStatus('Escolha um aliado do mesmo lado dentro do Alc. Hab.');return;}
     else if(a.mode==='shieldLink'){const ah=p.ah||0,target=v.ownPieces.find(x=>x.id!==p.id&&x.alive&&x.coord===c&&R.man(p.coord,x.coord)<=ah);if(!target){setStatus(`Escolha um aliado dentro do Alc. Hab. ${ah}.`);return;}pendingShieldTargetId=target.id;setStatus(`Vincular a ${target.displayName}? Confirme antes de gastar o turno.`);render();return;}
     else{const base=baseAtView(v,c);if(base){showBase(base,v);return;}const hits=piecesAt(vs,c);if(hits.length>1)chooseStack(hits);else if(hits[0])switchSelect(hits[0]);return;}
     after(r);
   }
   function seerClick(c){const p=activePiece(views());if(!seer.length){if(!R.abilityCells(p).includes(c))return setStatus('Casa principal fora do Alc. Hab.');seer=[c];setStatus('Agora escolha 1 casa ligada por lado à principal.');render();return;}if(c===seer[0]){seer=[];render();return;}if(!R.neighbors(seer[0],false).includes(c))return setStatus('A segunda casa precisa estar ligada por lado à principal.');seer=[seer[0],c];setStatus('2/2 casas escolhidas. Confirme a visão.');render();}
-  function after(r,label=''){if(!r)return;if(r.ok){recorder.capture(label||r.status);replayBtn.classList.remove('hidden');}setStatus(r.status);render();}
+  function after(r,label=''){if(!r)return;if(r.ok){recorder.capture(label||r.status);replayBtn.classList.remove('hidden');if(/Rodada/i.test(label||r.status))Audio.play('turn');else if(/Confronto/i.test(r.status))Audio.play('clash');else if(/sabotad/i.test(r.status))Audio.play('sabotage');else if(/Espelho|Vidente|Necromante|Druida|Bardo|armadilha|fumaça|desperta|ergue/i.test(r.status))Audio.play('magic');}setStatus(r.status);render();}
 
   function handleChoices(vs){
     const pc=vs.player.pendingCombat?'player':vs.enemy.pendingCombat?'enemy':null,dc=vs.player.doppelChoice?'player':vs.enemy.doppelChoice?'enemy':null;
@@ -236,14 +265,14 @@
   function showBard(target){showPopup(`<b>🎵 Inspirar ${target.displayName}</b><div class="row" style="margin-top:8px"><button data-stat="attack">+1 ATQ</button><button data-stat="range">+1 ALC</button><button data-stat="abilityRange">+1 Alc. Hab.</button><button data-stat="move">+1 M</button><button data-stat="life">+1 Vida</button></div>`);popup.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>after(client(activeSide).bardBuff(target.id,b.dataset.stat)));}
 
   document.querySelectorAll('[data-filter-side]').forEach(box=>{const side=box.dataset.filterSide;box.querySelectorAll('[data-filter]').forEach(btn=>btn.addEventListener('click',()=>{rosterFilter[side]=btn.dataset.filter;box.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===btn));renderRosterSide(side);}));});
-  $('#start').onclick=start;$('#reset').onclick=()=>{ref.reset();started=false;activeSide=null;setupPick=null;inspected=null;seer=[];pyro=[];recorder.clear();$('#setup').classList.remove('hidden');$('#actionControls').classList.add('hidden');replayBtn.classList.add('hidden');setStatus('Formação anterior restaurada. Ajuste se quiser e inicie o Treino novamente.');renderSetup();};
+  $('#start').onclick=start;$('#reset').onclick=()=>{ref.reset();started=false;activeSide=null;setupPick=null;inspected=null;seer=[];pyro=[];pendingShieldTargetId=null;recorder.clear();$('#setup').classList.remove('hidden');$('#actionControls').classList.add('hidden');replayBtn.classList.add('hidden');setStatus('Formação anterior restaurada. Ajuste se quiser e inicie o Treino novamente.');renderSetup();};
   $('#move').onclick=()=>activeSide?after(client(activeSide).startMove()):setStatus('Selecione uma peça.');
   $('#stop').onclick=()=>activeSide?after(client(activeSide).stopMove()):setStatus('Nenhum movimento em andamento.');
   $('#attack').onclick=()=>activeSide?after(client(activeSide).startAttack()):setStatus('Selecione uma peça.');
   $('#ability').onclick=()=>activeSide?after(client(activeSide).startAbility()):setStatus('Selecione uma peça.');
   $('#end').onclick=()=>activeSide?after(client(activeSide).endActivation()):setStatus('Selecione uma peça.');
-  $('#cancel').onclick=()=>{if(!activeSide)return setStatus('Nada para cancelar.');const v=views()[activeSide],r=v.activation?.mode?client(activeSide).cancelMode():client(activeSide).cancelSelection();seer=[];pyro=[];after(r);};
-  $('#nextRound').onclick=()=>{const r=A.advanceTrainingRound();after(r,'Rodada avançada manualmente');};
+  $('#cancel').onclick=()=>{if(!activeSide)return setStatus('Nada para cancelar.');const v=views()[activeSide],r=v.activation?.mode?client(activeSide).cancelMode():client(activeSide).cancelSelection();seer=[];pyro=[];pendingShieldTargetId=null;after(r);};
+  $('#nextRound').onclick=()=>{const r=playerClient.advanceTrainingRound();after(r,'Rodada avançada manualmente');};
   replayBtn.onclick=()=>window.GameReplay.open(recorder.frames(),{title:'Replay do Treino'});
   renderSetup();
 })();
