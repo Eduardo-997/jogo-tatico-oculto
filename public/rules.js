@@ -71,10 +71,9 @@ __gameRoot.GameRules = (() => {
       acc.v+=(Number(m.v)||0);acc.m+=(Number(m.m)||0);acc.a+=(Number(m.a)||0);acc.range+=(Number(m.range)||0);acc.per+=(Number(m.per)||0);acc.ah+=(Number(m.ah)||0);
       return acc;
     },{v:0,m:0,a:0,range:0,per:0,ah:0});
-    const absorb=p.golemAbsorbStat||null;
-    const rawV=Math.max(1,(base.v||0)+(p.bonusV||0)+temp.v+(absorb==='life'?1:0));
-    const rawM=Math.max(0,(base.m||0)+(p.bonusM||0)+temp.m+(absorb==='move'?1:0));
-    const rawA=Math.max(0,(base.a||0)+(p.bonusA||0)+temp.a+(absorb==='attack'?1:0));
+    const rawV=Math.max(1,(base.v||0)+(p.bonusV||0)+temp.v);
+    const rawM=Math.max(0,(base.m||0)+(p.bonusM||0)+temp.m);
+    const rawA=Math.max(0,(base.a||0)+(p.bonusA||0)+temp.a);
     let rawRange=Math.max(0,(base.range||0)+(p.bonusRange||0)+temp.range);
     if((p.name==='Arqueiro'||p.identity==='Arqueiro')&&p.sureShotActive)rawRange*=2;
     return {...base,
