@@ -2,24 +2,21 @@ import {TriReferee,TriAI,applyTriAction,TRI_SIDES} from './tri-core.js';
 // Jogo tático v1.13.5 — Cloudflare Worker + Durable Object
 // Regras e árbitro mantidos autoritativos no servidor para o X1.
 'use strict';
-// Batalha nas Sombras v1.15.21 — dificuldade da IA C sincronizada pela sala.
-'use strict';
-'use strict';
 var __gameRoot = typeof window!=='undefined' ? window : globalThis;
 __gameRoot.GameRules = (() => {
   const defs = [
     {name:'Arqueiro',icon:'🏹',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:3,per:1,ah:0},
     {name:'Ninja',icon:'🗡️',type:'S',typeIcon:'🗡️',v:1,m:2,a:1,range:2,per:1,ah:0},
-    {name:'Piromante',icon:'🔥',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:1,ah:1},
+    {name:'Piromante',icon:'🔥',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:1,ah:2},
     {name:'Kamikaze',icon:'💣',type:'S',typeIcon:'🗡️',v:1,m:1,a:0,range:1,per:1,ah:1},
     {name:'Caçador',icon:'🐾',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:1,ah:1},
-    {name:'Paranoia',icon:'🧠',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:2,ah:3},
+    {name:'Paranoia',icon:'🧠',type:'R',typeIcon:'🛡️',v:2,m:2,a:0,range:1,per:2,ah:2},
     {name:'Escudeiro',icon:'🛡️',type:'R',typeIcon:'🛡️',v:2,m:1,a:0,range:1,per:1,ah:0},
     {name:'Golem',icon:'🗿',type:'R',typeIcon:'🛡️',v:2,m:1,a:0,range:1,per:1,ah:0},
     {name:'Cavaleiro',icon:'🐎',type:'R',typeIcon:'🛡️',v:1,m:3,a:1,range:1,per:1,ah:0},
     {name:'Slime',icon:'🟢',type:'R',typeIcon:'🛡️',v:1,m:1,a:0,range:1,per:1,ah:0},
     {name:'Zumbi',icon:'🧟',type:'R',typeIcon:'🛡️',v:2,m:1,a:1,range:1,per:1,ah:0},
-    {name:'Druida',icon:'🌿',type:'R',typeIcon:'🛡️',v:1,m:1,a:1,range:1,per:1,ah:1},
+    {name:'Druida',icon:'🌿',type:'S',typeIcon:'🗡️',v:1,m:1,a:1,range:1,per:1,ah:1},
     {name:'Vidente',icon:'👁️',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:1,per:1,ah:3},
     {name:'Mago do Espelho',icon:'🔮',type:'P',typeIcon:'📜',v:1,m:1,a:0,range:1,per:1,ah:2},
     {name:'Necromante',icon:'☠️',type:'P',typeIcon:'📜',v:1,m:1,a:1,range:1,per:1,ah:1},
@@ -135,7 +132,6 @@ __gameRoot.GameRules = (() => {
   }
   return Object.freeze({defs,skeletonDef,miniDef,lavaDef,branchDef,baseBonuses,byName,archetypeNames,archetypeName,rc,coord,inside,man,sameLine,treeCells,rockCells,waterCells,swampCells,blockedCells,isBlocked,isRock,isWater,isSwamp,neighbors,perceptionCells,defOf,attackCells,abilityCells,blastCells,directWinner});
 })();
-
 
 
 'use strict';
@@ -436,9 +432,9 @@ __refRoot.GameReferee = class GameReferee {
   #publicPiece(p,viewerSide=p.owner){
     const d=this.#R.defOf(p);const possessedAway=!!p.possessedBy&&viewerSide===p.owner;
     const extraEffects=[...(p.effects||[]).filter(e=>viewerSide===p.owner||e.public!==false)];
-    if(p.paranoiaEchoPending&&viewerSide===p.owner)extraEffects.push({id:'paranoia-echo',name:'Eco da Presença Fantasma',icon:'🧠',remaining:1,kind:'debuff',tick:'turn'});
+    if(p.paranoiaEchoPending&&p.paranoiaEchoKnownFalse&&viewerSide===p.owner)extraEffects.push({id:'paranoia-echo',name:'Eco da Presença Fantasma',icon:'🧠',remaining:1,kind:'debuff',tick:'turn'});
     if((p.ninjaSmokeRemaining||0)>0&&viewerSide===p.owner)extraEffects.push({id:'ninja-smoke',name:'Bomba de Fumaça',icon:'🌫️',remaining:p.ninjaSmokeRemaining,kind:'buff',tick:'turn'});
-    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,flying:!!d.flying,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,pyroCooldown:p.pyroCooldown||0,paranoiaEchoPending:!!p.paranoiaEchoPending,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemArmor:((p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0)?1:0),golemArmorExpireAfterTurn:p.golemArmorExpireAfterTurn||0,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
+    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,flying:!!d.flying,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,pyroCooldown:p.pyroCooldown||0,paranoiaEchoPending:viewerSide===p.owner?!!p.paranoiaEchoPending:false,paranoiaEchoKnownFalse:viewerSide===p.owner?!!p.paranoiaEchoKnownFalse:false,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemArmor:((p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0)?1:0),golemArmorExpireAfterTurn:p.golemArmorExpireAfterTurn||0,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
   }
 
   #getView(side){
@@ -555,28 +551,29 @@ __refRoot.GameReferee = class GameReferee {
     const diagHits=diagOnly.filter(visibleEnemyAt);
     const expanded=!!p.bonusRadarExpanded,advanced=!!p.bonusRadarAdvanced;
     let detected=per>0&&(orthHits.length>0||(expanded&&diagHits.length>0));
-    const echo=this.#paranoiaEchoReady(p)&&per>0;if(echo){p.paranoiaEchoPending=false;p.paranoiaEchoReadyTurn=0;detected=true;}
+    const echo=this.#paranoiaEchoReady(p)&&per>0,echoKnown=!!(echo&&p.paranoiaEchoKnownFalse);if(echo){p.paranoiaEchoPending=false;p.paranoiaEchoReadyTurn=0;p.paranoiaEchoKnownFalse=false;detected=true;}
     a.lastPerception=detected;
     const hintable=c=>!this.#solidTerrain(c)&&!this.#pieceAt(side,c)&&!this.#baseAt(c);
-    const hints=[];
+    const hints=[];let echoCell=null;
     if(per>0){
       if(advanced&&orthHits.length){for(const c of orthHits)hints.push({coord:c,kind:'exact'});}
       else if(orthHits.length){for(const c of orthPossible.filter(hintable))hints.push({coord:c,kind:'orth'});}
       if(expanded&&diagHits.length){for(const c of diagPossible.filter(hintable))hints.push({coord:c,kind:'diag'});}
       if(echo){
-        const pool=orthPossible.filter(hintable);const fakeCell=pool[Math.floor(Math.random()*Math.max(1,pool.length))];
-        if(fakeCell){if(advanced)hints.push({coord:fakeCell,kind:'exact',knownFalse:true});else for(const c of orthPossible.filter(hintable))hints.push({coord:c,kind:'orth',knownFalse:true});}
+        const pool=orthPossible.filter(hintable);echoCell=pool[Math.floor(Math.random()*Math.max(1,pool.length))]||null;
+        if(echoCell){if(advanced)hints.push({coord:echoCell,kind:'exact',knownFalse:echoKnown});else for(const c of orthPossible.filter(hintable))hints.push({coord:c,kind:'orth',knownFalse:echoKnown});}
       }
     }
-    this.#s.perceptionHints[side]=hints.filter((h,i,a)=>a.findIndex(x=>x.coord===h.coord&&x.kind===h.kind)===i);
+    this.#s.perceptionHints[side]=hints.filter((h,i,a)=>a.findIndex(x=>x.coord===h.coord&&x.kind===h.kind&&!!x.knownFalse===!!h.knownFalse)===i);
     let msg;
     if(per<=0)msg='◌ PER0: esta unidade não possui percepção.';
-    else if(echo)msg=advanced?'🧠 Eco da Presença Fantasma: esta detecção é falsa e conhecida.':'🧠 Eco da Presença Fantasma: presença falsa conhecida no alcance ortogonal.';
+    else if(echoKnown)msg=advanced?'🧠 Eco da Presença Fantasma: esta detecção é falsa e conhecida.':'🧠 Eco da Presença Fantasma: presença falsa conhecida no alcance ortogonal.';
+    else if(echo)msg=advanced&&echoCell?`📡 presença ortogonal em ${echoCell}`:'⚠️ presença inimiga no alcance ortogonal.';
     else if(advanced&&orthHits.length){msg=`📡 presença ortogonal em ${orthHits.join(', ')}`;if(expanded&&diagHits.length)msg+=' + 📶 presença diagonal no alcance';}
     else if(expanded){const parts=[];if(orthHits.length)parts.push('presença ortogonal no alcance');if(diagHits.length)parts.push('presença diagonal no alcance');msg=parts.length?`📶 ${parts.join(' e ')}`:`✓ nenhuma presença no alcance PER${per}`;}
     else msg=orthHits.length?'⚠️ presença inimiga no alcance ortogonal.':`✓ nenhuma presença inimiga no alcance PER${per}.`;
-    this.#addIntel(side,`${d.icon} ${d.name}: ${msg}`);if(echo&&orthHits.length)this.#addIntel(side,'🧠 Eco da Presença Fantasma também disparou neste turno; a indicação extra é falsa e conhecida.');
-    this.#noteReplay('perception',side,{piece:d.name,coord:p.coord,detected:!!detected,hints:(this.#s.perceptionHints[side]||[]).map(h=>({...h})),text:msg});
+    this.#addIntel(side,`${d.icon} ${d.name}: ${msg}`);if(echoKnown&&orthHits.length)this.#addIntel(side,'🧠 Eco da Presença Fantasma também disparou neste turno; a indicação extra é falsa e conhecida.');
+    this.#noteReplay('perception',side,{piece:d.name,coord:p.coord,detected:!!detected,hints:(this.#s.perceptionHints[side]||[]).map(h=>({...h})),knownFalse:echoKnown,text:msg});
     return this.#ok('Movimento encerrado. Agora ataque, use habilidade, sabote um Posto ou encerre.');
   }
 
@@ -775,19 +772,20 @@ __refRoot.GameReferee = class GameReferee {
   }
   #removeFalsePresence(owner,f){if(!f)return;this.#s.falsePresences[owner]=(this.#s.falsePresences?.[owner]||[]).filter(x=>x.id!==f.id);}
   #paranoiaEchoReady(p){return !!(p?.paranoiaEchoPending&&Number(p.turnsTaken||0)>=Number(p.paranoiaEchoReadyTurn||0));}
-  #markParanoiaEcho(p){if(p?.alive){p.paranoiaEchoPending=true;p.paranoiaEchoReadyTurn=(p.turnsTaken||0)+1;}}
+  #markParanoiaEcho(p,knownFalse=false){if(p?.alive){p.paranoiaEchoPending=true;p.paranoiaEchoKnownFalse=!!knownFalse;p.paranoiaEchoReadyTurn=(p.turnsTaken||0)+1;}}
   #resolveFalsePresenceConfrontation(side,p,fake,from,to){
-    const owner=fake.owner;this.#removeFalsePresence(owner,fake);this.#markParanoiaEcho(p);const a=this.#activation(side);if(a){a.mode=null;a.moveRemaining=0;}for(const s of ['player','enemy'])this.#s.combatMarks[s]=[...new Set([...(this.#s.combatMarks[s]||[]),to])];this.#s.combatHold[side]=true;this.#noteReplay('combat',side,{coord:to,attacker:this.#R.defOf(p).name,defender:'Presença Fantasma',falsePresence:true});this.#addHistory(side,`🧠 ${this.#R.defOf(p).name} entrou em Confronto Direto com uma Presença Fantasma. Ela desapareceu; no próximo turno desta peça haverá uma detecção falsa conhecida.`);this.#addHistory(owner,'🧠 Uma de suas Presenças Fantasmas foi encontrada em Confronto Direto.');return this.#finishActivation(side);
+    const owner=fake.owner;this.#removeFalsePresence(owner,fake);this.#markParanoiaEcho(p,true);const a=this.#activation(side);if(a){a.mode=null;a.moveRemaining=0;}for(const s of ['player','enemy'])this.#s.combatMarks[s]=[...new Set([...(this.#s.combatMarks[s]||[]),to])];this.#s.combatHold[side]=true;this.#noteReplay('combat',side,{coord:to,attacker:this.#R.defOf(p).name,defender:'Presença Fantasma',falsePresence:true});this.#addHistory(side,`🧠 ${this.#R.defOf(p).name} entrou em Confronto Direto com uma Presença Fantasma. Ela desapareceu; no próximo turno desta peça haverá uma detecção falsa conhecida.`);this.#addHistory(owner,'🧠 Uma de suas Presenças Fantasmas foi encontrada em Confronto Direto.');return this.#finishActivation(side);
   }
   #triggerParanoiaEchoWithoutMove(side,p){
     if(!this.#paranoiaEchoReady(p))return;
-    const per=Math.max(0,this.#R.defOf(p).per||0);
-    p.paranoiaEchoPending=false;p.paranoiaEchoReadyTurn=0;
+    const per=Math.max(0,this.#R.defOf(p).per||0),knownFalse=!!p.paranoiaEchoKnownFalse;
+    p.paranoiaEchoPending=false;p.paranoiaEchoReadyTurn=0;p.paranoiaEchoKnownFalse=false;
     const a=this.#activation(side),orth=this.#R.perceptionCells(p.coord,per,false),pool=orth.filter(c=>!this.#solidTerrain(c)&&!this.#pieceAt(side,c)&&!this.#baseAt(c));
     const advanced=!!p.bonusRadarAdvanced,cell=pool[Math.floor(Math.random()*Math.max(1,pool.length))];
-    if(cell){this.#s.perceptionHints[side]=advanced?[{coord:cell,kind:'exact',knownFalse:true}]:pool.map(c=>({coord:c,kind:'orth',knownFalse:true}));if(a)a.lastPerception=true;}
-    this.#addIntel(side,'🧠 Eco da Presença Fantasma: esta detecção é falsa e conhecida.');
-    this.#noteReplay('perception',side,{piece:this.#R.defOf(p).name,coord:p.coord,detected:true,hints:(this.#s.perceptionHints[side]||[]).map(h=>({...h})),knownFalse:true,text:'Eco da Presença Fantasma: detecção falsa conhecida.'});
+    if(cell){this.#s.perceptionHints[side]=advanced?[{coord:cell,kind:'exact',knownFalse}]:pool.map(c=>({coord:c,kind:'orth',knownFalse}));if(a)a.lastPerception=true;}
+    const text=knownFalse?'Eco da Presença Fantasma: detecção falsa conhecida.':(advanced&&cell?`presença ortogonal em ${cell}`:'presença inimiga no alcance ortogonal.');
+    this.#addIntel(side,knownFalse?'🧠 Eco da Presença Fantasma: esta detecção é falsa e conhecida.':`${this.#R.defOf(p).icon} ${this.#R.defOf(p).name}: ${advanced&&cell?'📡 '+text:'⚠️ '+text}`);
+    this.#noteReplay('perception',side,{piece:this.#R.defOf(p).name,coord:p.coord,detected:true,hints:(this.#s.perceptionHints[side]||[]).map(h=>({...h})),knownFalse,text});
   }
   #triggerTraps(moverSide,p,to){
     const enemy=this.#other(moverSide),hits=(this.#s.traps?.[enemy]||[]).filter(t=>t.coord===to);if(!hits.length)return false;let any=false;
@@ -799,7 +797,7 @@ __refRoot.GameReferee = class GameReferee {
     this.#clearShieldLinks(target);
     ghost.possession={hostSide:targetSide,hostId:target.id,hostSnapshot:structuredClone(target),ghostState:{name:'Fantasma',form:ghost.form||null,copied:ghost.copied||null,bonusM:ghost.bonusM||0,bonusV:ghost.bonusV||0,bonusA:ghost.bonusA||0,bonusRange:ghost.bonusRange||0,bonusAH:ghost.bonusAH||0,effects:structuredClone(ghost.effects||[])}};
     target.alive=false;target.possessedBy=ghost.id;target.coord=null;
-    ghost.name=target.name;ghost.form=target.form||null;ghost.copied=target.copied||null;ghost.hp=target.hp;ghost.coord=coord;ghost.bonusM=target.bonusM||0;ghost.bonusV=target.bonusV||0;ghost.bonusA=target.bonusA||0;ghost.bonusRange=target.bonusRange||0;ghost.bonusAH=target.bonusAH||0;ghost.bonusPer=target.bonusPer||0;ghost.bonusRadarAdvanced=!!target.bonusRadarAdvanced;ghost.bonusRadarExpanded=!!target.bonusRadarExpanded;ghost.golemArmorExpireAfterTurn=target.golemArmorExpireAfterTurn||0;ghost.sureShotCooldown=target.sureShotCooldown||0;ghost.sureShotActive=!!target.sureShotActive;ghost.paranoiaEchoPending=!!target.paranoiaEchoPending;ghost.paranoiaEchoReadyTurn=target.paranoiaEchoReadyTurn||0;ghost.ninjaSmokeCooldown=target.ninjaSmokeCooldown||0;ghost.ninjaSmokeRemaining=target.ninjaSmokeRemaining||0;ghost.mirrorCooldown=target.mirrorCooldown||0;ghost.turnsTaken=target.turnsTaken||0;ghost.effects=structuredClone(target.effects||[]);
+    ghost.name=target.name;ghost.form=target.form||null;ghost.copied=target.copied||null;ghost.hp=target.hp;ghost.coord=coord;ghost.bonusM=target.bonusM||0;ghost.bonusV=target.bonusV||0;ghost.bonusA=target.bonusA||0;ghost.bonusRange=target.bonusRange||0;ghost.bonusAH=target.bonusAH||0;ghost.bonusPer=target.bonusPer||0;ghost.bonusRadarAdvanced=!!target.bonusRadarAdvanced;ghost.bonusRadarExpanded=!!target.bonusRadarExpanded;ghost.golemArmorExpireAfterTurn=target.golemArmorExpireAfterTurn||0;ghost.sureShotCooldown=target.sureShotCooldown||0;ghost.sureShotActive=!!target.sureShotActive;ghost.paranoiaEchoPending=!!target.paranoiaEchoPending;ghost.paranoiaEchoKnownFalse=!!target.paranoiaEchoKnownFalse;ghost.paranoiaEchoReadyTurn=target.paranoiaEchoReadyTurn||0;ghost.ninjaSmokeCooldown=target.ninjaSmokeCooldown||0;ghost.ninjaSmokeRemaining=target.ninjaSmokeRemaining||0;ghost.mirrorCooldown=target.mirrorCooldown||0;ghost.turnsTaken=target.turnsTaken||0;ghost.effects=structuredClone(target.effects||[]);
     const others=this.#piecesAt(targetSide,coord).filter(x=>x.id!==target.id);for(const ally of others){const dest=this.#R.neighbors(coord,false).find(c=>!this.#solidTerrain(c)&&!this.#baseAt(c)&&!this.#pieceAt(targetSide,c)&&!this.#pieceAt(side,c));if(dest)ally.coord=dest;}
     return true;
   }
@@ -867,7 +865,7 @@ __refRoot.GameReferee = class GameReferee {
   #hitAttack(side,attacker,to){
     const other=this.#other(side),d=this.#R.defOf(attacker),mir=this.#mirrorAt(to,other);
     if(mir){this.#s.mirrors=this.#s.mirrors.filter(m=>m!==mir);const res=this.#damage(attacker,d.a);this.#addHistory(side,`🪞 O ataque do seu ${d.name} foi refletido por um Espelho.${res.dead?' Seu atacante morreu.':res.possessionBroken?' A possessão foi quebrada.':''}`);this.#addHistory(other,`🪞 Seu Espelho refletiu um ataque.${res.dead?' O atacante inimigo morreu.':''}`);this.#resolveSlimeSplits();return;}
-    const friendly=this.#protectedTarget(side,to),hostile=this.#protectedTarget(other,to),target=friendly||hostile,dist=this.#R.man(attacker.coord,to);if(!target&&this.#damageTerrain(to,d.a,side,d.name)){this.#s.impact[other]=to;return;}if(!target){const fake=this.#falsePresenceAt(other,to);if(fake){this.#removeFalsePresence(other,fake);this.#markParanoiaEcho(attacker);this.#addHistory(side,`🧠 ${d.name} atacou uma Presença Fantasma. Ela desapareceu; no próximo turno desta peça haverá uma detecção falsa conhecida.`);this.#addHistory(other,'🧠 Uma de suas Presenças Fantasmas foi destruída por um ataque.');this.#s.impact[other]=to;return;}this.#addHistory(side,`${d.icon} ${d.name} atacou, mas não atingiu ninguém.`);this.#addIntel(other,'💥 Ataque inimigo detectado: a casa atingida foi marcada no tabuleiro.');this.#s.impact[other]=to;return;}
+    const friendly=this.#protectedTarget(side,to),hostile=this.#protectedTarget(other,to),target=friendly||hostile,dist=this.#R.man(attacker.coord,to);if(!target&&this.#damageTerrain(to,d.a,side,d.name)){this.#s.impact[other]=to;return;}if(!target){const fake=this.#falsePresenceAt(other,to);if(fake){this.#removeFalsePresence(other,fake);this.#markParanoiaEcho(attacker,false);this.#addHistory(side,`⚔️ Paranoia inimigo foi atingido por ${d.name}.`);this.#addHistory(other,'🧠 Uma de suas Presenças Fantasmas foi destruída por um ataque; o adversário acredita ter atingido Paranoia.');this.#s.impact[other]=to;return;}this.#addHistory(side,`${d.icon} ${d.name} atacou, mas não atingiu ninguém.`);this.#addIntel(other,'💥 Ataque inimigo detectado: a casa atingida foi marcada no tabuleiro.');this.#s.impact[other]=to;return;}
     const targetSide=target.owner,stacked=this.#piecesAt(targetSide,to).length>1&&target.name==='Escudeiro';const before=this.#R.defOf(target).name,res=this.#damage(target,d.a),friendlyFire=targetSide===side,slimeSplit=target.name==='Slime'&&target.original&&res.dead;
     if(res.possessionBroken){this.#addHistory(side,`👻 O golpe expulsou o Fantasma de ${res.hostName}; a peça foi recuperada pelo dono original.`);this.#addHistory(targetSide,`👻 ${res.hostName} foi recuperado após a morte do Fantasma.`);this.#s.impact[targetSide]=to;return;}
     if(res.zombieDown){this.#addHistory(side,`🧟 ${before} caiu, mas ainda não conta como eliminação.`);this.#addHistory(targetSide,`🧟 Seu Zumbi caiu e tentará voltar.`);return;}
@@ -967,12 +965,12 @@ __refRoot.GameReferee = class GameReferee {
   exportState(){
     return JSON.stringify(this.#s,(k,v)=>v instanceof Set?{__set:[...v]}:v);
   }
+  importState(raw){ this.#importState(raw); }
   #importState(raw){
-    if(!raw)return;this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);if(!this.#s.doppelChoice)this.#s.doppelChoice={player:null,enemy:null};if(!this.#s.matchConfig)this.#s.matchConfig={teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}};if(!this.#s.roundStarter)this.#s.roundStarter='player';if(!this.#s.roundActivations)this.#s.roundActivations={player:0,enemy:0};if(!this.#s.trees)this.#s.trees=[{coord:'B3',state:'live',hp:3},{coord:'G6',state:'live',hp:3}];for(const tr of this.#s.trees)if(tr.hp==null)tr.hp=tr.state==='live'?3:0;if(!this.#s.rocks)this.#s.rocks=['F2','C7'];if(!this.#s.rockHp)this.#s.rockHp=Object.fromEntries((this.#s.rocks||[]).map(c=>[c,3]));if(!this.#s.water)this.#s.water=['D3','E6'];if(!this.#s.swamps)this.#s.swamps=['C5','F4'];if(!this.#s.traps)this.#s.traps={player:[],enemy:[]};if(!this.#s.falsePresences)this.#s.falsePresences={player:[],enemy:[]};if(!this.#s.spotReveals)this.#s.spotReveals={player:{},enemy:{}};if(!this.#s.combatMarks)this.#s.combatMarks={player:[],enemy:[]};if(!this.#s.combatHold)this.#s.combatHold={player:false,enemy:false};if(this.#s.replayEvent===undefined)this.#s.replayEvent=null;for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(p.name==='Coringa')p.name='Trapaceiro';if(p.identity==='Coringa')p.identity='Trapaceiro';if(!Array.isArray(p.effects))p.effects=[];if(p.bonusAH==null)p.bonusAH=0;if(p.turnsTaken==null)p.turnsTaken=0;if(p.linkedToId===undefined)p.linkedToId=null;if(p.sureShotCooldown==null)p.sureShotCooldown=0;if(p.sureShotActive==null)p.sureShotActive=false;if(p.pyroCooldown==null)p.pyroCooldown=0;if(p.paranoiaEchoPending==null)p.paranoiaEchoPending=false;if(p.paranoiaEchoReadyTurn==null)p.paranoiaEchoReadyTurn=0;p.paranoia=null;if(p.golemArmorExpireAfterTurn==null)p.golemArmorExpireAfterTurn=0;p.golemAbsorbStat=null;if(p.ninjaSmokeCooldown==null)p.ninjaSmokeCooldown=0;if(p.ninjaSmokeRemaining==null)p.ninjaSmokeRemaining=0;}
+    if(!raw)return;this.#s=JSON.parse(raw,(k,v)=>v&&typeof v==='object'&&Array.isArray(v.__set)?new Set(v.__set):v);if(!this.#s.doppelChoice)this.#s.doppelChoice={player:null,enemy:null};if(!this.#s.matchConfig)this.#s.matchConfig={teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}};if(!this.#s.roundStarter)this.#s.roundStarter='player';if(!this.#s.roundActivations)this.#s.roundActivations={player:0,enemy:0};if(!this.#s.trees)this.#s.trees=[{coord:'B3',state:'live',hp:3},{coord:'G6',state:'live',hp:3}];for(const tr of this.#s.trees)if(tr.hp==null)tr.hp=tr.state==='live'?3:0;if(!this.#s.rocks)this.#s.rocks=['F2','C7'];if(!this.#s.rockHp)this.#s.rockHp=Object.fromEntries((this.#s.rocks||[]).map(c=>[c,3]));if(!this.#s.water)this.#s.water=['D3','E6'];if(!this.#s.swamps)this.#s.swamps=['C5','F4'];if(!this.#s.traps)this.#s.traps={player:[],enemy:[]};if(!this.#s.falsePresences)this.#s.falsePresences={player:[],enemy:[]};if(!this.#s.spotReveals)this.#s.spotReveals={player:{},enemy:{}};if(!this.#s.combatMarks)this.#s.combatMarks={player:[],enemy:[]};if(!this.#s.combatHold)this.#s.combatHold={player:false,enemy:false};if(this.#s.replayEvent===undefined)this.#s.replayEvent=null;for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(p.name==='Coringa')p.name='Trapaceiro';if(p.identity==='Coringa')p.identity='Trapaceiro';if(!Array.isArray(p.effects))p.effects=[];if(p.bonusAH==null)p.bonusAH=0;if(p.turnsTaken==null)p.turnsTaken=0;if(p.linkedToId===undefined)p.linkedToId=null;if(p.sureShotCooldown==null)p.sureShotCooldown=0;if(p.sureShotActive==null)p.sureShotActive=false;if(p.pyroCooldown==null)p.pyroCooldown=0;if(p.paranoiaEchoPending==null)p.paranoiaEchoPending=false;if(p.paranoiaEchoKnownFalse==null)p.paranoiaEchoKnownFalse=false;if(p.paranoiaEchoReadyTurn==null)p.paranoiaEchoReadyTurn=0;p.paranoia=null;if(p.golemArmorExpireAfterTurn==null)p.golemArmorExpireAfterTurn=0;p.golemAbsorbStat=null;if(p.ninjaSmokeCooldown==null)p.ninjaSmokeCooldown=0;if(p.ninjaSmokeRemaining==null)p.ninjaSmokeRemaining=0;}
   }
 
 };
-
 
 
 const actionMap={

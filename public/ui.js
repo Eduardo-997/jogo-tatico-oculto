@@ -33,14 +33,18 @@
   function currentMatchConfig(){const ps=clamp(playerTeamSizeEl?.value||4,1,8),es=clamp(enemyTeamSizeEl?.value||4,1,8),pl=clamp(playerLossLimitEl?.value||Math.min(3,ps),1,ps),el=clamp(enemyLossLimitEl?.value||Math.min(3,es),1,es);return{teamSize:{player:ps,enemy:es},lossLimit:{player:pl,enemy:el}};}
   function syncMatchSettings(){if(!playerTeamSizeEl)return;const cfg=currentMatchConfig();playerTeamSizeEl.value=cfg.teamSize.player;enemyTeamSizeEl.value=cfg.teamSize.enemy;playerLossLimitEl.max=cfg.teamSize.player;enemyLossLimitEl.max=cfg.teamSize.enemy;playerLossLimitEl.value=cfg.lossLimit.player;enemyLossLimitEl.value=cfg.lossLimit.enemy;while(selected.length>cfg.teamSize.player){const name=selected.pop();for(const[k,val]of setupPos)if(val===name)setupPos.delete(k);}if(view().phase==='setup')render();}
   const difficultyLabel=d=>({easy:'Nível 1',normal:'Nível 2',hard:'Nível 3',extreme:'Nível 4'}[d]||'Nível 2');
+  const CLASSIC_DIFFICULTY_KEY='bnsClassicDifficulty';
+  const validDifficulty=d=>['easy','normal','hard','extreme'].includes(d);
+  function restoreClassicDifficulty(){try{const d=localStorage.getItem(CLASSIC_DIFFICULTY_KEY);if(validDifficulty(d)){aiDifficulty=d;if(aiDifficultyEl)aiDifficultyEl.value=d;}}catch{}}
+  function saveClassicDifficulty(d){if(!validDifficulty(d))return;aiDifficulty=d;try{localStorage.setItem(CLASSIC_DIFFICULTY_KEY,d);}catch{}}
   let status='Inspecione os personagens e marque ☐ Selecionar para montar a equipe.';
   const ABILITY_TEXT={
     "Arqueiro":"Tiro Certeiro: mostra no tabuleiro o alcance dobrado antes de ativar e pede confirmação. Depois de confirmado, o próximo ataque normal usa esse alcance maior naquele turno. Recarga: 1 turno próprio.",
     "Ninja":"Bomba de Fumaça: ao ativar, fica completamente indetectável por PER, Vidente, armadilha da Sentinela e qualquer efeito de revelação até o fim do próximo turno próprio. Recarga: 2 turnos próprios.",
-    "Piromante":"Ataque normal atinge 1 casa. Rajada Dupla: escolha 1 ou 2 casas diferentes dentro do Alc. Hab., confira a prévia e confirme para atacar as selecionadas. Recarga: 1 turno próprio.",
+    "Piromante":"Rajada Dupla: escolha 1 ou 2 casas diferentes dentro do Alc. Hab., confira a prévia e confirme para atacar as selecionadas. Recarga: 1 turno próprio.",
     "Kamikaze":"Explode ao morrer e também pode usar Autodestruição como habilidade ativa. Antes de confirmar, o jogo mostra toda a área atingida. O Alc. Hab. funciona em anéis ao redor dele: Alc. Hab. 1 atinge o primeiro anel; Alc. Hab. 2 atinge os dois primeiros anéis, e assim por diante. A explosão causa 1 de dano inclusive em aliados.",
     "Caçador":"Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Pode prepará-la mesmo em uma casa já ocupada; ela não dispara na colocação. Quando um inimigo entrar nessa casa depois, sofre 1 de dano antes de qualquer Confronto Direto. Colocar outra armadilha substitui a anterior.",
-    "Paranoia":"Presença Fantasma: escolha exatamente 2 casas dentro do Alc. Hab. 3. Você vê as presenças; os inimigos não. A PER inimiga as detecta como se fossem unidades e elas podem ser atacadas ou gerar Confronto Direto. Ao destruir ou confrontar uma, aquela peça sabe que era falsa e, no próximo turno próprio, recebe uma detecção falsa conhecida onde quer que esteja. Máximo de 2 presenças por Paranoia; ao criar novas, as mais antigas desaparecem.",
+    "Paranoia":"Presença Fantasma: escolha exatamente 2 casas dentro do Alc. Hab. 2. Você vê as presenças; os inimigos não, e a PER inimiga as detecta como se fossem personagens. Se uma presença for atacada, o atacante acredita ter atingido o próprio Paranoia e, no próximo turno, recebe outra detecção falsa sem saber. Em Confronto Direto, a presença não causa dano nem repele: o adversário descobre que era falsa, mas ainda recebe uma detecção falsa conhecida no próximo turno. Máximo de 2 presenças por Paranoia; ao criar novas, as mais antigas desaparecem.",
     "Escudeiro":"Pode compartilhar casa com 1 aliado. Vincular escolhe um aliado dentro do Alc. Hab.; Alc. Hab. 0 alcança apenas a própria casa. Ao criar o vínculo, o Escudeiro se reúne ao aliado e passa a acompanhar automaticamente seus movimentos. Enquanto vinculado, não se move sozinho; use a habilidade novamente para Desvincular, gastando o turno. Também intercepta ataques e dano em área para proteger o aliado.",
     "Golem":"Absorver Rocha: consome uma Pedra adjacente. Golem normal recebe 1 de Armadura até o fim do próximo turno próprio; cada dano é reduzido em 1 e dano reduzido a 0 não o transforma. Como Golem de Lava, consumir uma Pedra concede +1 M permanente e cumulativo.",
     "Cavaleiro":"Não possui habilidade ativa.",
@@ -509,7 +513,7 @@
     const cfg=currentMatchConfig(),needed=cfg.teamSize.player;if(selected.length!==needed||setupPos.size!==needed||setupBasePos.size!==2){setStatus(`Escolha e posicione exatamente ${needed} ${needed===1?'personagem':'personagens'} e 2 Postos.`);return;}
     const setup=selected.map(name=>({name,coord:[...setupPos].find(([,n])=>n===name)?.[0]}));const bases=[setupBasePos.get(1),setupBasePos.get(2)];
     setStatus('Você: pronto · IA: pronta. Iniciando partida...');
-    aiDifficulty=aiDifficultyEl?.value||'normal';const r=referee.startGame(setup,bases,aiDifficulty,cfg);if(replay){replay.clear();replay.capture('Início da partida');}rosterCollapsed=true;setStatus(`${r.status} IA: ${difficultyLabel(aiDifficulty)}.`);render();if(view().turn==='enemy')scheduleAi(450);
+    aiDifficulty=aiDifficultyEl?.value||'normal';saveClassicDifficulty(aiDifficulty);const r=referee.startGame(setup,bases,aiDifficulty,cfg);if(replay){replay.clear();replay.capture('Início da partida');}rosterCollapsed=true;setStatus(`${r.status} IA: ${difficultyLabel(aiDifficulty)}.`);render();if(view().turn==='enemy')scheduleAi(450);
   });
   keepDoppelBtn.addEventListener('click',()=>{const r=player.chooseDoppelCopy(false);setStatus(r.status);render();});
   copyDoppelBtn.addEventListener('click',()=>{const r=player.chooseDoppelCopy(true);setStatus(r.status);render();});
@@ -539,8 +543,10 @@
   if(replayBtn)replayBtn.addEventListener('click',()=>{if(replay&&replay.length)window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'});});
   filterButtons.forEach(b=>b.addEventListener('click',()=>{rosterFilter=b.dataset.filter||'all';filterButtons.forEach(x=>x.classList.toggle('active',x===b));render();}));
 
+  if(aiDifficultyEl)aiDifficultyEl.addEventListener('change',()=>saveClassicDifficulty(aiDifficultyEl.value));
   for(const el of [playerTeamSizeEl,enemyTeamSizeEl,playerLossLimitEl,enemyLossLimitEl])if(el)el.addEventListener('change',syncMatchSettings);
   if(resetMatchSettingsBtn)resetMatchSettingsBtn.addEventListener('click',()=>{playerTeamSizeEl.value=4;enemyTeamSizeEl.value=4;playerLossLimitEl.value=3;enemyLossLimitEl.value=3;syncMatchSettings();setStatus('Configurações padrão restauradas: 4 × 4 e 3 perdas para derrota.');});
 
+  restoreClassicDifficulty();
   buildBoard();render();
 })();

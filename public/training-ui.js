@@ -17,10 +17,10 @@
   const ABILITY_TEXT={
     'Arqueiro':'Tiro Certeiro: mostra no tabuleiro o alcance dobrado antes de ativar e pede confirmação. Depois de confirmado, o próximo ataque normal usa esse alcance maior naquele turno. Recarga: 1 turno próprio.',
     'Ninja':'Bomba de Fumaça deixa a unidade completamente indetectável até o fim do próximo turno próprio. Recarga: 2 turnos próprios.',
-    'Piromante':'Ataque normal atinge 1 casa. Rajada Dupla: escolha 1 ou 2 casas diferentes dentro do Alc. Hab., confira a prévia e confirme para atacar as selecionadas. Recarga: 1 turno próprio.',
+    'Piromante':'Rajada Dupla: escolha 1 ou 2 casas diferentes dentro do Alc. Hab., confira a prévia e confirme para atacar as selecionadas. Recarga: 1 turno próprio.',
     'Kamikaze':'Explode ao morrer e também pode usar Autodestruição. O Alc. Hab. funciona em anéis ao redor da unidade; a área é mostrada antes da confirmação.',
     'Caçador':'Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Colocar outra substitui a anterior.',
-    'Paranoia':'Presença Fantasma: escolha exatamente 2 casas dentro do Alc. Hab. 3. Você vê as presenças; os inimigos não. A PER inimiga as detecta como se fossem unidades e elas podem ser atacadas ou gerar Confronto Direto. Ao destruir ou confrontar uma, aquela peça sabe que era falsa e, no próximo turno próprio, recebe uma detecção falsa conhecida onde quer que esteja. Máximo de 2 presenças por Paranoia; ao criar novas, as mais antigas desaparecem.',
+    'Paranoia':'Presença Fantasma: escolha exatamente 2 casas dentro do Alc. Hab. 2. Você vê as presenças; os inimigos não, e a PER inimiga as detecta como se fossem personagens. Se uma presença for atacada, o atacante acredita ter atingido o próprio Paranoia e, no próximo turno, recebe outra detecção falsa sem saber. Em Confronto Direto, a presença não causa dano nem repele: o adversário descobre que era falsa, mas ainda recebe uma detecção falsa conhecida no próximo turno. Máximo de 2 presenças por Paranoia; ao criar novas, as mais antigas desaparecem.',
     'Escudeiro':'Vincular escolhe um aliado dentro do Alc. Hab. Alc. Hab. 0 alcança apenas a própria casa. Enquanto vinculado, acompanha e protege o aliado.',
     'Golem':'Absorver Rocha: consome uma Pedra adjacente. Golem normal recebe 1 de Armadura até o fim do próximo turno próprio; cada dano é reduzido em 1 e dano reduzido a 0 não o transforma. Como Golem de Lava, consumir uma Pedra concede +1 M permanente e cumulativo.',
     'Cavaleiro':'Não possui habilidade ativa.',
