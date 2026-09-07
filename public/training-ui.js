@@ -202,7 +202,7 @@
     }
     for(const x of state.corpses||[])addFieldMarker(cells.get(x.coord),Assets.effects?.lapide,'corpse','Lápide','☠️');
     for(const x of state.mirrors||[])addFieldMarker(cells.get(x.coord),Assets.effects?.espelho,'mirror','Espelho','🪞');
-    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])addFieldMarker(cells.get(x.coord),x.kind==='spot'?Assets.structures?.trapSentry:Assets.structures?.trapHunter,'eye',`Armadilha do Lado ${sideName(s)}`,x.kind==='spot'?'🦉':'🕳️');for(const s of ['player','enemy'])for(const x of state.falsePresences?.[s]||[])addFieldMarker(cells.get(x.coord),null,'false-presence-marker',`Presença Fantasma do Lado ${sideName(s)}`,'🧠');
+    for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])addFieldMarker(cells.get(x.coord),x.kind==='spot'?Assets.structures?.trapSentry:Assets.structures?.trapHunter,'eye',`Armadilha do Lado ${sideName(s)}`,x.kind==='spot'?'🦉':'🕳️');for(const s of ['player','enemy'])for(const x of state.falsePresences?.[s]||[])addFieldMarker(cells.get(x.coord),Assets.effects?.phantomPresence,'false-presence-marker',`Presença Fantasma do Lado ${sideName(s)}`,'🧠');
     for(const c of new Set([vs.player.impactCell,vs.enemy.impactCell].filter(Boolean)))addFieldMarker(cells.get(c),Assets.effects?.dano,'impact','Ataque ocorreu aqui','💥');
     for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))addFieldMarker(cells.get(c),Assets.effects?.confronto,'combat-mark','Confronto Direto ocorreu aqui','⚔️');
     const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)addFieldMarker(cells.get(c),Assets.effects?.revelada,'eye','Casa revelada','👁️');
