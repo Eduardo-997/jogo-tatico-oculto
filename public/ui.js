@@ -148,7 +148,7 @@
     if(v.doppelChoice)return 'Doppelgänger aguarda sua decisão: manter a habilidade atual ou copiar a nova.';
     const a=v.activation,p=activePiece(v);if(!a||!p)return 'Escolha uma unidade disponível para agir.';
     const name=p.displayName||p.name||'Unidade',mode=a.mode;
-    if(mode==='move')return a.committed?`${name}: ainda está se movendo · ${a.moveRemaining||0} M restante${Number(a.moveRemaining||0)===1?'':'s'}. Mova novamente ou pare o movimento.`:`${name}: movimento preparado. Escolha uma casa para mover ou cancele.`;
+    if(mode==='move')return a.committed?`${name}: ainda está se movendo · ${a.moveRemaining||0} M restante${Number(a.moveRemaining||0)===1?'':'s'}. Mova novamente ou use Parar movimento; Encerrar turno fica bloqueado enquanto houver M restante.`:`${name}: movimento preparado. Escolha uma casa para mover ou cancele.`;
     if(mode==='attack')return `${name}: falta escolher a casa do ataque.`;
     if(mode==='sureShotConfirm')return `${name}: falta confirmar ou cancelar o Tiro Certeiro.`;
     if(mode==='pyro'){const n=(a.pyroTargets||[]).length;return `${name}: Rajada Dupla · ${n}/2 casas escolhidas. Escolha 1 ou 2 casas e confirme.`;}
@@ -385,11 +385,12 @@
   }
   function setActionVisual(btn,enabled,current=false){if(!btn)return;btn.disabled=!enabled;btn.classList.toggle('action-ready',enabled&&!current);btn.classList.toggle('action-current',enabled&&current);}
   function renderActionButtons(v){
-    const all=[moveBtn,stopBtn,attackBtn,abilityBtn,endBtn,cancelBtn];for(const b of all){if(!b)continue;b.classList.remove('action-ready','action-current');b.disabled=true;}
+    const all=[moveBtn,stopBtn,attackBtn,abilityBtn,endBtn,cancelBtn];for(const b of all){if(!b)continue;b.classList.remove('action-ready','action-current');b.disabled=true;}if(endBtn)endBtn.title='';
     if(v.phase!=='play'||v.gameOver||v.turn!=='player'||v.pendingCombat||v.doppelChoice)return;
     const a=v.activation,p=activePiece(v);if(!a||!p)return;
-    const mode=a.mode||'',flying=!!p.flying,solid=(v.rocks||[]).includes(p.coord)||!!(v.trees||[]).find(t=>t.coord===p.coord&&t.state==='live'),canEnd=!(flying&&solid);
-    if(mode==='move'){setActionVisual(moveBtn,true,true);setActionVisual(stopBtn,canEnd,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,!a.committed,false);return;}
+    const mode=a.mode||'',flying=!!p.flying,solid=(v.rocks||[]).includes(p.coord)||!!(v.trees||[]).find(t=>t.coord===p.coord&&t.state==='live'),canEnd=!(flying&&solid),partialMove=mode==='move'&&!!a.committed&&Number(a.moveRemaining||0)>0;
+    if(endBtn)endBtn.title=partialMove?'Use Parar movimento antes de encerrar o turno.':'';
+    if(mode==='move'){setActionVisual(moveBtn,true,true);setActionVisual(stopBtn,canEnd,true);setActionVisual(endBtn,canEnd&&!partialMove,false);setActionVisual(cancelBtn,!a.committed,false);return;}
     if(mode==='attack'){setActionVisual(attackBtn,true,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,true,false);return;}
     if(mode){setActionVisual(abilityBtn,true,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,true,false);return;}
     const canMove=!a.movementUsed&&Number(p.m||0)>0&&!p.linkedToId;
