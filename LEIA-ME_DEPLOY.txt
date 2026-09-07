@@ -1,21 +1,20 @@
-Batalha nas Sombras v1.15.45 — TESTE GIT
+Batalha nas Sombras v1.15.46 — TESTE GIT
 
-Base: v1.15.44 HOTFIX DEPLOY TESTE GIT.
+Base: v1.15.45 TESTE GIT.
 
 Principais mudanças desta versão:
-- Golem de Lava mantém Absorver Rocha: cada Pedra consumida concede +1 Movimento permanente e cumulativo.
-- Arqueiro: Tiro Certeiro agora mostra a área ampliada e pede confirmação antes de ativar o alcance dobrado naquele turno.
-- Piromante: ataque normal atinge 1 casa; Rajada Dupla é habilidade ativa para 1 ou 2 casas dentro do Alc. Hab., com prévia, confirmação e recarga de 1 turno.
-- Paranoia: habilidade antiga removida. Nova Presença Fantasma (Alc. Hab. 3) cria exatamente 2 presenças falsas; máximo de 2 por Paranoia, removendo as mais antigas ao criar novas.
-- Presenças Fantasmas enganam Percepção, podem ser atacadas ou gerar Confronto Direto falso, e são visíveis no mapa apenas para o dono.
-- Ao atacar/enfrentar uma Presença Fantasma, a peça recebe no próximo turno próprio um Eco conhecido como falso, independentemente da posição.
-- A IA reconhece que o Eco conhecido é falso, mas continua podendo ser enganada por Presenças Fantasmas normais.
-- A casa atual da peça é marcada como origem durante habilidades; habilidades compatíveis podem usar a própria casa.
-- Textos ativos foram revisados para usar "turno" no lugar de "ativação" quando o termo é apresentado ao jogador.
-- Clássico, Treino, Arena, Online, IA e Replay foram sincronizados com as novas regras.
+- Paranoia: agora é Vanguarda, com V2 / M2 / ATQ0 / Alc. Hab. 2.
+- Presença Fantasma: ataque comum faz o adversário acreditar que atingiu o próprio Paranoia; a detecção falsa do próximo turno permanece desconhecida.
+- Presença Fantasma em Confronto Direto: o adversário descobre que era falsa porque não sofre dano nem é repelido; a detecção falsa do próximo turno fica conhecida como falsa.
+- Druida: arquétipo alterado de Vanguarda para Executor.
+- Piromante: Alc. Hab. alterado para 2; texto da Rajada Dupla simplificado sem repetir a regra do ataque normal.
+- Replay: agora mostra a dificuldade usada na partida (Clássico e Arena, incluindo IA B/C separadas quando aplicável).
+- Dificuldade: Clássico preserva o último nível escolhido após recarregar/nova partida; Arena solo preserva separadamente os níveis de IA B e IA C.
+- IA: tabela tática sincronizada com os novos arquétipos de Paranoia e Druida, preservando informação oculta.
+- Online: restaurado importState público no árbitro do Clássico para reconexão/persistência de salas do Durable Object.
 
 Deploy:
-- O hotfix que removeu o require inválido de ./rules.js em src/worker.js foi preservado.
+- Mantida a correção que remove o require inválido de ./rules.js em src/worker.js.
+- src/worker.js é ESM e embute as regras/árbitro do Clássico sem dependência relativa inexistente.
 - package.json: npm run deploy -> wrangler deploy.
 - wrangler.jsonc mantém os Durable Objects GameRoom e TriGameRoom.
-- Arquivos SAVE_PROJETO, TESTES e VALIDACAO são documentação de desenvolvimento e não são necessários para o jogo funcionar.
