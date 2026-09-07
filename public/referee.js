@@ -178,6 +178,7 @@ __refRoot.GameReferee = class GameReferee {
     if(this.#s.mode!=='training'||this.#s.phase!=='play')return this.#fail('Só é possível avançar rodada no modo Treino.');
     if(this.#s.pendingCombat)return this.#fail('Resolva o Confronto Direto antes de avançar a rodada.');
     if(this.#s.doppelChoice?.player||this.#s.doppelChoice?.enemy)return this.#fail('Resolva a escolha do Doppelgänger antes de avançar a rodada.');
+    for(const side of ['player','enemy']){const p=this.#activePiece(side);if(p&&this.#R.defOf(p)?.flying&&this.#solidTerrain(p.coord))return this.#fail('Voador precisa terminar o movimento fora de Árvore ou Pedra antes de avançar a rodada.');}
     this.#s.activation.player=null;this.#s.activation.enemy=null;
     this.#s.round++;this.#tickRoundEffects();this.#s.roundActivations={player:0,enemy:0};
     for(const side of ['player','enemy'])for(const p of this.#pieces(side))p.activated=false;

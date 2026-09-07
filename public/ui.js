@@ -195,6 +195,14 @@
     const flying=(d.flying&&A.effects?.voador)?`<div class="info-pill flying-trait"><img class="trait-icon" src="${A.effects.voador}" alt="Voador"> <b>Voador</b></div>`:'';const html=`<div class="setup-definition"><div class="piece-info-grid"><div class="info-pill">❤️ Vida: <b>${d.v}</b></div><div class="info-pill">👣 Movimento: <b>${d.m}</b></div><div class="info-pill">⚔️ Ataque: <b>${d.a}</b></div><div class="info-pill">🎯 Alcance: <b>${alc}</b></div><div class="info-pill">👁️ Percepção: <b>PER ${d.per}</b></div><div class="info-pill">✨ Alc. Hab.: <b>${d.ah||0}</b></div><div class="info-pill">Arquétipo: <b>${d.typeIcon} ${R.archetypeName(d.type)}</b></div>${flying}</div><div class="ability-box"><b>Habilidade / característica</b><br>${ABILITY_TEXT[d.name]||'Sem descrição adicional.'}</div></div>`;
     if(setupInspector){setupInspectorTitle.textContent=`${d.icon} ${d.name}`;setupInspectorBody.innerHTML=html;setupInspector.classList.remove('hidden');}
   }
+  function cooldownText(p){
+    if(!p)return '';
+    const name=p.copied||p.displayName||p.name,parts=[];
+    if(name==='Arqueiro'&&(p.sureShotCooldown||0)>0)parts.push(`🏹 Tiro Certeiro: ${p.sureShotCooldown} turno${p.sureShotCooldown===1?'':'s'}`);
+    if(name==='Piromante'&&(p.pyroCooldown||0)>0)parts.push(`🔥 Rajada Dupla: ${p.pyroCooldown} turno${p.pyroCooldown===1?'':'s'}`);
+    if(name==='Ninja'&&(p.ninjaSmokeCooldown||0)>0)parts.push(`🌫️ Bomba de Fumaça: ${p.ninjaSmokeCooldown} turno${p.ninjaSmokeCooldown===1?'':'s'}`);
+    return parts.length?`<div class="cooldown-note"><b>⏳ Recarga:</b> ${parts.join(' · ')}</div>`:'';
+  }
   function pieceAbilityText(p){const key=p?.copied||p?.displayName||p?.name;return ABILITY_TEXT[key]||ABILITY_TEXT[p?.name]||'Sem habilidade ativa ou característica adicional.';}
   function showPieceInfo(v,p,enemy=false){
     if(!p)return;
@@ -218,7 +226,7 @@
         <div class="info-pill">${kind}</div>
         ${copied}${cd}${lineage}${flying}
       </div>
-      <div class="ability-box"><b>${p.copied?'Habilidade atual — '+p.copied:'Habilidade / característica'}</b><br>${pieceAbilityText(p)}</div>
+      <div class="ability-box"><b>${p.copied?'Habilidade atual — '+p.copied:'Habilidade / característica'}</b><br>${pieceAbilityText(p)}</div>${cooldownText(p)}
       <div class="small muted" style="margin-top:9px">Bônus desta unidade:</div>
       <div class="bonus-tags">${tags.length?tags.map(t=>`<span class="bonus-tag">${t}</span>`).join(''):'<span class="small muted">Nenhum bônus nesta unidade.</span>'}</div>
       ${temporary}
@@ -311,7 +319,14 @@
     }
   }
 
+  function renderSelectedStrip(v){
+    let strip=document.getElementById('selectedStrip');if(!strip){strip=document.createElement('div');strip.id='selectedStrip';strip.className='selected-strip';roster.parentNode.insertBefore(strip,roster);}
+    if(v.phase!=='setup'){strip.classList.add('hidden');strip.innerHTML='';return;}strip.classList.remove('hidden');strip.innerHTML='<span class="selected-strip-label">Escolhidos:</span>';
+    if(!selected.length){const e=document.createElement('span');e.className='small muted';e.textContent='nenhum';strip.appendChild(e);return;}
+    for(const name of selected){const d=R.byName[name],b=document.createElement('button');b.type='button';b.className='selected-chip';b.title=`Remover ${name} da equipe`;b.innerHTML=`${A.html?.(A.character?.(name),'',name)||d?.icon||''}<span>${name}</span><span class="remove-x">×</span>`;b.onclick=()=>d&&toggleSetupCharacter(d);strip.appendChild(b);}
+  }
   function renderRoster(v){
+    renderSelectedStrip(v);
     roster.innerHTML='';
     const defs=R.defs.filter(d=>rosterFilter==='all'||(rosterFilter==='flying'?!!d.flying:d.type===rosterFilter));
     defs.forEach(d=>{
@@ -409,8 +424,8 @@
         const group=ownGroups.get(c)||[];
         if(group.length){
           const ordered=[...group].sort((a,b)=>(b.name==='Escudeiro')-(a.name==='Escudeiro'));
-          const m=makePieceToken(ordered[0],false);b.appendChild(m);addHpBadge(b,ordered[0],false);addDurationBadges(b,ordered[0],false);if(v.activation?.pieceId===ordered[0].id||ordered.some(x=>v.activation?.pieceId===x.id))b.classList.add('active-cell');
-          if(ordered[1]){const s2=document.createElement('span');s2.className=`stack-second${ordered[1].activated?' spent-stack':''}`;s2.textContent=ordered[1].icon;b.appendChild(s2);}
+          const m=makePieceToken(ordered[0],false);if(ordered[1])m.classList.add('shared-primary');b.appendChild(m);addHpBadge(b,ordered[0],false);addDurationBadges(b,ordered[0],false);if(v.activation?.pieceId===ordered[0].id||ordered.some(x=>v.activation?.pieceId===x.id))b.classList.add('active-cell');
+          if(ordered[1]){const s2=document.createElement('span');s2.className=`stack-second art-stack shared-stack${ordered[1].activated?' spent-stack':''}`;const src=A.character?.(ordered[1].displayName||ordered[1].name);if(src)s2.appendChild(A.img(src,'piece-art',ordered[1].displayName||ordered[1].name));else s2.textContent=ordered[1].icon;s2.title=ordered[1].displayName||ordered[1].name;b.appendChild(s2);}
         }
         const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}if(eg.length&&!seer.has(c)){const rm=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Unidade revelada')||document.createElement('span');if(!rm.src){rm.className='marker reveal-marker';rm.textContent='👁️';}rm.title='Unidade revelada';appendCornerMarker(b,rm,'tl');}
         if(v.impactCell===c){const m=A.img?.(A.effects?.dano,'marker-art','Dano')||document.createElement('span');if(!m.src){m.className='marker impact';m.textContent='💥';}appendCornerMarker(b,m,'bl');}if((v.combatCells||[]).includes(c)){const m=A.img?.(A.effects?.confronto,'marker-art','Confronto')||document.createElement('span');if(!m.src){m.className='marker combat-mark';m.textContent='⚔️';}m.title='Confronto Direto ocorreu aqui';appendCornerMarker(b,m,'br');}
@@ -523,7 +538,7 @@
     else if(a.mode==='mirror')r=player.placeMirror(c);
     else if(a.mode==='awaken')r=player.awakenTree(c);
     else if(a.mode==='spotTrap'||a.mode==='damageTrap')r=player.placeTrap(c);
-    else if(a.mode==='bard'){const target=ownAtAll(v,c).find(x=>x.id!==p.id&&R.man(p.coord,x.coord)<=p.ah);if(!target){setStatus('Escolha um aliado dentro do Alc. Hab. do Bardo.');return;}showBardChoice(target);return;}
+    else if(a.mode==='bard'){const targets=ownAtAll(v,c).filter(x=>x.id!==p.id&&x.alive&&R.man(p.coord,x.coord)<=p.ah);if(!targets.length){setStatus('Escolha um aliado dentro do Alc. Hab. do Bardo.');return;}showBardChoice(targets);return;}
     else if(a.mode==='absorbRock'){if(!(v.rocks||[]).includes(c)||!R.neighbors(p.coord,false).includes(c)){setStatus('Escolha uma pedra adjacente ao Golem.');return;}const r=player.absorbRock(c);setStatus(r.status);afterMutation();return;}
     else if(a.mode==='shieldLink'){const ah=p.ah||0,target=ownAtAll(v,c).find(x=>x.id!==p.id&&x.alive&&R.man(p.coord,x.coord)<=ah);if(!target){setStatus(`Escolha um aliado dentro do Alc. Hab. ${ah}.`);return;}pendingShieldTargetId=target.id;setStatus(`Vincular a ${target.displayName}? Confirme antes de gastar o turno.`);render();return;}
     else {
@@ -546,7 +561,7 @@
     seerPreview=new Set([main,c]);seerConfirm.classList.remove('hidden');setStatus('2/2 casas selecionadas. Confirme a visão.');render();
   }
 
-  function showBardChoice(target){bardChoiceText.textContent=`${target.icon} ${target.displayName} — escolha o bônus até o fim do próximo turno do Bardo.`;bardChoiceButtons.innerHTML='';for(const [stat,label] of [['attack','⚔️ +1 ATQ'],['range','🎯 +1 ALC'],['abilityRange','✨ +1 Alc. Hab.'],['move','👣 +1 M'],['life','❤️ +1 Vida']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{bardChoiceBox.classList.add('hidden');const r=player.bardBuff(target.id,stat);setStatus(r.status);afterMutation();});bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');}
+  function showBardChoice(input){const targets=Array.isArray(input)?input:[input];bardChoiceButtons.innerHTML='';if(targets.length>1){bardChoiceText.textContent='Há duas unidades nesta casa. Quem receberá a Inspiração?';for(const target of targets){const b=document.createElement('button');b.type='button';b.textContent=`${target.icon} ${target.displayName}`;b.addEventListener('click',()=>showBardChoice(target));bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');return;}const target=targets[0];bardChoiceText.textContent=`${target.icon} ${target.displayName} — escolha o bônus até o fim do próximo turno do Bardo.`;for(const [stat,label] of [['attack','⚔️ +1 ATQ'],['range','🎯 +1 ALC'],['abilityRange','✨ +1 Alc. Hab.'],['move','👣 +1 M'],['life','❤️ +1 Vida']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{bardChoiceBox.classList.add('hidden');const r=player.bardBuff(target.id,stat);setStatus(r.status);afterMutation();});bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');}
   function hideBardChoice(){bardChoiceBox.classList.add('hidden');bardChoiceButtons.innerHTML='';}
 
   function afterMutation(){
