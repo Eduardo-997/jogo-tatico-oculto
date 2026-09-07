@@ -827,6 +827,7 @@ __refRoot.GameReferee = class GameReferee {
     const bad=this.#validateTurn(side); if(bad)return bad;
     const p=this.#activePiece(side);if(!p)return this.#fail('Selecione uma peça.');
     const a=this.#activation(side);if(a?.mode==='move'&&this.#R.defOf(p)?.flying&&this.#solidTerrain(p.coord))return this.#fail('Voador precisa sair da Árvore ou Pedra antes de encerrar o turno.');
+    if(a?.mode==='move'&&a.committed&&Number(a.moveRemaining||0)>0)return this.#fail('Primeiro use Parar movimento antes de encerrar o turno.');
     this.#commit(side);return this.#finishActivation(side);
   }
 

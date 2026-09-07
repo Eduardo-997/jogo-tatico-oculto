@@ -519,3 +519,12 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 .stack-second.shared-stack img{width:100%!important;height:100%!important;object-fit:contain!important;border-radius:50%!important}
 .mode-arena .shared-piece-svg{filter:drop-shadow(0 2px 3px rgba(0,0,0,.82))}
 @media(max-width:600px){.piece-token.shared-primary{width:25px!important;height:25px!important}.stack-second.shared-stack{width:23px!important;height:23px!important}}
+
+/* v1.15.67 — referência visual da Arena restaurada para A–H / 1–15. */
+.mode-arena .arena-axis-letter{font-size:10px}
+.mode-arena .arena-axis-number{font-size:8px}
+
+
+/* v1.15.67 — Arena: ataque público precisa ser impossível de perder de vista. */
+.mode-arena .tri-cell.public-impact-cell,.tri-cell.public-impact-cell{stroke:#ff875b!important;stroke-width:3.2!important;filter:brightness(1.10) drop-shadow(0 0 4px rgba(255,104,65,.72))!important;stroke-dasharray:4 3}
+.mode-arena .impact-mark-svg,.impact-mark-svg{filter:drop-shadow(0 0 5px rgba(255,108,67,.98)) drop-shadow(0 2px 2px #000)!important}

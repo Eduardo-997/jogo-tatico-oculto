@@ -158,7 +158,7 @@
     if(vs.player.doppelChoice||vs.enemy.doppelChoice)return 'Doppelgänger aguarda uma escolha de habilidade.';
     const v=activeView(vs),a=v?.activation,p=activePiece(vs);if(!a||!p)return 'Selecione qualquer peça viva do Lado A ou B para testar uma ação.';
     const name=`Lado ${sideName(activeSide)} · ${p.displayName||p.name||'Unidade'}`,mode=a.mode;
-    if(mode==='move')return a.committed?`${name}: ainda está se movendo · ${a.moveRemaining||0} M restante${Number(a.moveRemaining||0)===1?'':'s'}. Mova novamente ou pare.`:`${name}: movimento preparado. Escolha uma casa ou cancele.`;
+    if(mode==='move')return a.committed?`${name}: ainda está se movendo · ${a.moveRemaining||0} M restante${Number(a.moveRemaining||0)===1?'':'s'}. Mova novamente ou use Parar movimento; Encerrar fica bloqueado enquanto houver M restante.`:`${name}: movimento preparado. Escolha uma casa ou cancele.`;
     if(mode==='attack')return `${name}: escolha a casa do ataque.`;
     if(mode==='sureShotConfirm')return `${name}: confirme ou cancele o Tiro Certeiro.`;
     if(mode==='pyro')return `${name}: Rajada Dupla · ${(a.pyroTargets||[]).length}/2 casas escolhidas.`;
@@ -181,14 +181,15 @@
   function setActionVisual(btn,enabled,current=false){if(!btn)return;btn.disabled=!enabled;btn.classList.toggle('action-ready',enabled&&!current);btn.classList.toggle('action-current',enabled&&current);}
   function renderTrainingActionControls(vs){
     const move=$('#move'),stop=$('#stop'),attack=$('#attack'),ability=$('#ability'),end=$('#end'),cancel=$('#cancel'),next=$('#nextRound'),all=[move,stop,attack,ability,end,cancel];
-    for(const b of all){if(!b)continue;b.classList.remove('action-ready','action-current');b.disabled=true;}
+    for(const b of all){if(!b)continue;b.classList.remove('action-ready','action-current');b.disabled=true;}if(end)end.title='';
     const hint=$('#trainingActionHint');if(hint)hint.textContent=trainingActionText(vs);
     const blockedChoice=!!(vs.player.pendingCombat||vs.enemy.pendingCombat||vs.player.doppelChoice||vs.enemy.doppelChoice);
     const illegalFlyer=['player','enemy'].some(s=>{const a=vs[s].activation,p=a&&vs[s].ownPieces.find(x=>x.id===a.pieceId);return !!(p?.flying&&((vs[s].rocks||[]).includes(p.coord)||(vs[s].trees||[]).some(t=>t.coord===p.coord&&t.state==='live')));});
     if(next){next.disabled=blockedChoice||illegalFlyer;next.classList.toggle('action-ready',!next.disabled);}
     if(blockedChoice)return;const v=activeView(vs),a=v?.activation,p=activePiece(vs);if(!a||!p)return;
-    const mode=a.mode||'',solid=(v.rocks||[]).includes(p.coord)||!!(v.trees||[]).find(t=>t.coord===p.coord&&t.state==='live'),canEnd=!(p.flying&&solid);
-    if(mode==='move'){setActionVisual(move,true,true);setActionVisual(stop,canEnd,true);setActionVisual(end,canEnd,false);setActionVisual(cancel,!a.committed,false);return;}
+    const mode=a.mode||'',solid=(v.rocks||[]).includes(p.coord)||!!(v.trees||[]).find(t=>t.coord===p.coord&&t.state==='live'),canEnd=!(p.flying&&solid),partialMove=mode==='move'&&!!a.committed&&Number(a.moveRemaining||0)>0;
+    if(end)end.title=partialMove?'Use Parar movimento antes de encerrar o turno.':'';
+    if(mode==='move'){setActionVisual(move,true,true);setActionVisual(stop,canEnd,true);setActionVisual(end,canEnd&&!partialMove,false);setActionVisual(cancel,!a.committed,false);return;}
     if(mode==='attack'){setActionVisual(attack,true,true);setActionVisual(end,canEnd,false);setActionVisual(cancel,true,false);return;}
     if(mode){setActionVisual(ability,true,true);setActionVisual(end,canEnd,false);setActionVisual(cancel,true,false);return;}
     setActionVisual(move,!a.movementUsed&&Number(p.m||0)>0&&!p.linkedToId,false);
