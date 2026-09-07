@@ -375,7 +375,7 @@ function bestSeerArea(view,p){
   return best;
 }
 function legalRaiseCells(view,p){
-  const ownSet=ownCoords(view),corpses=new Set((view.corpses||[]).map(c=>c.coord)),solid=new Set([...(view.trees||[]).map(t=>t.coord),...(view.rocks||[])]);
+  const ownSet=ownCoords(view),corpses=new Set((view.corpses||[]).map(c=>c.coord)),solid=new Set([...(view.trees||[]).filter(t=>t.state==='live').map(t=>t.coord),...(view.rocks||[])]);
   return abilityCells(p).filter(c=>corpses.has(c)&&!ownSet.has(c)&&!solid.has(c));
 }
 function bestRaiseCell(view,p){
@@ -384,7 +384,7 @@ function bestRaiseCell(view,p){
   return b?.item||cells[0];
 }
 function mirrorCandidates(view,p){
-  const ownSet=ownCoords(view),visibleEnemy=new Set((view.visibleOpponents||[]).filter(x=>x.coord).map(x=>x.coord)),bases=baseCoords(view),mirrors=new Set((view.ownMirrors||[]).map(m=>m.coord)),solid=new Set([...(view.trees||[]).map(t=>t.coord),...(view.rocks||[])]);
+  const ownSet=ownCoords(view),visibleEnemy=new Set((view.visibleOpponents||[]).filter(x=>x.coord).map(x=>x.coord)),bases=baseCoords(view),mirrors=new Set((view.ownMirrors||[]).map(m=>m.coord)),solid=new Set([...(view.trees||[]).filter(t=>t.state==='live').map(t=>t.coord),...(view.rocks||[])]);
   return abilityCells(p).filter(c=>!solid.has(c)&&!ownSet.has(c)&&!visibleEnemy.has(c)&&!bases.has(c)&&!mirrors.has(c)&&(memory.failedCells[c]||0)<view.round);
 }
 function bestMirrorCell(view,p){
@@ -409,7 +409,7 @@ function bestAwakenCell(view,p){
   return b?.item?.coord||null;
 }
 function trapCandidates(view,p){
-  const bases=baseCoords(view),solid=new Set([...(view.trees||[]).map(t=>t.coord),...(view.rocks||[])]);
+  const bases=baseCoords(view),solid=new Set([...(view.trees||[]).filter(t=>t.state==='live').map(t=>t.coord),...(view.rocks||[])]);
   return abilityCells(p).filter(c=>!bases.has(c)&&!solid.has(c)&&(memory.failedCells[c]||0)<view.round);
 }
 function bestTrapCell(view,p){

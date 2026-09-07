@@ -422,7 +422,7 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 .mode-arena .tri-cell.ability-origin{stroke:#ffd875!important;stroke-width:4.5!important;filter:drop-shadow(0 0 5px rgba(255,211,105,.65))}
 .mode-arena .false-presence-svg{font-size:13px;fill:#d9a7ff;stroke:#1a0a25;stroke-width:2.5;paint-order:stroke;pointer-events:none;filter:drop-shadow(0 0 4px rgba(180,105,255,.7))}
 
-/* v1.15.49 — centralização fina de tokens, estruturas e marcadores */
+/* v1.15.54 — centralização fina de tokens, estruturas e marcadores */
 .cell{position:relative}
 .piece-token{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
 .piece-token.enemy-reveal{left:7px;top:7px;transform:none}
@@ -432,3 +432,25 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 .combat-mark{left:-7px;top:-9px;transform:none}
 .impact{right:-2px;top:-3px;left:auto;transform:none}
 .false-presence-marker{left:50%!important;top:50%!important;right:auto!important;transform:translate(-50%,-50%)!important;font-size:16px!important;filter:drop-shadow(0 0 4px rgba(181,117,255,.9));z-index:9}
+
+/* v1.15.54 — leitura clara de turno e confirmação de ações online */
+.turn-guide{margin:8px 0 10px!important;padding:10px 12px!important;border-width:1px!important;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;line-height:1.35}
+.turn-guide.hidden{display:none!important}
+.turn-guide.your-turn{border-color:#7d6b3e!important;background:linear-gradient(145deg,#2d2819,#171714)!important;box-shadow:0 0 0 1px rgba(219,183,92,.12),0 7px 20px rgba(0,0,0,.2)}
+.turn-guide.waiting-turn{border-color:#3e4652!important;background:linear-gradient(145deg,#191d22,#111316)!important}
+.turn-guide.turn-again{border-color:#5d825a!important;background:linear-gradient(145deg,#1d2c1c,#121914)!important;box-shadow:0 0 0 1px rgba(115,182,106,.15),0 7px 20px rgba(0,0,0,.2)}
+.turn-guide .turn-guide-title{font-weight:900;letter-spacing:.025em;color:#f0d8a5}
+.turn-guide.turn-again .turn-guide-title{color:#bfe3b8}
+.turn-guide .turn-guide-detail{color:#bdb3a3;font-size:12px}
+.turn-guide .turn-guide-count{white-space:nowrap;padding:4px 8px;border:1px solid rgba(190,160,102,.26);border-radius:999px;background:#111310;color:#ead9b9;font-size:11px;font-weight:800}
+.turn-usage{margin:0 0 7px;padding:5px 7px;border:1px solid rgba(170,143,95,.22);border-radius:6px;background:rgba(0,0,0,.16);font-size:11px;color:#cfc0a7}
+.action-confirmed{color:#bfe3b8;font-weight:700}
+@media(max-width:680px){.turn-guide{align-items:flex-start}.turn-guide .turn-guide-count{width:100%;text-align:center}}
+/* v1.15.54 — objetos do campo sempre acima da arte do bioma. */
+.marker-art{z-index:6}
+
+/* v1.15.54 — marcador de casa revelada pequeno no canto */
+.marker-art.reveal-marker{left:auto!important;right:2px!important;top:2px!important;transform:none!important;width:18px!important;height:18px!important;z-index:11!important;background:#090a0bd9!important}
+.marker.reveal-marker{left:auto!important;right:2px!important;top:2px!important;transform:none!important;width:18px;height:18px;z-index:11!important}
+.marker.reveal-marker .marker-art{position:static!important;transform:none!important;width:18px!important;height:18px!important}
+.mode-arena .reveal-mark-svg{pointer-events:none;filter:drop-shadow(0 1px 2px #000)}
