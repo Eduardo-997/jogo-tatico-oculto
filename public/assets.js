@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const ASSET_VERSION='?v=1.15.61';
+  const ASSET_VERSION='?v=1.15.64';
   const charMap={
     'Arqueiro':'arqueiro','Ninja':'ninja','Piromante':'piromante','Kamikaze':'kamikaze','Caçador':'cacador','Paranoia':'paranoia',
     'Escudeiro':'escudeiro','Golem':'golem','Golem de Lava':'golem-de-lava','Cavaleiro':'cavaleiro','Slime':'slime','Mini-Slime':'mini-slime','Zumbi':'zumbi','Druida':'druida',

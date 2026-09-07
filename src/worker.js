@@ -476,7 +476,6 @@ __refRoot.GameReferee = class GameReferee {
     
     const a=this.#activation(side);
     if(a&&a.committed&&a.pieceId!==id) return this.#fail(`O turno de ${this.#R.defOf(this.#activePiece(side)).name} já foi comprometido.`);
-    if(!a||a.pieceId!==id)this.#clearSpotOnTurnStart(p);
     this.#s.activation[side]={pieceId:id,committed:a?.pieceId===id?!!a.committed:false,movementUsed:a?.pieceId===id?!!a.movementUsed:false,mode:null,moveRemaining:0,stepsTaken:a?.pieceId===id?(a.stepsTaken||0):0,movePath:a?.pieceId===id?[...(a.movePath||[])]:[],lastPerception:a?.pieceId===id?(a.lastPerception??null):null,pyroTargets:[],paranoiaTargets:[],mirrorBlockedCurrentActivation:false};
     return this.#ok(`${this.#R.defOf(p).name} selecionado. Ainda pode trocar enquanto não agir.`);
   }
@@ -500,6 +499,7 @@ __refRoot.GameReferee = class GameReferee {
     this.#s.perceptionHints[side]=[];
     if(this.#s.seerExpires[side]){this.#s.seer[side].clear();this.#s.seerExpires[side]=false;}
     const p=this.#activePiece(side);
+    this.#clearSpotOnTurnStart(p);
     a.committed=true;
     // O Eco só nasce no próximo turno próprio. Em movimento, ele é resolvido
     // no fim do deslocamento para usar a posição final; nas demais ações,
