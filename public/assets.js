@@ -1,5 +1,6 @@
 'use strict';
 (() => {
+  const ASSET_VERSION='?v=1.15.47';
   const charMap={
     'Arqueiro':'arqueiro','Ninja':'ninja','Piromante':'piromante','Kamikaze':'kamikaze','Caçador':'cacador','Paranoia':'paranoia',
     'Escudeiro':'escudeiro','Golem':'golem','Golem de Lava':'golem-de-lava','Cavaleiro':'cavaleiro','Slime':'slime','Mini-Slime':'mini-slime','Zumbi':'zumbi','Druida':'druida',
@@ -21,7 +22,8 @@
     invocacao:'assets/effects/invocacao.png',lapide:'assets/effects/lapide.png',voador:'assets/effects/voador.png'
   };
   const archetypes={R:'assets/archetypes/vanguarda.png',P:'assets/archetypes/estrategista.png',S:'assets/archetypes/executor.png',J:'assets/archetypes/coringa.png',C:'assets/archetypes/condenado.png'};
-  const character=name=>{const key=charMap[name]||charMap[String(name||'').trim()];return key?`assets/characters/${key}.png`:null;};
+  for(const group of [terrain,structures,effects,archetypes]) for(const k of Object.keys(group)) group[k]+=ASSET_VERSION;
+  const character=name=>{const key=charMap[name]||charMap[String(name||'').trim()];return key?`assets/characters/${key}.png${ASSET_VERSION}`:null;};
   function img(src,className='bns-art',alt=''){
     if(!src)return null;const el=document.createElement('img');el.src=src;el.className=className;el.alt=alt||'';el.draggable=false;return el;
   }
