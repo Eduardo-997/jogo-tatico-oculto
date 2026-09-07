@@ -422,7 +422,7 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 .mode-arena .tri-cell.ability-origin{stroke:#ffd875!important;stroke-width:4.5!important;filter:drop-shadow(0 0 5px rgba(255,211,105,.65))}
 .mode-arena .false-presence-svg{font-size:13px;fill:#d9a7ff;stroke:#1a0a25;stroke-width:2.5;paint-order:stroke;pointer-events:none;filter:drop-shadow(0 0 4px rgba(180,105,255,.7))}
 
-/* v1.15.54 — centralização fina de tokens, estruturas e marcadores */
+/* v1.15.56 — centralização fina de tokens, estruturas e marcadores */
 .cell{position:relative}
 .piece-token{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
 .piece-token.enemy-reveal{left:7px;top:7px;transform:none}
@@ -433,7 +433,7 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 .impact{right:-2px;top:-3px;left:auto;transform:none}
 .false-presence-marker{left:50%!important;top:50%!important;right:auto!important;transform:translate(-50%,-50%)!important;font-size:16px!important;filter:drop-shadow(0 0 4px rgba(181,117,255,.9));z-index:9}
 
-/* v1.15.54 — leitura clara de turno e confirmação de ações online */
+/* v1.15.56 — leitura clara de turno e confirmação de ações online */
 .turn-guide{margin:8px 0 10px!important;padding:10px 12px!important;border-width:1px!important;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;line-height:1.35}
 .turn-guide.hidden{display:none!important}
 .turn-guide.your-turn{border-color:#7d6b3e!important;background:linear-gradient(145deg,#2d2819,#171714)!important;box-shadow:0 0 0 1px rgba(219,183,92,.12),0 7px 20px rgba(0,0,0,.2)}
@@ -446,11 +446,53 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 .turn-usage{margin:0 0 7px;padding:5px 7px;border:1px solid rgba(170,143,95,.22);border-radius:6px;background:rgba(0,0,0,.16);font-size:11px;color:#cfc0a7}
 .action-confirmed{color:#bfe3b8;font-weight:700}
 @media(max-width:680px){.turn-guide{align-items:flex-start}.turn-guide .turn-guide-count{width:100%;text-align:center}}
-/* v1.15.54 — objetos do campo sempre acima da arte do bioma. */
+/* v1.15.56 — objetos do campo sempre acima da arte do bioma. */
 .marker-art{z-index:6}
 
-/* v1.15.54 — marcador de casa revelada pequeno no canto */
+/* v1.15.56 — marcador de casa revelada pequeno no canto */
 .marker-art.reveal-marker{left:auto!important;right:2px!important;top:2px!important;transform:none!important;width:18px!important;height:18px!important;z-index:11!important;background:#090a0bd9!important}
 .marker.reveal-marker{left:auto!important;right:2px!important;top:2px!important;transform:none!important;width:18px;height:18px;z-index:11!important}
 .marker.reveal-marker .marker-art{position:static!important;transform:none!important;width:18px!important;height:18px!important}
 .mode-arena .reveal-mark-svg{pointer-events:none;filter:drop-shadow(0 1px 2px #000)}
+
+/* v1.15.56 — marcadores de campo em cantos, sem cobrir as peças */
+.corner-marker{--marker-stack:0;z-index:12!important;pointer-events:none!important}
+.corner-marker.slot-tl{position:absolute!important;left:2px!important;right:auto!important;top:calc(2px + (var(--marker-stack) * 13px))!important;bottom:auto!important;transform:none!important}
+.corner-marker.slot-tr{position:absolute!important;right:2px!important;left:auto!important;top:calc(2px + (var(--marker-stack) * 13px))!important;bottom:auto!important;transform:none!important}
+.corner-marker.slot-bl{position:absolute!important;left:2px!important;right:auto!important;bottom:calc(2px + (var(--marker-stack) * 13px))!important;top:auto!important;transform:none!important}
+.corner-marker.slot-br{position:absolute!important;right:2px!important;left:auto!important;bottom:calc(2px + (var(--marker-stack) * 13px))!important;top:auto!important;transform:none!important}
+.marker-art.corner-marker{width:16px!important;height:16px!important;object-fit:contain!important;background:#090a0bd9!important;border-radius:4px!important}
+.marker.corner-marker{width:16px!important;height:16px!important;font-size:11px!important;display:flex!important;align-items:center!important;justify-content:center!important}
+.marker.corner-marker .marker-art{position:static!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;width:16px!important;height:16px!important}
+.presence-hint.corner-marker{right:auto;top:auto;width:16px;height:16px}
+.false-presence-marker.corner-marker{width:16px!important;height:16px!important;font-size:11px!important}
+@media(max-width:600px){
+  .marker-art.corner-marker,.marker.corner-marker{width:14px!important;height:14px!important}
+  .marker.corner-marker .marker-art{width:14px!important;height:14px!important}
+  .corner-marker.slot-tl,.corner-marker.slot-tr{top:calc(1px + (var(--marker-stack) * 11px))!important}
+  .corner-marker.slot-bl,.corner-marker.slot-br{bottom:calc(1px + (var(--marker-stack) * 11px))!important}
+  .corner-marker.slot-tl,.corner-marker.slot-bl{left:1px!important}.corner-marker.slot-tr,.corner-marker.slot-br{right:1px!important}
+}
+
+
+/* v1.15.56 — leitura visual do estado de cada unidade e das ações possíveis */
+.turn-unit-list{display:grid;gap:5px;margin-top:7px}
+.turn-unit-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid #37342e;border-radius:7px;background:#131414;font-size:11px}
+.turn-unit-chip small{font-size:9px;font-weight:800;letter-spacing:.025em;text-align:right}
+.turn-unit-chip.ready{border-color:#4d684d;background:linear-gradient(145deg,#182019,#121613)}
+.turn-unit-chip.ready small{color:#a9d4a8}
+.turn-unit-chip.active{border-color:#b68b4a;background:linear-gradient(145deg,#3b2d18,#1c1811);box-shadow:0 0 0 2px rgba(212,165,82,.15),0 0 14px rgba(212,165,82,.12)}
+.turn-unit-chip.active small{color:#ffe0a2}
+.turn-unit-chip.spent{opacity:.6;filter:saturate(.55)}
+.turn-unit-chip.spent small{color:#aaa397}
+.turn-unit-chip.dead{opacity:.45;filter:grayscale(.75)}
+.turn-unit-chip.waiting{opacity:.72}
+.char.ready-char{border-color:#536b51!important;box-shadow:inset 0 0 0 1px rgba(118,173,110,.10)}
+.char.turn-active-char{opacity:1!important;filter:none!important;border-color:#c79b51!important;box-shadow:0 0 0 2px rgba(218,172,88,.24),0 0 18px rgba(218,172,88,.16)!important}
+.char.turn-active-char .roster-state{color:#f5d69a!important;font-weight:900}
+.char.spent-char .roster-state{font-weight:800}
+.cell.active-cell{outline:3px solid rgba(239,197,112,.95)!important;outline-offset:-4px!important;box-shadow:inset 0 0 0 2px rgba(255,223,150,.30),inset 0 0 24px rgba(232,184,91,.20),0 0 10px rgba(213,166,78,.22)!important}
+.controls button.action-ready:not(:disabled){border-color:#71825c!important;box-shadow:inset 0 0 0 1px rgba(142,175,112,.13),0 0 10px rgba(105,145,85,.08);filter:brightness(1.08)}
+.controls button.action-current:not(:disabled){border-color:#d0a154!important;background:linear-gradient(180deg,#66491f,#342716)!important;color:#fff0cd!important;box-shadow:inset 0 0 0 1px rgba(255,221,153,.18),0 0 0 2px rgba(208,161,84,.16),0 0 15px rgba(208,161,84,.16)!important;filter:brightness(1.12)}
+.controls button.action-current:not(:disabled)::after{content:'  •';font-weight:900}
+@media(max-width:600px){.turn-unit-chip{padding:5px 6px}.turn-unit-chip small{font-size:8px}}

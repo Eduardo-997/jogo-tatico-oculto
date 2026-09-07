@@ -12,7 +12,7 @@
   const roster=$('#roster'),board=$('#board'),historyEl=$('#history'),intelEl=$('#intel'),statusEl=$('#status'),availableEl=$('#available');
   const Presentation=window.BattlePresentation||{battleEvents:a=>a||[],showEndScreen:()=>{},hideEndScreen:()=>{}};
   const roundEl=$('#round'),countEl=$('#count'),myDeathsEl=$('#myDeaths'),enemyDeathsEl=$('#enemyDeaths'),phaseEl=$('#phase'),turnGuide=$('#turnGuide');
-  const startBtn=$('#start'),resetBtn=$('#reset'),moveBtn=$('#move'),stopBtn=$('#stop'),attackBtn=$('#attack'),abilityBtn=$('#ability'),endBtn=$('#end'),cancelBtn=$('#cancel'),replayBtn=$('#replayBtn');
+  const startBtn=$('#start'),resetBtn=$('#reset'),moveBtn=$('#move'),stopBtn=$('#stop'),attackBtn=$('#attack'),abilityBtn=$('#ability'),endBtn=$('#end'),cancelBtn=$('#cancel'),replayBtn=$('#replayBtn'),surrenderBtn=$('#surrenderBtn');
   const seerConfirm=$('#seerConfirm'),confirmSeerBtn=$('#confirmSeer'),cancelSeerBtn=$('#cancelSeer');
   const pyroConfirm=$('#pyroConfirm'),confirmPyroBtn=$('#confirmPyro'),cancelPyroBtn=$('#cancelPyro');
   const stackChoice=$('#stackChoice'),stackButtons=$('#stackButtons');
@@ -65,6 +65,9 @@
   const WATER_CELLS=new Set(R.waterCells||['D3','E6']);
   const SWAMP_CELLS=new Set(R.swampCells||['C5','F4']);
   const setStatus=t=>{status=t;statusEl.textContent=t;};
+  function appendCornerMarker(cell,el,slot='tr'){
+    if(!cell||!el)return;const n=cell.querySelectorAll(`.corner-marker.slot-${slot}`).length;el.classList.add('corner-marker',`slot-${slot}`);el.style.setProperty('--marker-stack',String(n));cell.appendChild(el);
+  }
   let previousFxView=null,pendingActionFx=[];
   const FX_MS=760;
   function clearFxClass(el,cls,ms=FX_MS){if(!el)return;el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);setTimeout(()=>el.classList.remove(cls),ms);}
@@ -315,9 +318,9 @@
       const chosen=v.phase==='setup'?selected.includes(d.name):v.ownPieces.some(p=>p.original&&p.name===d.name);
       const p=v.phase==='play'?v.ownPieces.find(q=>q.original&&q.name===d.name):null;
       const active=p&&v.activation?.pieceId===p.id;
-      const card=document.createElement('div');card.className='char roster-card type-'+d.type+(chosen?' chosen':'')+(active?' active':'')+(p?.activated?' spent-char':'');card.tabIndex=0;card.setAttribute('role','button');
+      const card=document.createElement('div');const turnState=p?unitTurnState(v,p):{cls:''};card.className='char roster-card type-'+d.type+(chosen?' chosen':'')+(active?' active turn-active-char':'')+(p?.activated?' spent-char':'')+(turnState.cls==='ready'?' ready-char':'');card.tabIndex=0;card.setAttribute('role','button');
       let state='';
-      if(v.phase==='play'&&chosen)state=p?(p.alive?(p.activated?'✓ Já agiu':active?(v.activation.committed?'🔒 Comprometido':'◉ Selecionado'):'● Disponível'):'☠ Eliminado'):'☠ Eliminado';
+      if(v.phase==='play'&&chosen)state=p?unitTurnState(v,p).label:'☠ Eliminada';
       card.innerHTML=`<div class="roster-main"><span class="roster-icon">${A.html?.(A.character?.(d.name),'roster-art',d.name)||d.icon}</span><span class="roster-name">${d.name}</span><span class="roster-type">${A.html?.(A.archetypes?.[d.type],'archetype-art',R.archetypeName(d.type))||d.typeIcon}</span></div>${state?`<div class="roster-state">${state}</div>`:''}`;
       if(v.phase==='setup'){
         const pick=document.createElement('button');pick.type='button';pick.className='roster-pick'+(chosen?' selected':'');pick.textContent=chosen?'☑ Selecionado':'☐ Selecionar';
@@ -329,10 +332,54 @@
     });
   }
 
+  function unitTurnState(v,p){
+    if(!p)return{label:'',cls:''};
+    if(!p.alive)return{label:'☠ Eliminada',cls:'dead'};
+    const a=v.activation,active=!!a&&a.pieceId===p.id;
+    if(active){
+      const mode=a.mode||'';
+      if(mode==='move')return{label:a.committed?'▶ Movendo · turno em andamento':'▶ Prévia de movimento',cls:'active'};
+      if(mode==='attack')return{label:'▶ Escolhendo ataque',cls:'active'};
+      if(mode)return{label:'▶ Habilidade em andamento',cls:'active'};
+      if(a.committed)return{label:'▶ Movimento feito · falta concluir',cls:'active'};
+      return{label:'▶ Em turno',cls:'active'};
+    }
+    if(p.activated)return{label:'✓ Já foi',cls:'spent'};
+    if((v.availablePieceIds||[]).includes(p.id))return{label:'● Disponível',cls:'ready'};
+    return{label:'○ Aguarda',cls:'waiting'};
+  }
   function renderAvailable(v){
     if(v.phase!=='play'){availableEl.textContent='—';return;}
-    const ids=new Set(v.availablePieceIds),arr=v.ownPieces.filter(p=>p.alive&&ids.has(p.id));
-    availableEl.innerHTML=arr.length?arr.map(p=>`<span class="available-chip">${p.icon} ${p.displayName}</span>`).join(''):'<span class="muted">Nenhuma</span>';
+    const used=Number(v.roundActivationsUsed||0),limit=Number(v.roundActivationLimit||0),remaining=Math.max(0,limit-used);
+    const units=(v.ownPieces||[]).filter(p=>p.original||p.alive);
+    const rows=units.map(p=>{const st=unitTurnState(v,p);return `<span class="turn-unit-chip ${st.cls}"><b>${p.icon} ${p.displayName}</b><small>${st.label}</small></span>`;}).join('');
+    availableEl.innerHTML=`<div class="turn-usage">Turnos usados: <b>${used}/${limit}</b> · ainda disponíveis: <b>${remaining}</b></div><div class="turn-unit-list">${rows||'<span class="muted">Nenhuma unidade.</span>'}</div>`;
+  }
+
+  const ACTIVE_ABILITY_NAMES=new Set(['Arqueiro','Piromante','Paranoia','Ninja','Kamikaze','Golem','Golem de Lava','Escudeiro','Vidente','Necromante','Mago do Espelho','Druida','Sentinela','Caçador','Bardo']);
+  function actionAbilityName(p){return p?.copied||p?.displayName||p?.name||'';}
+  function canUseAbilityNow(v,p){
+    if(!p)return false;const n=actionAbilityName(p);if(!ACTIVE_ABILITY_NAMES.has(n))return false;
+    if(n==='Arqueiro'&&(p.sureShotCooldown||0)>0)return false;
+    if(n==='Piromante'&&(p.pyroCooldown||0)>0)return false;
+    if(n==='Ninja'&&(p.ninjaSmokeCooldown||0)>0)return false;
+    if((n==='Golem'||n==='Golem de Lava'))return (v.rocks||[]).some(c=>R.neighbors(p.coord,false).includes(c));
+    if(n==='Necromante'&&(v.ownPieces||[]).some(x=>x.alive&&x.summonType==='skeleton'&&x.summonerId===p.id))return false;
+    if(n==='Druida'&&(v.ownPieces||[]).some(x=>x.alive&&x.summonType==='livingBranch'&&x.druidId===p.id))return false;
+    return true;
+  }
+  function setActionVisual(btn,enabled,current=false){if(!btn)return;btn.disabled=!enabled;btn.classList.toggle('action-ready',enabled&&!current);btn.classList.toggle('action-current',enabled&&current);}
+  function renderActionButtons(v){
+    const all=[moveBtn,stopBtn,attackBtn,abilityBtn,endBtn,cancelBtn];for(const b of all){if(!b)continue;b.classList.remove('action-ready','action-current');b.disabled=true;}
+    if(v.phase!=='play'||v.gameOver||v.turn!=='player'||v.pendingCombat||v.doppelChoice)return;
+    const a=v.activation,p=activePiece(v);if(!a||!p)return;
+    const mode=a.mode||'',flying=!!p.flying,solid=(v.rocks||[]).includes(p.coord)||!!(v.trees||[]).find(t=>t.coord===p.coord&&t.state==='live'),canEnd=!(flying&&solid);
+    if(mode==='move'){setActionVisual(moveBtn,true,true);setActionVisual(stopBtn,canEnd,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,!a.committed,false);return;}
+    if(mode==='attack'){setActionVisual(attackBtn,true,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,true,false);return;}
+    if(mode){setActionVisual(abilityBtn,true,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,true,false);return;}
+    const canMove=!a.movementUsed&&Number(p.m||0)>0&&!p.linkedToId;
+    const canAttack=Number(p.a||0)>0||p.name==='Fantasma'||p.identity==='Fantasma';
+    setActionVisual(moveBtn,canMove,false);setActionVisual(stopBtn,false,false);setActionVisual(attackBtn,canAttack,false);setActionVisual(abilityBtn,canUseAbilityNow(v,p),false);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,!a.committed,false);
   }
 
   function safeMirrorCells(v,p){
@@ -354,10 +401,10 @@
         const n=setupPos.get(c);if(n){const d=R.byName[n];if(d)b.appendChild(makePieceToken(d,false));if(setupSelected===n)b.classList.add('active-cell');}
         const baseEntry=[...setupBasePos.entries()].find(([,bc])=>bc===c);if(baseEntry){const m=A.img?.(A.structures?.baseAlly,'base-art','Posto de Operação')||document.createElement('span');if(!m.src){m.className='base-icon';m.textContent='🏰';}b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=`P${baseEntry[0]}`;b.appendChild(lab);if(setupBaseSelected===baseEntry[0])b.classList.add('active-cell');}
       }else{
-        if(seer.has(c)){const m=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Casa revelada')||document.createElement('span');if(!m.src){m.className='marker reveal-marker';m.textContent='👁️';}m.title='Casa revelada';b.appendChild(m);}
+        if(seer.has(c)){const m=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Casa revelada')||document.createElement('span');if(!m.src){m.className='marker reveal-marker';m.textContent='👁️';}m.title='Casa revelada';appendCornerMarker(b,m,'tl');}
         if(seerPreview.has(c)){const m=document.createElement('span');m.className='marker previewmark';m.textContent='◉';b.appendChild(m);}
-        if(corpseAt(v,c)){const m=A.img?.(A.effects?.lapide,'marker-art','Lápide')||document.createElement('span');if(!m.src){m.className='marker corpse';m.textContent='☠️';}b.appendChild(m);}
-        if(ownMirrorAt(v,c)){const m=A.img?.(A.effects?.espelho,'marker-art','Espelho')||document.createElement('span');if(!m.src){m.className='marker mirror';m.textContent='🪞';}b.appendChild(m);}for(const t of v.ownTraps||[])if(t.coord===c){const src=t.kind==='spot'?A.structures?.trapSentry:A.structures?.trapHunter;const m=A.img?.(src,'marker-art',t.kind==='spot'?'Armadilha da Sentinela':'Armadilha do Caçador')||document.createElement('span');if(!m.src){m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🕳️';}m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';b.appendChild(m);}for(const f of v.ownFalsePresences||[])if(f.coord===c){const m=A.img?.(A.effects?.phantomPresence,'marker-art false-presence-marker','Presença Fantasma')||document.createElement('span');if(!m.src){m.className='marker false-presence-marker';m.textContent='🧠';}m.title='Sua Presença Fantasma (invisível ao adversário)';b.appendChild(m);}
+        if(corpseAt(v,c)){const m=A.img?.(A.effects?.lapide,'marker-art','Lápide')||document.createElement('span');if(!m.src){m.className='marker corpse';m.textContent='☠️';}m.title='Lápide';appendCornerMarker(b,m,'bl');}
+        if(ownMirrorAt(v,c)){const m=A.img?.(A.effects?.espelho,'marker-art','Espelho')||document.createElement('span');if(!m.src){m.className='marker mirror';m.textContent='🪞';}appendCornerMarker(b,m,'tl');}for(const t of v.ownTraps||[])if(t.coord===c){const src=t.kind==='spot'?A.structures?.trapSentry:A.structures?.trapHunter;const m=A.img?.(src,'marker-art',t.kind==='spot'?'Armadilha da Sentinela':'Armadilha do Caçador')||document.createElement('span');if(!m.src){m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🕳️';}m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';appendCornerMarker(b,m,'tr');}for(const f of v.ownFalsePresences||[])if(f.coord===c){const m=A.img?.(A.effects?.phantomPresence,'marker-art false-presence-marker','Presença Fantasma')||document.createElement('span');if(!m.src){m.className='marker false-presence-marker';m.textContent='🧠';}m.title='Sua Presença Fantasma (invisível ao adversário)';appendCornerMarker(b,m,'tr');}
         const base=baseAt(v,c);if(base){const ownBase=base.owner==='player',src=base.sabotaged?(ownBase?A.structures?.baseSabotagedAlly:A.structures?.baseSabotagedEnemy):(ownBase?A.structures?.baseAlly:A.structures?.baseEnemy);const m=A.img?.(src,'base-art',base.sabotaged?'Posto Sabotado':'Posto de Operação')||document.createElement('span');if(!m.src){m.className='base-icon'+(base.sabotaged?' base-dead':'');m.textContent='🏰';}b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=base.owner==='player'?'SEU':'IA';b.appendChild(lab);}
         const group=ownGroups.get(c)||[];
         if(group.length){
@@ -365,9 +412,9 @@
           const m=makePieceToken(ordered[0],false);b.appendChild(m);addHpBadge(b,ordered[0],false);addDurationBadges(b,ordered[0],false);if(v.activation?.pieceId===ordered[0].id||ordered.some(x=>v.activation?.pieceId===x.id))b.classList.add('active-cell');
           if(ordered[1]){const s2=document.createElement('span');s2.className=`stack-second${ordered[1].activated?' spent-stack':''}`;s2.textContent=ordered[1].icon;b.appendChild(s2);}
         }
-        const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}if(eg.length&&!seer.has(c)){const rm=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Unidade revelada')||document.createElement('span');if(!rm.src){rm.className='marker reveal-marker';rm.textContent='👁️';}rm.title='Unidade revelada';b.appendChild(rm);}
-        if(v.impactCell===c){const m=A.img?.(A.effects?.dano,'marker-art','Dano')||document.createElement('span');if(!m.src){m.className='marker impact';m.textContent='💥';}b.appendChild(m);}if((v.combatCells||[]).includes(c)){const m=A.img?.(A.effects?.confronto,'marker-art','Confronto')||document.createElement('span');if(!m.src){m.className='marker combat-mark';m.textContent='⚔️';}m.title='Confronto Direto ocorreu aqui';b.appendChild(m);}
-        for(const h of v.perceptionHints||[])if(h.coord===c){const m=document.createElement('span');m.className=`presence-hint ${h.kind||'orth'}`;m.textContent=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';m.title=h.knownFalse?'Detecção falsa conhecida — Eco da Presença Fantasma':h.kind==='exact'?'Presença detectada nesta casa':h.kind==='diag'?'Possível presença diagonal':'Possível presença ortogonal';if(h.knownFalse)m.classList.add('known-false');b.appendChild(m);}
+        const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}if(eg.length&&!seer.has(c)){const rm=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Unidade revelada')||document.createElement('span');if(!rm.src){rm.className='marker reveal-marker';rm.textContent='👁️';}rm.title='Unidade revelada';appendCornerMarker(b,rm,'tl');}
+        if(v.impactCell===c){const m=A.img?.(A.effects?.dano,'marker-art','Dano')||document.createElement('span');if(!m.src){m.className='marker impact';m.textContent='💥';}appendCornerMarker(b,m,'bl');}if((v.combatCells||[]).includes(c)){const m=A.img?.(A.effects?.confronto,'marker-art','Confronto')||document.createElement('span');if(!m.src){m.className='marker combat-mark';m.textContent='⚔️';}m.title='Confronto Direto ocorreu aqui';appendCornerMarker(b,m,'br');}
+        for(const h of v.perceptionHints||[])if(h.coord===c){const m=document.createElement('span');m.className=`presence-hint ${h.kind||'orth'}`;m.textContent=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';m.title=h.knownFalse?'Detecção falsa conhecida — Eco da Presença Fantasma':h.kind==='exact'?'Presença detectada nesta casa':h.kind==='diag'?'Possível presença diagonal':'Possível presença ortogonal';if(h.knownFalse)m.classList.add('known-false');appendCornerMarker(b,m,'tr');}
       }
       const p=activePiece(v),a=v.activation;
       if(p&&v.turn==='player'&&!v.pendingCombat){
@@ -401,16 +448,16 @@
     roster.classList.toggle('hidden',v.phase==='play'&&rosterCollapsed);
     rosterFilters.classList.toggle('hidden',v.phase==='play'&&rosterCollapsed);
     teamToggle.textContent=rosterCollapsed?'Ver equipe':'Ocultar equipe';
-    refreshPieceInfo(v);paint(v);renderTurnGuide(v);
+    refreshPieceInfo(v);paint(v);renderTurnGuide(v);renderActionButtons(v);
     flushActionFx(v);applyStateFx(previousFxView,v);previousFxView=snapshotFx(v);
     combatChoice.classList.toggle('hidden',!v.pendingCombat);
     doppelChoiceBox.classList.toggle('hidden',!v.doppelChoice);if(v.doppelChoice)doppelChoiceText.textContent=`Atual: ${v.doppelChoice.current} · Novo: ${v.doppelChoice.newAbility}`;
     advanceCombatBtn.disabled=v.pendingCombat?.canAdvance===false;
     advanceCombatBtn.textContent=v.pendingCombat?.canAdvance===false?'Posição ocupada':'Posição da derrotada';
     pyroConfirm.classList.toggle('hidden',v.activation?.mode!=='pyro');kamikazeBox.classList.toggle('hidden',v.activation?.mode!=='kamikaze');sureShotBox.classList.toggle('hidden',v.activation?.mode!=='sureShotConfirm');paranoiaBox.classList.toggle('hidden',v.activation?.mode!=='paranoiaPresence');if(v.activation?.mode==='paranoiaPresence')paranoiaChoiceText.textContent=`${(v.activation.paranoiaTargets||[]).length}/2 casas escolhidas. Máximo 2 presenças ativas por Paranoia.`;const sa=v.activation;let shieldTarget=null;if(sa?.mode==='shieldLink'&&pendingShieldTargetId)shieldTarget=v.ownPieces.find(x=>x.id===pendingShieldTargetId);if(sa?.mode==='shieldUnlink'){shieldConfirmTitle.textContent='🛡️ Confirmar desvinculação';shieldConfirmText.textContent='Desvincular gastará o turno do Escudeiro.';shieldConfirmBox.classList.remove('hidden');}else if(sa?.mode==='shieldLink'&&shieldTarget){shieldConfirmTitle.textContent='🛡️ Confirmar vínculo';shieldConfirmText.textContent=`Vincular a ${shieldTarget.displayName}. O Escudeiro irá até a casa do aliado e passará a acompanhá-lo.`;shieldConfirmBox.classList.remove('hidden');}else shieldConfirmBox.classList.add('hidden');
-    if(v.gameOver){setStatus(v.result==='player'?'Você venceu.':v.result==='enemy'?'Você perdeu.':'Empate.');const win=v.result==='player',draw=v.result==='draw',cfg=v.matchConfig||currentMatchConfig();Presentation.showEndScreen({key:`classic:${v.result}:${v.round}`,mode:'classic',result:v.result,icon:draw?'⚖️':win?'🏆':'☠️',title:draw?'EMPATE':win?'VITÓRIA':'DERROTA',tone:draw?'draw':win?'victory':'defeat',reason:draw?'As duas equipes chegaram ao próprio limite de perdas na mesma resolução.':win?`O adversário atingiu ${cfg.lossLimit.enemy} perdas originais.`:`Você atingiu ${cfg.lossLimit.player} perdas originais.`,round:v.round,summary:[{label:'Suas perdas',value:`${v.ownOriginalDeaths}/${cfg.lossLimit.player}`},{label:'Perdas inimigas',value:`${v.enemyOriginalDeaths}/${cfg.lossLimit.enemy}`},{label:'Rodadas disputadas',value:v.round}],onReplay:replay&&replay.length>1?()=>window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'}):null});}
+    if(v.gameOver){setStatus(v.result==='player'?'Você venceu.':v.result==='enemy'?'Você perdeu.':'Empate.');const win=v.result==='player',draw=v.result==='draw',cfg=v.matchConfig||currentMatchConfig();Presentation.showEndScreen({key:`classic:${v.result}:${v.round}`,mode:'classic',result:v.result,icon:draw?'⚖️':win?'🏆':'☠️',title:draw?'EMPATE':win?'VITÓRIA':'DERROTA',tone:draw?'draw':win?'victory':'defeat',reason:v.surrenderedBy?(v.surrenderedBy==='player'?'Você desistiu da partida.':'O adversário desistiu da partida.'):draw?'As duas equipes chegaram ao próprio limite de perdas na mesma resolução.':win?`O adversário atingiu ${cfg.lossLimit.enemy} perdas originais.`:`Você atingiu ${cfg.lossLimit.player} perdas originais.`,round:v.round,summary:[{label:'Suas perdas',value:`${v.ownOriginalDeaths}/${cfg.lossLimit.player}`},{label:'Perdas inimigas',value:`${v.enemyOriginalDeaths}/${cfg.lossLimit.enemy}`},{label:'Rodadas disputadas',value:v.round}],onReplay:replay&&replay.length>1?()=>window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'}):null});}
     else {Presentation.hideEndScreen();if(v.turn==='enemy'&&!v.pendingCombat)statusEl.textContent='🤖 Vez da IA...'; else statusEl.textContent=status;}
-    if(replayBtn)replayBtn.classList.toggle('hidden',!(v.gameOver&&replay&&replay.length>1));
+    if(replayBtn)replayBtn.classList.toggle('hidden',!(v.gameOver&&replay&&replay.length>1));if(surrenderBtn)surrenderBtn.classList.toggle('hidden',v.phase!=='play'||v.gameOver);
     return v;
   }
 
@@ -556,6 +603,7 @@
   copyDoppelBtn.addEventListener('click',()=>{const r=player.chooseDoppelCopy(true);setStatus(r.status);render();});
 
   resetBtn.addEventListener('click',()=>{const keepSelected=[...selected],keepPos=new Map(setupPos),keepBases=new Map(setupBasePos),keepDifficulty=aiDifficultyEl?.value||aiDifficulty||'normal';if(replay)replay.clear();previousFxView=null;pendingActionFx=[];aiLastResult=null;aiDifficulty=keepDifficulty;if(aiDifficultyEl)aiDifficultyEl.value=keepDifficulty;referee.reset();selected=keepSelected;setupSelected=null;setupBaseSelected=null;setupPos=keepPos;setupBasePos=keepBases;openedBaseId=null;pendingBaseBonusId=null;pendingShieldTargetId=null;closeBasePanel();seerPreview.clear();seerConfirm.classList.add('hidden');pyroConfirm.classList.add('hidden');hideStackChoice();hideBardChoice();combatChoice.classList.add('hidden');rosterCollapsed=false;rosterFilter='all';filterButtons.forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));inspectedPieceId=null;pieceInfoTitle.textContent='Ficha da unidade';pieceInfoBody.innerHTML='<div class="muted empty-inspector">Clique em uma peça para ver vida, movimento, ataque, alcance, percepção e bônus.</div>';if(setupInspector){setupInspector.classList.add('hidden');setupInspectorBody.innerHTML='';}setStatus('Formação anterior restaurada. Ajuste se quiser e clique em ✓ Pronto para jogar novamente.');render();});
+  if(surrenderBtn)surrenderBtn.addEventListener('click',()=>{const v=view();if(v.phase!=='play'||v.gameOver)return;if(!confirm('Desistir da partida? A partida será encerrada e o Replay ficará disponível.'))return;const r=player.surrender();setStatus(r.status);if(r.ok&&replay)replay.capture('🏳️ Desistência');render();});
   moveBtn.addEventListener('click',()=>{const r=player.startMove();setStatus(r.status);render();});
   stopBtn.addEventListener('click',()=>{const r=player.stopMove();setStatus(r.status);afterMutation();});
   attackBtn.addEventListener('click',()=>{const r=player.startAttack();setStatus(r.status);render();});
