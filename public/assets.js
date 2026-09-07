@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const ASSET_VERSION='?v=1.15.47';
+  const ASSET_VERSION='?v=1.15.49';
   const charMap={
     'Arqueiro':'arqueiro','Ninja':'ninja','Piromante':'piromante','Kamikaze':'kamikaze','Caçador':'cacador','Paranoia':'paranoia',
     'Escudeiro':'escudeiro','Golem':'golem','Golem de Lava':'golem-de-lava','Cavaleiro':'cavaleiro','Slime':'slime','Mini-Slime':'mini-slime','Zumbi':'zumbi','Druida':'druida',
@@ -19,7 +19,7 @@
     percepcao:'assets/effects/percepcao.png',vida:'assets/effects/vida.png',revelada:'assets/effects/casa-revelada.png',confronto:'assets/effects/confronto.png',buff:'assets/effects/buff.png',
     dano:'assets/effects/dano.png',cura:'assets/effects/cura.png',trapAtivada:'assets/effects/armadilha-ativada.png',espelho:'assets/effects/espelho.png',canalizacao:'assets/effects/canalizacao.png',
     vinculo:'assets/effects/vinculo.png',oculto:'assets/effects/oculto.png',explosao:'assets/effects/explosao.png',fogo:'assets/effects/fogo.png',sabotagem:'assets/effects/sabotagem.png',
-    invocacao:'assets/effects/invocacao.png',lapide:'assets/effects/lapide.png',voador:'assets/effects/voador.png'
+    invocacao:'assets/effects/invocacao.png',lapide:'assets/effects/lapide.png',voador:'assets/effects/voador.png',phantomPresence:'assets/effects/presenca-fantasma.png'
   };
   const archetypes={R:'assets/archetypes/vanguarda.png',P:'assets/archetypes/estrategista.png',S:'assets/archetypes/executor.png',J:'assets/archetypes/coringa.png',C:'assets/archetypes/condenado.png'};
   for(const group of [terrain,structures,effects,archetypes]) for(const k of Object.keys(group)) group[k]+=ASSET_VERSION;
