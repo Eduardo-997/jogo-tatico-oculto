@@ -168,7 +168,7 @@
   }
 
   function addFieldMarker(cell,src,cls,title,fallback){
-    if(!cell)return;const wrap=document.createElement('span');wrap.className=`marker ${cls||''}`.trim();wrap.title=title||'';if(src)wrap.appendChild(Assets.img(src,'marker-art',title||''));else wrap.textContent=fallback||'•';cell.appendChild(wrap);
+    if(!cell)return;const wrap=document.createElement('span');wrap.className=`marker ${cls||''}`.trim();wrap.title=title||'';if(src)wrap.appendChild(Assets.img(src,'marker-art',title||''));else wrap.textContent=fallback||'•';let slot=null;if(/Armadilha/i.test(title||'')||cls==='false-presence-marker')slot='tr';else if(cls==='mirror'||cls==='reveal-marker'||cls==='enemy-reveal')slot='tl';else if(cls==='impact'||cls==='corpse')slot='bl';else if(cls==='combat-mark')slot='br';if(slot){const n=cell.querySelectorAll(`.corner-marker.slot-${slot}`).length;wrap.classList.add('corner-marker',`slot-${slot}`);wrap.style.setProperty('--marker-stack',String(n));}cell.appendChild(wrap);
   }
 
   function canMoveInto(state,p,activeSide,c,ps){
@@ -206,7 +206,7 @@
     for(const c of new Set([vs.player.impactCell,vs.enemy.impactCell].filter(Boolean)))addFieldMarker(cells.get(c),Assets.effects?.dano,'impact','Ataque ocorreu aqui','💥');
     for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))addFieldMarker(cells.get(c),Assets.effects?.confronto,'combat-mark','Confronto Direto ocorreu aqui','⚔️');
     const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)addFieldMarker(cells.get(c),Assets.effects?.revelada,'reveal-marker','Casa revelada','👁️');
-    const hints=[...(vs.player.perceptionHints||[]).map(h=>({...h,side:'player'})),...(vs.enemy.perceptionHints||[]).map(h=>({...h,side:'enemy'}))];for(const h of hints){const mark=h.knownFalse?'🧠':h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';cells.get(h.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint ${h.kind||'orth'}${h.knownFalse?' known-false':''}" title="${h.knownFalse?'Detecção falsa conhecida':'PER do Lado '+sideName(h.side)}">${mark}</span>`);}
+    const hints=[...(vs.player.perceptionHints||[]).map(h=>({...h,side:'player'})),...(vs.enemy.perceptionHints||[]).map(h=>({...h,side:'enemy'}))];for(const h of hints){const cell=cells.get(h.coord);if(!cell)continue;const m=document.createElement('span');m.className=`presence-hint ${h.kind||'orth'}${h.knownFalse?' known-false':''}`;m.title=h.knownFalse?'Detecção falsa conhecida':'PER do Lado '+sideName(h.side);m.textContent=h.knownFalse?'🧠':h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';const n=cell.querySelectorAll('.corner-marker.slot-tr').length;m.classList.add('corner-marker','slot-tr');m.style.setProperty('--marker-stack',String(n));cell.appendChild(m);}
     for(const viewer of ['player','enemy'])for(const pieceId of Object.keys(state.spotReveals?.[viewer]||{})){const target=['player','enemy'].flatMap(s=>state.pieces?.[s]||[]).find(x=>x.id===pieceId&&x.alive&&x.coord);if(target)addFieldMarker(cells.get(target.coord),Assets.effects?.revelada,'enemy-reveal',`Revelado ao Lado ${sideName(viewer)} pela armadilha da Sentinela`,'📍');}
   }
 

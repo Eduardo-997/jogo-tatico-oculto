@@ -1,7 +1,7 @@
 {
   "name": "batalha-nas-sombras",
   "private": true,
-  "version": "1.15.54",
+  "version": "1.15.56",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
