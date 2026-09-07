@@ -172,7 +172,7 @@
   }
 
   function canMoveInto(state,p,activeSide,c,ps){
-    if((state.rocks||[]).includes(c)&&!p.flying)return false;const t=treeAt(state,c);if(t&&!p.flying&&!(p.name==='Druida'&&t.state==='live'))return false;if(baseAtState(state,c))return false;
+    if((state.rocks||[]).includes(c)&&!p.flying)return false;const t=treeAt(state,c);if(t?.state==='live'&&!p.flying&&p.name!=='Druida')return false;if(baseAtState(state,c))return false;
     const foes=ps.filter(x=>x.owner!==activeSide);if(foes.length)return true;
     const own=ps.filter(x=>x.owner===activeSide&&x.id!==p.id),isLinker=x=>x?.name==='Escudeiro'||(x?.name==='Doppelgänger'&&x?.copied==='Escudeiro');const follower=ps.find(x=>x.owner===activeSide&&x.alive&&x.linkedToId===p.id);if(follower&&own.length)return false;if(!own.length)return true;if(own.length>=2)return false;return isLinker(p)||own.some(isLinker);
   }
@@ -191,7 +191,7 @@
       if(p&&!mode&&base&&base.owner!==activeSide&&!base.sabotaged&&R.neighbors(base.coord,true).includes(p.coord))b.classList.add('sabotage-zone');
       if(p&&mode){
         if(mode==='absorbRock'&&(state.rocks||[]).includes(c)&&R.neighbors(p.coord,false).includes(c))b.classList.add('highlight');
-        if(mode==='move'&&v.activation.moveRemaining>=(p.flying?1:((R.swampCells||[]).includes(c)?2:1))&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps)){const solid=(state.rocks||[]).includes(c)||!!treeAt(state,c);if(!(p.flying&&solid&&v.activation.moveRemaining<=1))b.classList.add('highlight');}
+        if(mode==='move'&&v.activation.moveRemaining>=(p.flying?1:((R.swampCells||[]).includes(c)?2:1))&&R.neighbors(p.coord,p.diag).includes(c)&&canMoveInto(state,p,activeSide,c,ps)){const solid=(state.rocks||[]).includes(c)||treeAt(state,c)?.state==='live';if(!(p.flying&&solid&&v.activation.moveRemaining<=1))b.classList.add('highlight');}
         if(mode==='attack'&&R.attackCells(p).includes(c))b.classList.add('attack-highlight');
         if(['raise','mirror','awaken','bard'].includes(mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');if(['spotTrap','damageTrap'].includes(mode)&&R.abilityCells(p,true).includes(c))b.classList.add('highlight');
         if(mode==='seer'){if(!seer.length&&R.abilityCells(p,true).includes(c))b.classList.add('highlight','seer-range');else if(seer.length){if(c===seer[0])b.classList.add('highlight','seer-main');else if(R.neighbors(seer[0],false).includes(c))b.classList.add('highlight','seer-next');}}
@@ -205,7 +205,7 @@
     for(const s of ['player','enemy'])for(const x of state.traps?.[s]||[])addFieldMarker(cells.get(x.coord),x.kind==='spot'?Assets.structures?.trapSentry:Assets.structures?.trapHunter,'eye',`Armadilha do Lado ${sideName(s)}`,x.kind==='spot'?'🦉':'🕳️');for(const s of ['player','enemy'])for(const x of state.falsePresences?.[s]||[])addFieldMarker(cells.get(x.coord),Assets.effects?.phantomPresence,'false-presence-marker',`Presença Fantasma do Lado ${sideName(s)}`,'🧠');
     for(const c of new Set([vs.player.impactCell,vs.enemy.impactCell].filter(Boolean)))addFieldMarker(cells.get(c),Assets.effects?.dano,'impact','Ataque ocorreu aqui','💥');
     for(const c of new Set([...(vs.player.combatCells||[]),...(vs.enemy.combatCells||[])]))addFieldMarker(cells.get(c),Assets.effects?.confronto,'combat-mark','Confronto Direto ocorreu aqui','⚔️');
-    const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)addFieldMarker(cells.get(c),Assets.effects?.revelada,'eye','Casa revelada','👁️');
+    const seerCells=new Set([...(vs.player.seerArea||[]),...(vs.enemy.seerArea||[])]);for(const c of seerCells)addFieldMarker(cells.get(c),Assets.effects?.revelada,'reveal-marker','Casa revelada','👁️');
     const hints=[...(vs.player.perceptionHints||[]).map(h=>({...h,side:'player'})),...(vs.enemy.perceptionHints||[]).map(h=>({...h,side:'enemy'}))];for(const h of hints){const mark=h.knownFalse?'🧠':h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';cells.get(h.coord)?.insertAdjacentHTML('beforeend',`<span class="presence-hint ${h.kind||'orth'}${h.knownFalse?' known-false':''}" title="${h.knownFalse?'Detecção falsa conhecida':'PER do Lado '+sideName(h.side)}">${mark}</span>`);}
     for(const viewer of ['player','enemy'])for(const pieceId of Object.keys(state.spotReveals?.[viewer]||{})){const target=['player','enemy'].flatMap(s=>state.pieces?.[s]||[]).find(x=>x.id===pieceId&&x.alive&&x.coord);if(target)addFieldMarker(cells.get(target.coord),Assets.effects?.revelada,'enemy-reveal',`Revelado ao Lado ${sideName(viewer)} pela armadilha da Sentinela`,'📍');}
   }

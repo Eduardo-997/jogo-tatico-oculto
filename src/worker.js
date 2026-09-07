@@ -490,6 +490,7 @@ __refRoot.GameReferee = class GameReferee {
   #cancelMode(side){
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side);if(!a)return this.#fail('Nenhuma peça selecionada.');
+    if(a.mode==='move')return this.#stopMove(side);
     a.mode=null;a.moveRemaining=0;a.pyroTargets=[];a.paranoiaTargets=[];a.kamikazeCells=[];return this.#ok('Ação cancelada. A peça continua selecionada.');
   }
 
@@ -816,6 +817,7 @@ __refRoot.GameReferee = class GameReferee {
   #endActivationRequest(side){
     const bad=this.#validateTurn(side); if(bad)return bad;
     const p=this.#activePiece(side);if(!p)return this.#fail('Selecione uma peça.');
+    const a=this.#activation(side);if(a?.mode==='move'&&this.#R.defOf(p)?.flying&&this.#solidTerrain(p.coord))return this.#fail('Voador precisa sair da Árvore ou Pedra antes de encerrar o turno.');
     this.#commit(side);return this.#finishActivation(side);
   }
 
@@ -979,13 +981,15 @@ const actionMap={
 
 export class GameRoom {
   constructor(ctx,env){
-    this.ctx=ctx;this.env=env;this.referee=new globalThis.GameReferee();this.ready={player:null,enemy:null};this.started=false;this.matchConfig={teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}};
+    this.ctx=ctx;this.env=env;this.referee=new globalThis.GameReferee();this.ready={player:null,enemy:null};this.started=false;this.matchConfig={teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}};this.replayInitialState=null;this.replayActions=[];
     ctx.blockConcurrencyWhile(async()=>{
       const saved=await ctx.storage.get('room');
-      if(saved){this.ready=saved.ready||{player:null,enemy:null};this.started=!!saved.started;this.matchConfig=saved.matchConfig||{teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}};if(saved.gameState)this.referee.importState(saved.gameState);}
+      if(saved){this.ready=saved.ready||{player:null,enemy:null};this.started=!!saved.started;this.matchConfig=saved.matchConfig||{teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}};this.replayInitialState=saved.replayInitialState||null;this.replayActions=Array.isArray(saved.replayActions)?saved.replayActions:[];if(saved.gameState)this.referee.importState(saved.gameState);}
     });
   }
-  async persist(){await this.ctx.storage.put('room',{ready:this.ready,started:this.started,matchConfig:this.matchConfig,gameState:this.referee.exportState()});}
+  resetReplay(){try{this.replayInitialState=this.referee.exportState();this.replayActions=[];}catch(e){console.error('Falha ao iniciar Replay do Clássico Online:',e);this.replayInitialState=null;this.replayActions=[];}}
+  recordReplayAction(side,action){try{if(!['player','enemy'].includes(side)||!action)return false;const copy=typeof structuredClone==='function'?structuredClone(action):JSON.parse(JSON.stringify(action));this.replayActions.push({side,action:copy});return true;}catch(e){console.error('Falha ao registrar ação no Replay do Clássico Online:',e);return false;}}
+  async persist(){await this.ctx.storage.put('room',{ready:this.ready,started:this.started,matchConfig:this.matchConfig,gameState:this.referee.exportState(),replayInitialState:this.replayInitialState,replayActions:this.replayActions});}
   async safePersist(){try{await this.persist();return true;}catch(e){console.error('Falha ao persistir sala Clássico Online:',e);return false;}}
   send(ws,obj){try{ws.send(JSON.stringify(obj));}catch{}}
   sockets(){return this.ctx.getWebSockets();}
@@ -994,7 +998,7 @@ export class GameRoom {
   roomState(){return {type:'roomState',started:this.started,connected:{player:!!this.sideSocket('player'),enemy:!!this.sideSocket('enemy')},ready:{player:!!this.ready.player,enemy:!!this.ready.enemy},matchConfig:this.matchConfig};}
   broadcast(obj){for(const ws of this.sockets())this.send(ws,obj);}
   broadcastRoomState(){this.broadcast(this.roomState());}
-  broadcastViews(){if(!this.started)return;for(const side of ['player','enemy']){const ws=this.sideSocket(side);if(ws)this.send(ws,{type:'view',view:this.referee.createClient(side).getView()});}}
+  broadcastViews(){if(!this.started)return;for(const side of ['player','enemy']){const ws=this.sideSocket(side);if(!ws)continue;let view;try{view=this.referee.createClient(side).getView();this.send(ws,{type:'view',view});}catch(e){console.error('Falha ao gerar visão do Clássico Online para '+side+':',e);continue;}if(view.gameOver&&this.replayInitialState){try{this.send(ws,{type:'classicReplay',initialState:this.replayInitialState,actions:this.replayActions});}catch(e){console.error('Falha ao enviar Replay do Clássico Online:',e);}}}}
   async fetch(request){
     if(request.headers.get('Upgrade')!=='websocket')return new Response('WebSocket required',{status:426});
     const pair=new WebSocketPair();const client=pair[0],server=pair[1];
@@ -1024,14 +1028,14 @@ export class GameRoom {
       if(this.started)return this.send(ws,{type:'result',ok:false,status:'A partida já começou.'});
       const res=this.referee.validateSetup(side,msg.setup,msg.bases,this.matchConfig.teamSize[side]);if(!res.ok)return this.send(ws,{type:'result',ok:false,status:res.status});
       this.ready[side]={setup:msg.setup,bases:msg.bases};this.send(ws,{type:'result',ok:true,status:'Você está pronto. Aguardando o outro jogador.'});
-      if(this.ready.player&&this.ready.enemy){const a=this.ready.player,b=this.ready.enemy;const start=this.referee.startMultiplayerGame(a.setup,a.bases,b.setup,b.bases,this.matchConfig);if(!start.ok)return this.broadcast({type:'result',ok:false,status:start.status});this.started=true;}
+      if(this.ready.player&&this.ready.enemy){const a=this.ready.player,b=this.ready.enemy;const start=this.referee.startMultiplayerGame(a.setup,a.bases,b.setup,b.bases,this.matchConfig);if(!start.ok)return this.broadcast({type:'result',ok:false,status:start.status});this.started=true;this.resetReplay();}
       await this.persist();this.broadcastRoomState();this.broadcastViews();return;
     }
     if(msg.type==='action'){
       if(!this.started)return this.send(ws,{type:'result',ok:false,status:'A partida ainda não começou.'});
       const action=msg.action||{},fn=actionMap[action.type];if(!fn)return this.send(ws,{type:'result',ok:false,status:'Ação desconhecida.'});
       let res;try{res=fn(this.referee.createClient(side),action);}catch(e){console.error(e);res={ok:false,status:'Erro interno ao resolver a ação.'};}
-      await this.safePersist();this.send(ws,{type:'result',...res});this.broadcastViews();return;
+      if(res?.ok)this.recordReplayAction(side,action);await this.safePersist();this.send(ws,{type:'result',...res});this.broadcastViews();return;
     }
     this.send(ws,{type:'error',message:'Tipo de mensagem desconhecido.'});
   }

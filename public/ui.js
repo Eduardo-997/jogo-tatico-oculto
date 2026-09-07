@@ -11,7 +11,7 @@
   const $=s=>document.querySelector(s);
   const roster=$('#roster'),board=$('#board'),historyEl=$('#history'),intelEl=$('#intel'),statusEl=$('#status'),availableEl=$('#available');
   const Presentation=window.BattlePresentation||{battleEvents:a=>a||[],showEndScreen:()=>{},hideEndScreen:()=>{}};
-  const roundEl=$('#round'),countEl=$('#count'),myDeathsEl=$('#myDeaths'),enemyDeathsEl=$('#enemyDeaths'),phaseEl=$('#phase');
+  const roundEl=$('#round'),countEl=$('#count'),myDeathsEl=$('#myDeaths'),enemyDeathsEl=$('#enemyDeaths'),phaseEl=$('#phase'),turnGuide=$('#turnGuide');
   const startBtn=$('#start'),resetBtn=$('#reset'),moveBtn=$('#move'),stopBtn=$('#stop'),attackBtn=$('#attack'),abilityBtn=$('#ability'),endBtn=$('#end'),cancelBtn=$('#cancel'),replayBtn=$('#replayBtn');
   const seerConfirm=$('#seerConfirm'),confirmSeerBtn=$('#confirmSeer'),cancelSeerBtn=$('#cancelSeer');
   const pyroConfirm=$('#pyroConfirm'),confirmPyroBtn=$('#confirmPyro'),cancelPyroBtn=$('#cancelPyro');
@@ -140,6 +140,41 @@
     const c=autoPlaceBase(index);setupBaseSelected=null;setStatus(c?`Posto ${index} entrou automaticamente em ${c}. Clique nele no tabuleiro para ajustar.`:'Não há casa livre para posicionar o Posto.');render();
   }
   function activePiece(v){return v.activation?ownAlive(v).find(p=>p.id===v.activation.pieceId):null;}
+  function pendingTurnStep(v){
+    if(v.pendingCombat)return 'Falta escolher onde o vencedor termina após o Confronto Direto.';
+    if(v.doppelChoice)return 'Doppelgänger aguarda sua decisão: manter a habilidade atual ou copiar a nova.';
+    const a=v.activation,p=activePiece(v);if(!a||!p)return 'Escolha uma unidade disponível para agir.';
+    const name=p.displayName||p.name||'Unidade',mode=a.mode;
+    if(mode==='move')return a.committed?`${name}: ainda está se movendo · ${a.moveRemaining||0} M restante${Number(a.moveRemaining||0)===1?'':'s'}. Mova novamente ou pare o movimento.`:`${name}: movimento preparado. Escolha uma casa para mover ou cancele.`;
+    if(mode==='attack')return `${name}: falta escolher a casa do ataque.`;
+    if(mode==='sureShotConfirm')return `${name}: falta confirmar ou cancelar o Tiro Certeiro.`;
+    if(mode==='pyro'){const n=(a.pyroTargets||[]).length;return `${name}: Rajada Dupla · ${n}/2 casas escolhidas. Escolha 1 ou 2 casas e confirme.`;}
+    if(mode==='paranoiaPresence'){const n=(a.paranoiaTargets||[]).length;return `${name}: Presença Fantasma · ${n}/2 casas escolhidas. Complete as 2 casas e confirme.`;}
+    if(mode==='seer')return `${name}: falta escolher as 2 casas da visão e confirmar.`;
+    if(mode==='kamikaze')return `${name}: Autodestruição preparada. Falta confirmar ou cancelar.`;
+    if(mode==='shieldLink'){const t=pendingShieldTargetId&&v.ownPieces.find(x=>x.id===pendingShieldTargetId);return t?`${name}: falta confirmar o vínculo com ${t.displayName}.`:`${name}: falta escolher um aliado para o vínculo.`;}
+    if(mode==='shieldUnlink')return `${name}: falta confirmar ou cancelar a desvinculação.`;
+    if(mode==='raise')return `${name}: falta escolher um cadáver para a habilidade.`;
+    if(mode==='mirror')return `${name}: falta escolher onde colocar o Espelho.`;
+    if(mode==='awaken')return `${name}: falta escolher uma Árvore para despertar.`;
+    if(mode==='spotTrap')return `${name}: falta escolher onde colocar a armadilha de revelação.`;
+    if(mode==='damageTrap')return `${name}: falta escolher onde colocar a armadilha de dano.`;
+    if(mode==='bard')return `${name}: falta escolher o aliado e o bônus da Inspiração.`;
+    if(mode==='absorbRock')return `${name}: falta escolher a Pedra adjacente para consumir.`;
+    if(p.sureShotActive)return `${name}: Tiro Certeiro já está ativo. Falta atacar com o alcance ampliado ou encerrar o turno.`;
+    if(a.committed)return `${name}: movimento concluído. Ainda falta atacar, usar habilidade, sabotar um Posto ou encerrar o turno.`;
+    return `${name} selecionado. Movimento é opcional; você pode mover, atacar, usar habilidade ou encerrar o turno.`;
+  }
+  function renderTurnGuide(v){
+    if(!turnGuide)return;
+    if(v.phase!=='play'||v.gameOver){turnGuide.className='notice turn-guide hidden';turnGuide.innerHTML='';return;}
+    const mine=v.turn==='player',used=Number(v.roundActivationsUsed||0),limit=Number(v.roundActivationLimit||0),remaining=Math.max(0,limit-used);
+    let title,detail,cls;
+    if(!mine){title='⏳ AGUARDE — VEZ DA IA';detail='A partida continua automaticamente quando a IA terminar.';cls='waiting-turn';}
+    else if(v.activation){const p=activePiece(v);title=`▶ ${(p?.displayName||p?.name||'UNIDADE').toUpperCase()} — TURNO EM ANDAMENTO`;detail=pendingTurnStep(v);cls='your-turn';}
+    else{title='▶ SUA VEZ';detail=used>0&&remaining>0?'Seu turno anterior terminou. Escolha outra unidade disponível.':'Escolha uma unidade disponível para agir.';cls=used>0&&remaining>0?'turn-again':'your-turn';}
+    turnGuide.className=`notice turn-guide ${cls}`;turnGuide.innerHTML=`<div><div class="turn-guide-title">${title}</div><div class="turn-guide-detail">${detail}</div></div><div class="turn-guide-count">Seus turnos na rodada: ${used}/${limit} · restam ${remaining}</div>`;
+  }
   function visibleAt(v,c){return (v.visibleOpponents||[]).filter(p=>p.coord===c);}
   function pieceBonusTags(p){
     const tags=[];
@@ -157,6 +192,7 @@
     const flying=(d.flying&&A.effects?.voador)?`<div class="info-pill flying-trait"><img class="trait-icon" src="${A.effects.voador}" alt="Voador"> <b>Voador</b></div>`:'';const html=`<div class="setup-definition"><div class="piece-info-grid"><div class="info-pill">❤️ Vida: <b>${d.v}</b></div><div class="info-pill">👣 Movimento: <b>${d.m}</b></div><div class="info-pill">⚔️ Ataque: <b>${d.a}</b></div><div class="info-pill">🎯 Alcance: <b>${alc}</b></div><div class="info-pill">👁️ Percepção: <b>PER ${d.per}</b></div><div class="info-pill">✨ Alc. Hab.: <b>${d.ah||0}</b></div><div class="info-pill">Arquétipo: <b>${d.typeIcon} ${R.archetypeName(d.type)}</b></div>${flying}</div><div class="ability-box"><b>Habilidade / característica</b><br>${ABILITY_TEXT[d.name]||'Sem descrição adicional.'}</div></div>`;
     if(setupInspector){setupInspectorTitle.textContent=`${d.icon} ${d.name}`;setupInspectorBody.innerHTML=html;setupInspector.classList.remove('hidden');}
   }
+  function pieceAbilityText(p){const key=p?.copied||p?.displayName||p?.name;return ABILITY_TEXT[key]||ABILITY_TEXT[p?.name]||'Sem habilidade ativa ou característica adicional.';}
   function showPieceInfo(v,p,enemy=false){
     if(!p)return;
     inspectedPieceId=p.id;
@@ -179,6 +215,7 @@
         <div class="info-pill">${kind}</div>
         ${copied}${cd}${lineage}${flying}
       </div>
+      <div class="ability-box"><b>${p.copied?'Habilidade atual — '+p.copied:'Habilidade / característica'}</b><br>${pieceAbilityText(p)}</div>
       <div class="small muted" style="margin-top:9px">Bônus desta unidade:</div>
       <div class="bonus-tags">${tags.length?tags.map(t=>`<span class="bonus-tag">${t}</span>`).join(''):'<span class="small muted">Nenhum bônus nesta unidade.</span>'}</div>
       ${temporary}
@@ -192,7 +229,7 @@
     if(enemy){showPieceInfo(v,enemy,true);return;}
     inspectedPieceId=null;pieceInfoTitle.textContent='Ficha da unidade';pieceInfoBody.innerHTML='<div class="muted empty-inspector">Clique em uma peça para ver vida, movimento, ataque, alcance, percepção e bônus.</div>';
   }
-  function canShareUi(v,p,c){if(((v.rocks||[]).includes(c)&&!p.flying)||baseAt(v,c))return false;const tree=(v.trees||[]).find(t=>t.coord===c);if(tree&&!p.flying&&!(p.name==='Druida'&&tree.state==='live'))return false;const ps=ownAtAll(v,c).filter(x=>x.id!==p.id),isLinker=x=>x?.name==='Escudeiro'||(x?.name==='Doppelgänger'&&x?.copied==='Escudeiro');const follower=ownAtAll(v,p.coord).find(x=>x.alive&&x.linkedToId===p.id);if(follower&&ps.length)return false;if(!ps.length)return true;if(ps.length>=2)return false;return isLinker(p)||ps.some(isLinker);}
+  function canShareUi(v,p,c){if(((v.rocks||[]).includes(c)&&!p.flying)||baseAt(v,c))return false;const tree=(v.trees||[]).find(t=>t.coord===c&&t.state==='live');if(tree&&!p.flying&&p.name!=='Druida')return false;const ps=ownAtAll(v,c).filter(x=>x.id!==p.id),isLinker=x=>x?.name==='Escudeiro'||(x?.name==='Doppelgänger'&&x?.copied==='Escudeiro');const follower=ownAtAll(v,p.coord).find(x=>x.alive&&x.linkedToId===p.id);if(follower&&ps.length)return false;if(!ps.length)return true;if(ps.length>=2)return false;return isLinker(p)||ps.some(isLinker);}
   function hideStackChoice(){stackChoice.classList.add('hidden');stackButtons.innerHTML='';}
   function showStackChoice(v,pieces){
     stackButtons.innerHTML='';
@@ -317,10 +354,10 @@
         const n=setupPos.get(c);if(n){const d=R.byName[n];if(d)b.appendChild(makePieceToken(d,false));if(setupSelected===n)b.classList.add('active-cell');}
         const baseEntry=[...setupBasePos.entries()].find(([,bc])=>bc===c);if(baseEntry){const m=A.img?.(A.structures?.baseAlly,'base-art','Posto de Operação')||document.createElement('span');if(!m.src){m.className='base-icon';m.textContent='🏰';}b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=`P${baseEntry[0]}`;b.appendChild(lab);if(setupBaseSelected===baseEntry[0])b.classList.add('active-cell');}
       }else{
-        if(seer.has(c)){const m=document.createElement('span');m.className='marker eye';m.textContent='👁️';b.appendChild(m);}
+        if(seer.has(c)){const m=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Casa revelada')||document.createElement('span');if(!m.src){m.className='marker reveal-marker';m.textContent='👁️';}m.title='Casa revelada';b.appendChild(m);}
         if(seerPreview.has(c)){const m=document.createElement('span');m.className='marker previewmark';m.textContent='◉';b.appendChild(m);}
         if(corpseAt(v,c)){const m=A.img?.(A.effects?.lapide,'marker-art','Lápide')||document.createElement('span');if(!m.src){m.className='marker corpse';m.textContent='☠️';}b.appendChild(m);}
-        if(ownMirrorAt(v,c)){const m=A.img?.(A.effects?.espelho,'marker-art','Espelho')||document.createElement('span');if(!m.src){m.className='marker mirror';m.textContent='🪞';}b.appendChild(m);}for(const t of v.ownTraps||[])if(t.coord===c){const src=t.kind==='spot'?A.structures?.trapSentry:A.structures?.trapHunter;const m=A.img?.(src,'marker-art',t.kind==='spot'?'Armadilha da Sentinela':'Armadilha do Caçador')||document.createElement('span');if(!m.src){m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🕳️';}m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';b.appendChild(m);}for(const f of v.ownFalsePresences||[])if(f.coord===c){const m=document.createElement('span');m.className='marker false-presence-marker';m.textContent='🧠';m.title='Sua Presença Fantasma (invisível ao adversário)';b.appendChild(m);}
+        if(ownMirrorAt(v,c)){const m=A.img?.(A.effects?.espelho,'marker-art','Espelho')||document.createElement('span');if(!m.src){m.className='marker mirror';m.textContent='🪞';}b.appendChild(m);}for(const t of v.ownTraps||[])if(t.coord===c){const src=t.kind==='spot'?A.structures?.trapSentry:A.structures?.trapHunter;const m=A.img?.(src,'marker-art',t.kind==='spot'?'Armadilha da Sentinela':'Armadilha do Caçador')||document.createElement('span');if(!m.src){m.className='marker';m.textContent=t.kind==='spot'?'🦉':'🕳️';}m.title=t.kind==='spot'?'Sua armadilha de revelação':'Sua armadilha de dano';b.appendChild(m);}for(const f of v.ownFalsePresences||[])if(f.coord===c){const m=A.img?.(A.effects?.phantomPresence,'marker-art false-presence-marker','Presença Fantasma')||document.createElement('span');if(!m.src){m.className='marker false-presence-marker';m.textContent='🧠';}m.title='Sua Presença Fantasma (invisível ao adversário)';b.appendChild(m);}
         const base=baseAt(v,c);if(base){const ownBase=base.owner==='player',src=base.sabotaged?(ownBase?A.structures?.baseSabotagedAlly:A.structures?.baseSabotagedEnemy):(ownBase?A.structures?.baseAlly:A.structures?.baseEnemy);const m=A.img?.(src,'base-art',base.sabotaged?'Posto Sabotado':'Posto de Operação')||document.createElement('span');if(!m.src){m.className='base-icon'+(base.sabotaged?' base-dead':'');m.textContent='🏰';}b.appendChild(m);const lab=document.createElement('span');lab.className='base-label';lab.textContent=base.owner==='player'?'SEU':'IA';b.appendChild(lab);}
         const group=ownGroups.get(c)||[];
         if(group.length){
@@ -328,7 +365,7 @@
           const m=makePieceToken(ordered[0],false);b.appendChild(m);addHpBadge(b,ordered[0],false);addDurationBadges(b,ordered[0],false);if(v.activation?.pieceId===ordered[0].id||ordered.some(x=>v.activation?.pieceId===x.id))b.classList.add('active-cell');
           if(ordered[1]){const s2=document.createElement('span');s2.className=`stack-second${ordered[1].activated?' spent-stack':''}`;s2.textContent=ordered[1].icon;b.appendChild(s2);}
         }
-        const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}
+        const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}if(eg.length&&!seer.has(c)){const rm=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Unidade revelada')||document.createElement('span');if(!rm.src){rm.className='marker reveal-marker';rm.textContent='👁️';}rm.title='Unidade revelada';b.appendChild(rm);}
         if(v.impactCell===c){const m=A.img?.(A.effects?.dano,'marker-art','Dano')||document.createElement('span');if(!m.src){m.className='marker impact';m.textContent='💥';}b.appendChild(m);}if((v.combatCells||[]).includes(c)){const m=A.img?.(A.effects?.confronto,'marker-art','Confronto')||document.createElement('span');if(!m.src){m.className='marker combat-mark';m.textContent='⚔️';}m.title='Confronto Direto ocorreu aqui';b.appendChild(m);}
         for(const h of v.perceptionHints||[])if(h.coord===c){const m=document.createElement('span');m.className=`presence-hint ${h.kind||'orth'}`;m.textContent=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';m.title=h.knownFalse?'Detecção falsa conhecida — Eco da Presença Fantasma':h.kind==='exact'?'Presença detectada nesta casa':h.kind==='diag'?'Possível presença diagonal':'Possível presença ortogonal';if(h.knownFalse)m.classList.add('known-false');b.appendChild(m);}
       }
@@ -354,7 +391,7 @@
     const v=view();
     const cfg=v.matchConfig||currentMatchConfig();countEl.textContent=`${v.phase==='setup'?selected.length:v.ownPieces.filter(p=>p.original).length}/${cfg.teamSize.player}`;
     myDeathsEl.textContent=`${v.ownOriginalDeaths}/${cfg.lossLimit.player}`;enemyDeathsEl.textContent=`${v.enemyOriginalDeaths}/${cfg.lossLimit.enemy}`;roundEl.textContent=v.phase==='play'?v.round:'—';
-    phaseEl.textContent=v.phase==='setup'?'Posicionamento':v.gameOver?'Encerrada':v.turn==='enemy'?'Vez da IA':'Sua vez';
+    phaseEl.textContent=v.phase==='setup'?'Posicionamento':v.gameOver?'Encerrada':v.turn==='enemy'?'Vez da IA':v.activation?`Seu turno · ${activePiece(v)?.displayName||activePiece(v)?.name||'unidade'}`:'Sua vez';
     renderRoster(v);renderAvailable(v);renderList(historyEl,Presentation.battleEvents(v.history),'Nenhum evento importante recente.');
     setupBasesEl.classList.toggle('hidden',v.phase!=='setup');if(setupInspector)setupInspector.classList.toggle('hidden',v.phase!=='setup'||!setupInspectorBody.innerHTML);baseSetupStatus.textContent=`${setupBasePos.size}/2 posicionados`;base1Btn.classList.toggle('selected',setupBaseSelected===1);base2Btn.classList.toggle('selected',setupBaseSelected===2);
     startBtn.classList.toggle('hidden',v.phase!=='setup');if(aiDifficultyEl){aiDifficultyEl.disabled=v.phase!=='setup';aiDifficultyEl.closest('.ai-difficulty')?.classList.toggle('hidden',v.phase!=='setup');}if(matchSettingsEl)matchSettingsEl.classList.toggle('hidden',v.phase!=='setup');
@@ -364,7 +401,7 @@
     roster.classList.toggle('hidden',v.phase==='play'&&rosterCollapsed);
     rosterFilters.classList.toggle('hidden',v.phase==='play'&&rosterCollapsed);
     teamToggle.textContent=rosterCollapsed?'Ver equipe':'Ocultar equipe';
-    refreshPieceInfo(v);paint(v);
+    refreshPieceInfo(v);paint(v);renderTurnGuide(v);
     flushActionFx(v);applyStateFx(previousFxView,v);previousFxView=snapshotFx(v);
     combatChoice.classList.toggle('hidden',!v.pendingCombat);
     doppelChoiceBox.classList.toggle('hidden',!v.doppelChoice);if(v.doppelChoice)doppelChoiceText.textContent=`Atual: ${v.doppelChoice.current} · Novo: ${v.doppelChoice.newAbility}`;

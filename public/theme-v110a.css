@@ -142,8 +142,10 @@ button:disabled{filter:saturate(.5);opacity:.48;cursor:not-allowed}
 
 /* v1.10-C — acabamento de interface */
 .marker.mirror{
-  right:-2px;
-  top:-4px;
+  left:50%;
+  top:50%;
+  right:auto;
+  transform:translate(-50%,-50%);
   font-size:22px;
   line-height:1;
   filter:drop-shadow(0 2px 2px rgba(0,0,0,.8));

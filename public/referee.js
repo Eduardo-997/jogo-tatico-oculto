@@ -355,6 +355,7 @@ __refRoot.GameReferee = class GameReferee {
   #cancelMode(side){
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side);if(!a)return this.#fail('Nenhuma peça selecionada.');
+    if(a.mode==='move')return this.#stopMove(side);
     a.mode=null;a.moveRemaining=0;a.pyroTargets=[];a.paranoiaTargets=[];a.kamikazeCells=[];return this.#ok('Ação cancelada. A peça continua selecionada.');
   }
 
@@ -681,6 +682,7 @@ __refRoot.GameReferee = class GameReferee {
   #endActivationRequest(side){
     const bad=this.#validateTurn(side); if(bad)return bad;
     const p=this.#activePiece(side);if(!p)return this.#fail('Selecione uma peça.');
+    const a=this.#activation(side);if(a?.mode==='move'&&this.#R.defOf(p)?.flying&&this.#solidTerrain(p.coord))return this.#fail('Voador precisa sair da Árvore ou Pedra antes de encerrar o turno.');
     this.#commit(side);return this.#finishActivation(side);
   }
 
