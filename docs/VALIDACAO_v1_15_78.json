@@ -1,0 +1,22 @@
+{
+  "version": "1.15.78",
+  "base": "1.15.77",
+  "scope": ["Clássico solo", "Clássico Online", "Arena solo", "Arena Online", "Treino"],
+  "generalsGameplayAudited": false,
+  "releaseTests": {"command": "npm run test:release", "passed": 513, "failed": 0, "skipped": 0, "newTests": 22},
+  "structure": {"javascriptFiles": 45, "htmlReferences": 95, "dynamicImageReferences": 70, "missingReferences": 0, "duplicateHtmlIds": 0, "generatedParity": true},
+  "newSimulations": {
+    "executedBase": "1.15.77",
+    "gameplaySourcesIdenticalToCandidate": true,
+    "seedOffset": 77000,
+    "checkpointEveryAction": true,
+    "classic": {"games": 160, "completed": 160, "actions": 36349, "invalid": 0, "invariants": 0, "limitExceeded": 0, "opponent": "stationary human test driver"},
+    "arena": {"games": 240, "completed": 239, "actions": 106178, "invalid": 0, "invariants": 0, "limitExceeded": 1, "opponent": "three AIs"},
+    "candidateReproduction": {"seed": 227054, "difficulty": "easy", "actions": 5000, "invalid": 0, "invariants": 0, "gameOver": false, "observed": "same archetype survivors, one side ATQ0 only, other side sole ATQ1 unit has M0; valid play continues"}
+  },
+  "fixes": ["Clear stale Classic Online game and preparation when switching rooms", "Clear Classic preparation when assigned a different side", "Clear stale Arena Online game and preparation when switching rooms"],
+  "realBrowserTested": false,
+  "cloudflareFunctionalTested": false,
+  "published": false,
+  "balanceOrDrawRulesChanged": false
+}

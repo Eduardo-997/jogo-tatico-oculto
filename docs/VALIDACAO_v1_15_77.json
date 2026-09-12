@@ -1,0 +1,10 @@
+{
+  "version": "1.15.77",
+  "base": "1.15.76",
+  "tests": {"passed": 523, "failed": 0, "skipped": 0},
+  "validation": {"javascriptFiles": 44, "htmlReferences": 95, "dynamicImageReferences": 70, "missingReferences": 0, "duplicateIds": 0, "generatedParity": true},
+  "newRegressions": ["Clássico Online: ambos Pronto, visão filtrada com lado correto e reconexão", "Handler real da interface aceita visão própria e recusa lado ausente ou adversário"],
+  "realBrowserTested": false,
+  "cloudflareFunctionalTested": false,
+  "published": false
+}

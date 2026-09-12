@@ -1,0 +1,10 @@
+{
+  "version": "1.15.79",
+  "tests": {"total": 569, "passed": 569, "failed": 0},
+  "generalsUncapped": {"observations": 200, "naturalEndings": 193, "actionCeilingReached": 7, "actions": 80328, "invalidActions": 0, "invariantFailures": 0},
+  "generalsRoundCapped": {"observations": 80, "ended": 80, "roundLimit": 200, "actions": 23676, "invalidActions": 0, "invariantFailures": 0, "note": "Reexecução de configurações 1x1 e 2x5; inclui encerramentos de observação sem vencedor, não somente vitórias naturais."},
+  "realBrowserTest": false,
+  "onlineTests": "WebSocket/Durable Objects mocks",
+  "balanceChanged": false,
+  "deploymentTarget": "Eduardo-997/jogo-tatico-oculto"
+}

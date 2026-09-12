@@ -1,5 +1,5 @@
 // Proteções compartilhadas pelos dois Durable Objects. Tokens nunca entram nas visões/replays.
-export function activeSocket(room,side){return room.sockets().find(ws=>(ws.readyState==null||ws.readyState===1)&&room.attachment(ws).side===side)||null;}
+export function activeSocket(room,side){return room.sockets().find(ws=>(ws.readyState==null||ws.readyState===1)&&(room.attachment(ws).side===side||(room.generals&&room.attachment(ws).controlledSides?.includes(side))))||null;}
 export function readMessage(room,ws,raw){
   const bytes=typeof raw==='string'?new TextEncoder().encode(raw).byteLength:raw?.byteLength;
   if(!Number.isFinite(bytes)||bytes>16384){room.send(ws,{type:'error',message:'Mensagem grande demais.'});try{ws.close(1009,'Limite de mensagem');}catch{}return null;}
@@ -46,7 +46,9 @@ export async function joinSeat(room,ws,msg,sides){
   if(room.attachment(ws).side)return;
   room.seatTokens??={};
   const token=typeof msg.seatToken==='string'?msg.seatToken:'';
+  if(room.generals&&msg.both===true&&!token&&sides.some(s=>room.seatTokens[s]||activeSocket(room,s))){room.send(ws,{type:'error',message:'Para controlar ambos, use uma sala nova e vazia.'});return;}
   let chosen=token?sides.find(side=>room.seatTokens[side]===token):null;
+  if(room.generals&&msg.both===true&&!token)chosen=sides[0];
   if(token&&!chosen){room.send(ws,{type:'error',message:'A reconexão não corresponde a esta sala. Confira o código ou use uma nova sala.'});try{ws.close(1008,'Reconexão inválida');}catch{}return;}
   if(!chosen&&!room.started){
     if(room.generals&&msg.side!=null){
@@ -58,11 +60,14 @@ export async function joinSeat(room,ws,msg,sides){
   if(!chosen&&room.started)chosen=sides.find(side=>(room.legacySeats||[]).includes(side)&&!room.seatTokens[side]&&!activeSocket(room,side));
   if(!chosen){room.send(ws,{type:'error',message:room.started?'Partida já iniciada. Reconecte pelo navegador original ou use outro código de sala.':'Sala cheia.'});try{ws.close(1008,'Assento indisponível');}catch{}return;}
   const old=activeSocket(room,chosen),newToken=token||crypto.randomUUID();
+  const controlledSides=room.generals&&(msg.both===true&&!token||token&&sides.every(s=>room.seatTokens[s]===token))?[...sides]:[chosen];
+  const oldTokens=structuredClone(room.seatTokens);
   const previous=room.seatTokens[chosen];room.seatTokens[chosen]=newToken;
+  for(const s of controlledSides)room.seatTokens[s]=newToken;
   const legacy=room.legacySeats||[];room.legacySeats=legacy.filter(side=>side!==chosen);
-  try{await room.persist();}catch(err){room.seatTokens[chosen]=previous;room.legacySeats=legacy;room.send(ws,{type:'error',message:'Não foi possível reservar seu lugar. Tente novamente.'});return;}
+  try{await room.persist();}catch(err){room.seatTokens=oldTokens;room.legacySeats=legacy;room.send(ws,{type:'error',message:'Não foi possível reservar seu lugar. Tente novamente.'});return;}
   if(old&&old!==ws){old.serializeAttachment({...room.attachment(old),side:null});try{old.close(1000,'Reconectado em outra conexão');}catch{}}
-  ws.serializeAttachment({...room.attachment(ws),side:chosen});
-  room.send(ws,{type:'joined',room:String(msg.room||'').slice(0,16),side:chosen,seatToken:newToken,preparation:room.started?null:(room.ready[chosen]||null)});
+  ws.serializeAttachment({...room.attachment(ws),side:chosen,...(room.generals?{controlledSides}:{})});
+  room.send(ws,{type:'joined',room:String(msg.room||'').slice(0,16),side:chosen,seatToken:newToken,preparation:room.started?null:(room.ready[chosen]||null),...(room.generals?{controlledSides,preparations:room.started?null:Object.fromEntries(controlledSides.map(s=>[s,room.ready[s]||null]))}:{})});
   room.broadcastRoomState();if(room.started)room.broadcastViews();
 }

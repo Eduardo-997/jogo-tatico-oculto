@@ -214,10 +214,15 @@
   function hideBardChoice(){bardChoiceBox.classList.add('hidden');bardChoiceButtons.innerHTML='';}
 
   let reconnectTimer=null,reconnectAttempts=0;
+  function clearOnlineRoom(){
+    currentView=null;roomState=null;readyMe=false;side=null;selected=[];setupPos.clear();setupBasePos.clear();setupSelected=null;setupBaseSelected=null;
+    seerPreview.clear();pendingShieldTargetId=null;onlineReplayFrames=[];previousFxView=null;turnGuideSticky='';closeBasePanel();hideBardChoice();hideStackChoice();
+  }
   function connect(reconnecting=false){
     if(joined)return;
-    clearTimeout(reconnectTimer);room=window.BNSOnlineSession.normalize(roomCode.value);
+    clearTimeout(reconnectTimer);const previousRoom=room;room=window.BNSOnlineSession.normalize(roomCode.value);
     if(!room)return;roomCode.value=room;
+    if(previousRoom&&previousRoom!==room)clearOnlineRoom();
     const scheme=location.protocol==='https:'?'wss':'ws';
     if(!location.host){connectionStatus.textContent='Abra esta página pelo servidor do projeto, não como arquivo local.';return;}
     if(!reconnecting)reconnectAttempts=0;
@@ -232,6 +237,7 @@
     socket.onerror=()=>{if(ws===socket)connectionStatus.textContent='Erro de conexão.';};
     socket.onmessage=e=>{if(ws!==socket)return;let m;try{m=JSON.parse(e.data);}catch{return;}if(!m||typeof m!=='object')return;
       if(m.type==='joined'){
+        if(side&&side!==m.side)clearOnlineRoom();
         reconnectAttempts=0;window.BNSOnlineSession.remember('classic',room,m.seatToken);if(m.preparation){selected=m.preparation.setup.map(x=>x.name);setupPos=new Map(m.preparation.setup.map(x=>[x.coord,x.name]));setupBasePos=new Map(m.preparation.bases.map((c,i)=>[i+1,c]));}previousFxView=null;onlineReplayFrames=[];turnGuideSticky='';joined=true;side=m.side;room=m.room;roomLabel.textContent=room;sideLabel.textContent=side==='player'?'Jogador 1':'Jogador 2';connectionStatus.textContent=`Conectado como ${sideLabel.textContent}`;connection.classList.add('connected');joinRoom.disabled=true;roomCode.disabled=true;gameArea.classList.remove('hidden');buildBoard();setStatus('Seu lugar está reservado neste navegador.');render();
       }else if(m.type==='roomState'){roomState=m;if(m.matchConfig)applyOnlineConfig(m.matchConfig,true);readyMe=!!m.ready?.[side]||!!m.started;render();
       }else if(m.type==='view'){

@@ -1,8 +1,10 @@
-Batalha nas Sombras v1.15.76 — TESTE GIT
+Batalha nas Sombras v1.15.78 — TESTE GIT
 
-Base: v1.15.75; novo modo Generais no tabuleiro Clássico (local e Online).
+Base: v1.15.77; revisão de início/jogabilidade sem Generais.
+Corrige estado antigo ao trocar de sala no Clássico e na Arena Online.
+O servidor identifica o lado na visão enviada, preservando informação oculta.
 Inclui recuperação local, identificação de unidades e Rendição junto das ações.
-Estado completo: SAVE_PROJETO_v1_15_76.md; SAVEs anteriores são históricos.
+Estado completo: SAVE_PROJETO_v1_15_78.md; SAVEs anteriores são históricos.
 Histórico antigo: docs/HISTORICO_DEPLOY_ATE_v1_15_70.txt.
 
 EXECUÇÃO E PUBLICAÇÃO
@@ -13,8 +15,8 @@ EXECUÇÃO E PUBLICAÇÃO
   globais do ZIP. Online precisa do servidor, como os outros modos Online.
 - Arquivos abertos diretamente por file:// não fornecem o servidor WebSocket.
 - Publicar somente com autorização explícita do usuário.
-- A v1.15.75 está publicada no repositório Eduardo-997/jogo-tatico-oculto;
-  esta v1.15.76 ainda não foi publicada. Não assumir autorização anterior
+- A v1.15.76 está publicada no repositório Eduardo-997/jogo-tatico-oculto;
+  esta v1.15.78 ainda não foi publicada. Não assumir autorização anterior
   de deploy como autorização para publicar automaticamente toda versão.
 - Clássico contra IA e Arena solo salvam a partida em sessionStorage nesta
   aba desde a v1.15.73; atualizar a página tenta recuperar o estado.
@@ -49,9 +51,15 @@ FONTES E SINCRONIZAÇÃO
   sem novos bindings ou migrações de Durable Objects. IA avança por alarmes.
 
 VALIDAÇÃO
-- v1.15.76: 521 testes passaram, 44 arquivos JS/MJS válidos, 95 referências
+- v1.15.78: npm run test:release (sem Generais): 513 testes passaram,
+  45 arquivos JS/MJS válidos, 95 referências
   HTML e 70 referências dinâmicas de assets existentes.
-- Resultado atual: docs/VALIDACAO_v1_15_76.json.
+- Resultado atual: docs/VALIDACAO_v1_15_78.json.
+- Novas simulações na base 77 (fontes de jogabilidade idênticas à 78):
+  Clássico 160/160 encerradas, Arena 239/240, zero ações inválidas ou
+  invariantes quebrados. Uma Arena atingiu 5.000 ações em impasse tático,
+  reproduzido na candidata. Veja SAVE 78: não houve regra de empate nova.
+- As simulações de Generais abaixo foram feitas na v1.15.76, não neste hotfix.
 - GAMES=40 RESTORE=1 SEED_OFFSET=40000 npm run simulate:generals:
   160 partidas IA x IA, 160 encerradas; 43.919 ações sem ações inválidas,
   ocupação/vínculos ilegais ou travamentos na bateria. Recuperação a cada

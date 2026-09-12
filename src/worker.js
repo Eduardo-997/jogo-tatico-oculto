@@ -1,6 +1,6 @@
 import {TriReferee,TriAI,applyTriAction,TRI_SIDES} from './tri-core.js';
 import {activeSocket,readMessage,enqueue,joinSeat,loadReplay,persistReplay,checkpoint,restore,commit} from './room-protocol.js';
-import {defaultGeneralControl,makeGeneralBrains,brainSnapshots,generalStep} from '../public/generals-core.mjs';
+import {defaultGeneralControl,makeGeneralBrains,brainSnapshots,generalStep,finishGeneralObservation} from '../public/generals-core.mjs';
 // Batalha nas Sombras — Cloudflare Worker + Durable Objects (fontes sincronizadas).
 // Regras e árbitro mantidos autoritativos no servidor para o X1.
 'use strict';
@@ -1055,18 +1055,19 @@ export class GameRoom {
   sockets(){return this.ctx.getWebSockets();}
   attachment(ws){try{return ws.deserializeAttachment()||{};}catch{return {};}}
   sideSocket(side){return activeSocket(this,side);}
-  roomState(){return {type:'roomState',generals:this.generals,generalControl:this.generals?this.generalControl:undefined,started:this.started,connected:{player:!!this.sideSocket('player'),enemy:!!this.sideSocket('enemy')},ready:{player:!!this.ready.player,enemy:!!this.ready.enemy},matchConfig:this.matchConfig};}
+  roomState(){return {type:'roomState',generals:this.generals,generalControl:this.generals?{...this.generalControl,latest:undefined}:undefined,started:this.started,connected:{player:!!this.sideSocket('player'),enemy:!!this.sideSocket('enemy')},ready:{player:!!this.ready.player,enemy:!!this.ready.enemy},matchConfig:this.matchConfig};}
   broadcast(obj){for(const ws of this.sockets())this.send(ws,obj);}
   broadcastRoomState(){this.broadcast(this.roomState());}
-  broadcastViews(){if(!this.started)return;for(const side of ['player','enemy']){const ws=this.sideSocket(side);if(!ws)continue;let view;try{view=this.referee.createClient(side).getView();if(this.generals)this.send(ws,{type:'generalView',state:JSON.parse(this.referee.exportState()),control:this.generalControl});else this.send(ws,{type:'view',view});}catch(e){console.error('Falha ao gerar visão do Clássico Online para '+side+':',e);continue;}if(view.gameOver&&this.replayInitialState){try{this.send(ws,{type:'classicReplay',initialState:this.replayInitialState,actions:this.replayActions});}catch(e){console.error('Falha ao enviar Replay do Clássico Online:',e);}}}}
+  broadcastViews(){if(!this.started)return;const sent=new Set();for(const side of ['player','enemy']){const ws=this.sideSocket(side);if(!ws||sent.has(ws))continue;sent.add(ws);let view;try{view=this.referee.createClient(side).getView();if(this.generals)this.send(ws,{type:'generalView',state:JSON.parse(this.referee.exportState()),control:this.generalControl});else this.send(ws,{type:'view',view:{...view,side}});}catch(e){console.error('Falha ao gerar visão do Clássico Online para '+side+':',e);continue;}if(view.gameOver&&this.replayInitialState){try{this.send(ws,{type:'classicReplay',initialState:this.replayInitialState,actions:this.replayActions});}catch(e){console.error('Falha ao enviar Replay do Clássico Online:',e);}}}}
   async scheduleGenerals(){if(this.generals&&this.started&&!this.generalControl.paused&&!JSON.parse(this.referee.exportState()).gameOver)await this.ctx.storage.setAlarm(Date.now()+this.generalControl.delay);}
   async generalTick(){
     if(!this.generals||!this.started||JSON.parse(this.referee.exportState()).gameOver)return;
     const before=checkpoint(this),control=structuredClone(this.generalControl),saved=brainSnapshots(this.generalBrains);
     try{
-      const step=generalStep(this.referee,this.generalBrains);
+      const step=generalStep(this.referee,this.generalBrains,this.generalControl);
       if(!step.result?.ok)throw Error(step.result?.status||'Ação inválida');
       this.recordReplayAction(step.side,step.action);
+      if(step.observation)this.generalControl.latest={...step.observation,id:this.replayActions.length};
       await this.persist();
     }catch(err){
       restore(this,before);this.generalControl={...control,paused:true,error:'IA pausada: '+String(err.message).slice(0,180)};this.generalBrains=makeGeneralBrains(control,saved);
@@ -1080,6 +1081,16 @@ export class GameRoom {
   async generalMessage(ws,msg,side){
     if(msg.type==='generalControl'){
       if(!this.started)return this.send(ws,{type:'result',ok:false,status:'Aguarde ambos confirmarem Pronto.'});
+      if(['finish','cancelFinish'].includes(msg.command)){
+        if(JSON.parse(this.referee.exportState()).gameOver)return this.send(ws,{type:'result',ok:false,status:'A observação já terminou.'});
+        const before=checkpoint(this),old=structuredClone(this.generalControl),owned=this.attachment(ws).controlledSides||[side];
+        this.generalControl.finishVotes={...this.generalControl.finishVotes};for(const s of owned)this.generalControl.finishVotes[s]=msg.command==='finish';
+        let result={ok:true,status:'Pedido de encerramento atualizado. Os dois generais precisam concordar.'};
+        if(['player','enemy'].every(s=>this.generalControl.finishVotes[s])){result=finishGeneralObservation(this.referee);if(result.ok)this.recordReplayAction(side,{type:'observerFinish'});}
+        if(!await this.safePersist()){restore(this,before);this.generalControl=old;return this.send(ws,{type:'result',ok:false,status:'Não foi possível salvar o encerramento.'});}
+        if(JSON.parse(this.referee.exportState()).gameOver)await this.ctx.storage.deleteAlarm();
+        this.send(ws,{type:'result',...result});this.broadcastRoomState();this.broadcastViews();return true;
+      }
       if(!['pause','resume','step','speed'].includes(msg.command))return this.send(ws,{type:'result',ok:false,status:'Controle inválido.'});
       if(msg.command==='speed'&&![150,600,1200].includes(msg.delay))return this.send(ws,{type:'result',ok:false,status:'Velocidade inválida.'});
       const previous=structuredClone(this.generalControl);
@@ -1117,15 +1128,20 @@ export class GameRoom {
   async webSocketMessage(ws,message){const msg=readMessage(this,ws,message);if(!msg)return;if((this.pendingMessages||0)>=64)return this.send(ws,{type:'error',message:'Sala ocupada. Aguarde a resolução das ações.'});return enqueue(this,()=>this.processMessage(ws,msg));}
   async processMessage(ws,msg){
     if(ws.readyState!=null&&ws.readyState!==1)return;
-    const att=this.attachment(ws);const side=att.side;
+    const att=this.attachment(ws);let side=att.side;
+    if(this.generals&&['ready','unready','generalDifficulty','action'].includes(msg.type)&&msg.side!=null){
+      if(!(att.controlledSides||[att.side]).includes(msg.side))return this.send(ws,{type:'result',ok:false,status:'Esse exército não pertence ao seu general.'});
+      side=msg.side;
+    }
     if(msg.type==='join'){await joinSeat(this,ws,msg,['player','enemy']);if(this.attachment(ws).side)await this.scheduleGenerals();return;}
     if(!side)return this.send(ws,{type:'error',message:'Entre na sala primeiro.'});
     if(msg.type==='ping')return this.send(ws,{type:'pong'});
     if(this.generals&&['generalControl','generalDifficulty','action'].includes(msg.type)){await this.generalMessage(ws,msg,side);return;}
     if(msg.type==='setMatchConfig'){
-      if(this.generals)return this.send(ws,{type:'result',ok:false,status:'Generais usa a formação padrão: 4 peças e 2 Postos por lado.'});
       if(this.started)return this.send(ws,{type:'result',ok:false,status:'As configurações da partida já estão travadas.'});
       if(side!=='player')return this.send(ws,{type:'result',ok:false,status:'As configurações da partida são definidas pelo Jogador 1.'});
+      if(this.generals&&msg.roundLimit!=null&&(!Number.isInteger(msg.roundLimit)||msg.roundLimit<0||msg.roundLimit>500))return this.send(ws,{type:'result',ok:false,status:'Limite de rodadas inválido (0 a 500).'});
+      if(this.generals){const before=checkpoint(this),old=structuredClone(this.generalControl);this.matchConfig=this.referee.normalizeMatchConfig(msg.config||{});this.generalControl.roundLimit=msg.roundLimit??this.generalControl.roundLimit??0;this.ready={player:null,enemy:null};if(!await this.safePersist()){restore(this,before);this.generalControl=old;this.send(ws,{type:'result',ok:false,status:'Não foi possível salvar a configuração.'});this.broadcastRoomState();return;}this.broadcastRoomState();this.send(ws,{type:'result',ok:true,status:'Exércitos e limite da observação atualizados.'});return;}
       const before=checkpoint(this);this.matchConfig=this.referee.normalizeMatchConfig(msg.config||{});this.ready={player:null,enemy:null};if(!await commit(this,before,ws))return;this.broadcastRoomState();this.send(ws,{type:'result',ok:true,status:'Configurações da partida atualizadas.'});return;
     }
     if(msg.type==='unready'){
@@ -1148,7 +1164,7 @@ export class GameRoom {
   }
   async webSocketClose(ws){return enqueue(this,()=>this.closeSocket(ws));}
   async closeSocket(ws){
-    const side=this.attachment(ws).side;if(side&&!this.started&&!this.sideSocket(side)){this.ready[side]=null;await this.safePersist();}
+    const side=this.attachment(ws).side;if(side&&!this.generals&&!this.started&&!this.sideSocket(side)){this.ready[side]=null;await this.safePersist();}
     this.broadcastRoomState();
   }
   async webSocketError(ws){this.broadcastRoomState();}
@@ -1225,7 +1241,7 @@ export class TriGameRoom {
     this.send(ws,{type:'error',message:'Tipo desconhecido.'});
   }
   async webSocketClose(ws){return enqueue(this,()=>this.closeSocket(ws));}
-  async closeSocket(ws){const side=this.attachment(ws).side;if(side&&!this.started&&!this.sideSocket(side)){this.ready[side]=null;await this.safePersist();}this.broadcastRoomState();}
+  async closeSocket(ws){const side=this.attachment(ws).side;if(side&&!this.generals&&!this.started&&!this.sideSocket(side)){this.ready[side]=null;await this.safePersist();}this.broadcastRoomState();}
   async webSocketError(ws){this.broadcastRoomState();}
 }
 

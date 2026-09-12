@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
 import {GameRoom,TriGameRoom} from '../src/worker.js';
 import {enqueue,loadReplay,persistReplay} from '../src/room-protocol.js';
 
@@ -13,6 +15,27 @@ class Socket{
 }
 function context(saved,prefix){const data=new Map(saved?[[prefix,structuredClone(saved)]]:[]),ctx={sockets:[],storage:{async get(k){return structuredClone(data.get(k));},async put(k,v){if(typeof k==='object'){for(const [key,value] of Object.entries(k))data.set(key,structuredClone(value));}else data.set(k,structuredClone(v));}},blockConcurrencyWhile(fn){ctx.init=fn();},getWebSockets(){return ctx.sockets;}};return ctx;}
 const send=(room,ws,msg)=>room.webSocketMessage(ws,JSON.stringify(msg));
+test('Interface Clássico Online: aplica visão do próprio lado e rejeita lado ausente ou adversário',()=>{
+  const src=fs.readFileSync(new URL('../public/multiplayer-ui.js',import.meta.url),'utf8'),marker="}else if(m.type==='view'){";
+  const body=src.slice(src.indexOf(marker)+marker.length,src.indexOf("}else if(m.type==='classicReplay'){"));
+  for(const side of ['player','enemy']){
+    let draws=0;const context={side,currentView:null,rosterCollapsed:false,closeBasePanel(){},hideBardChoice(){},seerPreview:new Set(),seerConfirm:{classList:{add(){}}},render(){draws++;},setStatus(){}};
+    const apply=view=>{context.m={view};vm.runInNewContext('(function(){'+body+'})()',context);};
+    apply({phase:'play'});assert.equal(draws,0);assert.equal(context.currentView,null);
+    apply({side,phase:'play'});assert.equal(draws,1);assert.equal(context.currentView.side,side);
+    apply({side:side==='player'?'enemy':'player',phase:'play'});assert.equal(draws,1);assert.equal(context.currentView.side,side);
+  }
+});
+test('Clássico Online: ambos Prontos recebem visão identificada que a interface aceita',async()=>{
+  const ctx=context(),room=new GameRoom(ctx,{});await ctx.init;
+  const a=new Socket(),b=new Socket();ctx.sockets.push(a,b);
+  for(const ws of [a,b])await send(room,ws,{type:'join',room:'TEST'});
+  const names=['Ninja','Cavaleiro','Bardo','Fantasma'];
+  for(const [ws,coords,bases]of [[a,['A2','C2','E2','H2'],['B1','G1']],[b,['H7','F7','D7','A7'],['G8','B8']]])await send(room,ws,{type:'ready',setup:names.map((name,i)=>({name,coord:coords[i]})),bases});
+  assert.equal(room.started,true);
+  for(const ws of [a,b]){const view=ws.last('view').view;assert.equal(view.phase,'play');assert.equal(view.side,ws.att.side);assert.equal(view.visibleOpponents.length,0);assert.equal(view.ownPieces.length,4);}
+  const aa=new Socket();ctx.sockets.push(aa);await send(room,aa,{type:'join',room:'TEST',seatToken:a.last('joined').seatToken});assert.equal(aa.last('view').view.side,'player');
+});
 for(const [Class,sides,prefix] of [[GameRoom,['player','enemy'],'room'],[TriGameRoom,['A','B'],'triRoom']]){
   const label=Class.name;
   async function make(saved){const ctx=context(saved,prefix),room=new Class(ctx,{});await ctx.init;return{ctx,room};}

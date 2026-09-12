@@ -29,6 +29,7 @@ const totals={games:0,completed:0,actions:0,invalid:0,stalled:0,maxRound:0,invar
 const originalRandom=Math.random;
 const seeded=seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
 for(const [di,difficulty] of difficulties.entries()){
+  if(process.env.DIFFICULTY&&process.env.DIFFICULTY!==difficulty)continue;
   for(let game=0;game<Math.max(1,Number(process.env.GAMES)||30);game++){
     const seed=150000+(Number(process.env.SEED_OFFSET)||0)+di*1000+game;Math.random=seeded(seed);
     const ref=new T.TriReferee(),a=ref.autoSetup('A',difficulty,4),start=ref.startSolo(a.setup,a.bases,{B:difficulty,C:difficulty});
@@ -51,7 +52,7 @@ for(const [di,difficulty] of difficulties.entries()){
     }
     totals.games++;
     const end=JSON.parse(ref.exportState());totals.maxRound=Math.max(totals.maxRound,end.round||0);
-    if(end.gameOver){totals.completed++;totals.results[end.result]=(totals.results[end.result]||0)+1;}else{totals.stalled++;totals.stallDetails=totals.stallDetails||[];totals.stallDetails.push({difficulty,game,seed,round:end.round,turn:end.turn,alive:Object.fromEntries(T.TRI_SIDES.map(x=>[x,end.pieces[x].filter(p=>p.alive).map(p=>({id:p.id,name:p.name,identity:p.identity,coord:p.coord,hp:p.hp,linkedToId:p.linkedToId,copied:p.copied}))])),bases:end.bases,history:Object.fromEntries(T.TRI_SIDES.map(x=>[x,end.history[x].slice(0,8)]))});}
+    if(end.gameOver){totals.completed++;totals.results[end.result]=(totals.results[end.result]||0)+1;}else{totals.stalled++;totals.stallDetails=totals.stallDetails||[];totals.stallDetails.push({difficulty,game,seed,round:end.round,turn:end.turn,alive:Object.fromEntries(T.TRI_SIDES.map(x=>[x,end.pieces[x].filter(p=>p.alive).map(p=>({id:p.id,name:p.name,identity:p.identity,coord:p.coord,hp:p.hp,linkedToId:p.linkedToId,copied:p.copied}))])),combatStats:Object.fromEntries(T.TRI_SIDES.map(side=>[side,ref.client(side).getView().ownPieces.filter(p=>p.alive).map(p=>({id:p.id,name:p.name,type:p.type,attack:p.a,movement:p.m}))])),bases:end.bases,history:Object.fromEntries(T.TRI_SIDES.map(x=>[x,end.history[x].slice(0,8)]))});}
   }
 }
 Math.random=originalRandom;

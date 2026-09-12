@@ -1,4 +1,16 @@
-# Modo Generais — Clássico implementado na v1.15.76
+# Modo Generais — Clássico, atualizado na v1.15.79
+
+## Melhorias da v1.15.79
+
+Cada lado pode usar de 1 a 8 peças, com limite de perdas configurável. No Online, o anfitrião define a configuração antes da preparação. Uma sala nova e vazia também pode reservar ambos os lados para um só general; a reconexão recupera os dois. Em salas com dois amigos, cada preparação continua secreta até ambos confirmarem Pronto.
+
+Ataques, deslocamentos e criações recentes permanecem destacados no mapa. O registro clicável localiza a ação e permite acompanhar automaticamente os acontecimentos. A ficha e o placar ajudam a consultar peças e perdas. A visão do observador nunca é fornecida às IAs.
+
+Encerrar observação não declara um vencedor: libera o replay e interrompe as IAs. Localmente basta confirmar; Online, ambos os lados precisam concordar (um general dos dois lados confirma sozinho). Um limite opcional de 1 a 500 rodadas oferece o mesmo encerramento para testes; 0 mantém a observação sem limite. Não é uma nova regra de empate do jogo normal. Algumas combinações podem permanecer em impasse sem esse limite.
+
+Recuperação local conserva configuração, registro e estado, sempre pausada. Se o armazenamento ficar cheio, tenta reduzir apenas o trecho de replay. O Online conserva preparações confirmadas durante desconexões e impede comandos em lados não controlados.
+
+Validação da v1.15.79: 569 testes passaram; simulações descritas em VALIDACAO_v1_15_79.json. Não foi realizado teste visual em navegador real.
 
 Não confundir com um espectador passivo de partidas humanas.
 

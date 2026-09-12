@@ -28,7 +28,7 @@ console.log('Worker, Arena Online, bundles globais e IA sincronizados.');
 for(const [source,target,namespace,imports]of [
   ['classic-ai.mjs','classic-ai-global.js','ClassicBrains',null],
   ['generals-core.mjs','generals-core-global.js','GeneralGame',"const {createClassicBrain}=window.ClassicBrains;"],
-  ['generals-ui.mjs','generals-ui-global.js',null,"const {GENERAL_SIDES,defaultGeneralControl,makeGeneralBrains,brainSnapshots,generalStep,applyGeneralAction}=window.GeneralGame;"]
+  ['generals-ui.mjs','generals-ui-global.js',null,"const {GENERAL_SIDES,defaultGeneralControl,makeGeneralBrains,brainSnapshots,generalStep,applyGeneralAction,applyGeneralRecord,finishGeneralObservation}=window.GeneralGame;"]
 ]){
   let body=read('public/'+source);
   const names=[...body.matchAll(/^export (?:const|function) (\w+)/gm)].map(m=>m[1]);
