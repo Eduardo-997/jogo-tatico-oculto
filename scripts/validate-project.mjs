@@ -50,7 +50,7 @@ for(const [,name] of characterMap[1].matchAll(/'([^']+)'\s*:/g)){
 assert.ok(read('public/assets.js').includes(`?v=${version}`),'Cache de assets fora da versão do pacote');
 for(const page of ['index.html','multiplayer.html','triplayer.html']){
   const html=read('public/'+page),button=html.indexOf('id="surrenderBtn"'),cancel=html.indexOf(page==='triplayer.html'?'id="cancelBtn"':'id="cancel"');
-  assert.ok(button>cancel&&cancel>=0,'Rendição deve ficar depois das ações em '+page);
+  assert.ok(button>cancel&&cancel>=0&&html.slice(cancel,button).includes('class="surrender-zone"'),'Rendição deve ficar separada das ações em '+page);
 }
 console.log(JSON.stringify({javascriptSyntax:js,localHtmlReferences:refs,missingReferences:0,duplicateHtmlIds:0,workerParity:true,arenaParity:true,aiBundleParity:true},null,2));
 console.log(JSON.stringify({dynamicAssetReferences:assetReferences,assetCacheVersion:version,surrenderPlacement:true},null,2));

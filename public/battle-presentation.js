@@ -41,7 +41,7 @@
     if(typeof opts.onReplay==='function'){
       const b=document.createElement('button');b.className='primary';b.textContent='🎞️ Ver Replay';b.onclick=()=>opts.onReplay();actions.appendChild(b);
     }
-    const again=document.createElement('button');again.textContent=opts.mode==='online'?'↻ Nova sala':'↻ Nova partida';again.onclick=()=>location.reload();actions.appendChild(again);
+    const again=document.createElement('button');again.textContent=opts.mode==='online'?'↻ Nova sala':'↻ Nova partida';again.onclick=()=>{hideEndScreen();if(typeof opts.onNewGame==='function')opts.onNewGame();else location.reload();};actions.appendChild(again);
     if(opts.showClassicLink){const home=document.createElement('button');home.textContent='⌂ Voltar ao Clássico';home.onclick=()=>{location.href='index.html'};actions.appendChild(home);}
     document.body.appendChild(overlay);
     requestAnimationFrame(()=>overlay.querySelector('button')?.focus());

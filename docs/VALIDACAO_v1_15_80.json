@@ -1,0 +1,9 @@
+{
+  "version": "1.15.80",
+  "tests": {"total": 581, "passed": 581, "failed": 0},
+  "newRegressions": ["Nova partida utiliza reinício real", "Rendição separada das ações", "Arena A/B/C: só desistente eliminado", "Duas rendições: último exército vence", "Confronto dos outros lados preservado", "Arena Online persiste eliminação e libera replay somente ao final"],
+  "realBrowserTest": false,
+  "onlineTests": "WebSocket/Durable Objects mocks",
+  "balanceChanged": false,
+  "deploymentTargets": ["Eduardo-997/jogo-tatico-oculto", "Eduardo-997/Batalha-nas-sombras-v1"]
+}

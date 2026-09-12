@@ -23,6 +23,13 @@ function fixture(e,lists={},extra={}){
   r.importState(JSON.stringify(s));return r;
 }
 const state=r=>JSON.parse(r.exportState());
+for(const e of engines.filter(e=>e.tri)){
+  for(const side of e.sides)test(`${e.label}: rendição ${side} elimina apenas esse lado e preserva os outros`,()=>{
+    const r=fixture(e),before=state(r);const res=e.client(r,side).surrender();assert.equal(res.ok,true);const after=state(r);assert.equal(after.gameOver,false);assert.equal(after.result,null);assert.equal(after.eliminated[side],true);assert.equal(after.surrenderedSides[side],true);assert.equal(after.pieces[side].some(p=>p.alive),false);assert.notEqual(after.turn,side);for(const other of e.sides.filter(s=>s!==side)){assert.equal(after.eliminated[other],false);assert.deepEqual(after.pieces[other],before.pieces[other]);}assert.equal(e.client(r,side).surrender().ok,false);const copy=new e.C();copy.importState(r.exportState());assert.equal(e.client(copy,side).getView().surrenderedSides[side],true);
+  });
+  test(`${e.label}: duas rendições deixam o último exército vencer`,()=>{const r=fixture(e);assert.equal(e.client(r,'A').surrender().ok,true);assert.equal(e.client(r,'B').surrender().ok,true);assert.equal(state(r).gameOver,true);assert.equal(state(r).result,'C');});
+  test(`${e.label}: rendição de terceiro lado conserva confronto pendente entre os outros`,()=>{const pc={winnerSide:'A',winnerId:'f0',afterSide:'B',ownCell:e.cells()[0],deadCell:e.cells()[1]},r=fixture(e,{}, {turn:'B',pendingCombat:pc});assert.equal(e.client(r,'C').surrender().ok,true);assert.deepEqual(state(r).pendingCombat,pc);assert.equal(state(r).gameOver,false);});
+}
 const checkpointVM=vm.createContext({window:{}});vm.runInContext(read('public/local-checkpoint.js'),checkpointVM);
 const checkpointFor=e=>checkpointVM.window.BNSLocalCheckpoint.create(e.tri?'arena':'classic',{coords:e.cells(),names:R.defs.map(d=>d.name)});
 function forceTurn(e,r,side){const s=state(r);s.turn=side;s.gameOver=false;for(const x of e.sides){s.activation[x]=null;s.roundActivations[x]=0;for(const p of s.pieces[x])p.activated=false;}r.importState(JSON.stringify(s));}

@@ -15,6 +15,14 @@ class Socket{
 }
 function context(saved,prefix){const data=new Map(saved?[[prefix,structuredClone(saved)]]:[]),ctx={sockets:[],storage:{async get(k){return structuredClone(data.get(k));},async put(k,v){if(typeof k==='object'){for(const [key,value] of Object.entries(k))data.set(key,structuredClone(value));}else data.set(k,structuredClone(v));}},blockConcurrencyWhile(fn){ctx.init=fn();},getWebSockets(){return ctx.sockets;}};return ctx;}
 const send=(room,ws,msg)=>room.webSocketMessage(ws,JSON.stringify(msg));
+test('Arena Online: rendição de A mantém B e IA C na partida, persiste e só libera replay ao final',async()=>{
+  const ctx=context(),room=new TriGameRoom(ctx,{});await ctx.init;const a=new Socket(),b=new Socket();ctx.sockets.push(a,b);for(const ws of [a,b])await send(room,ws,{type:'join',room:'TEST'});
+  const cfg={teamSize:{A:1,B:1,C:1},lossLimit:{A:1,B:1,C:1}};
+  // Use the same valid setup generator as the referee, then import the started state into the room.
+  const seed=room.referee.autoSetup('A','easy',1);assert.equal(room.referee.startSolo(seed.setup,seed.bases,{B:'easy',C:'easy'},cfg).ok,true);room.started=true;room.resetReplay();let raw=JSON.parse(room.referee.exportState());raw.turn='A';raw.controllers={A:'human',B:'human',C:'ai'};room.referee.importState(JSON.stringify(raw));room.resetReplay();
+  await send(room,a,{type:'action',action:{type:'surrender'}});const view=b.last('view').view;assert.equal(view.gameOver,false);assert.equal(view.eliminated.A,true);assert.equal(view.eliminated.B,false);assert.equal(view.eliminated.C,false);assert.equal(view.turn,'B');assert.equal(a.last('arenaReplay'),undefined);const recovered=new TriGameRoom(ctx,{});await ctx.init;assert.equal(JSON.parse(recovered.referee.exportState()).eliminated.A,true);assert.equal(JSON.parse(recovered.referee.exportState()).gameOver,false);
+  await send(room,b,{type:'action',action:{type:'surrender'}});assert.equal(b.last('view').view.result,'C');assert.ok(b.last('arenaReplay'));assert.equal(room.replayActions.filter(x=>x.action.type==='surrender').length,2);
+});
 test('Interface Clássico Online: aplica visão do próprio lado e rejeita lado ausente ou adversário',()=>{
   const src=fs.readFileSync(new URL('../public/multiplayer-ui.js',import.meta.url),'utf8'),marker="}else if(m.type==='view'){";
   const body=src.slice(src.indexOf(marker)+marker.length,src.indexOf("}else if(m.type==='classicReplay'){"));

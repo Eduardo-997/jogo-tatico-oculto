@@ -1,10 +1,12 @@
-Batalha nas Sombras v1.15.78 — TESTE GIT
+Batalha nas Sombras v1.15.80 — TESTE GIT
 
-Base: v1.15.77; revisão de início/jogabilidade sem Generais.
+Base: v1.15.79; correções de reinício e rendição, incluindo Generais.
 Corrige estado antigo ao trocar de sala no Clássico e na Arena Online.
 O servidor identifica o lado na visão enviada, preservando informação oculta.
-Inclui recuperação local, identificação de unidades e Rendição junto das ações.
-Estado completo: SAVE_PROJETO_v1_15_78.md; SAVEs anteriores são históricos.
+Inclui recuperação local, identificação de unidades e Rendição separada das ações.
+Nova partida reinicia de verdade, sem recuperar checkpoint encerrado.
+Rendição da Arena elimina apenas o desistente; os demais continuam.
+Estado completo: SAVE_PROJETO_v1_15_80.md; SAVEs anteriores são históricos.
 Histórico antigo: docs/HISTORICO_DEPLOY_ATE_v1_15_70.txt.
 
 EXECUÇÃO E PUBLICAÇÃO
@@ -15,8 +17,8 @@ EXECUÇÃO E PUBLICAÇÃO
   globais do ZIP. Online precisa do servidor, como os outros modos Online.
 - Arquivos abertos diretamente por file:// não fornecem o servidor WebSocket.
 - Publicar somente com autorização explícita do usuário.
-- A v1.15.76 está publicada no repositório Eduardo-997/jogo-tatico-oculto;
-  esta v1.15.78 ainda não foi publicada. Não assumir autorização anterior
+- Esta v1.15.80 tem publicação autorizada nos dois repositórios do jogo.
+  Não assumir autorização anterior
   de deploy como autorização para publicar automaticamente toda versão.
 - Clássico contra IA e Arena solo salvam a partida em sessionStorage nesta
   aba desde a v1.15.73; atualizar a página tenta recuperar o estado.
