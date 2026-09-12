@@ -1,0 +1,15 @@
+{
+  "games": 240,
+  "completed": 240,
+  "actions": 109976,
+  "invalid": 0,
+  "stalled": 0,
+  "maxRound": 48,
+  "invariants": [],
+  "results": {
+    "A": 70,
+    "B": 90,
+    "C": 73,
+    "draw": 7
+  }
+}

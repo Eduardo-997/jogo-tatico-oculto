@@ -3,17 +3,16 @@
   let ctx=null, master=null;
   const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
   const store={get(k,f=null){try{return localStorage.getItem(k)??f}catch{return f}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-  let volume=clamp(Number(store.get('gameAudioVolume',0.32)),0,1);
+  const storedVolume=Number(store.get('gameAudioVolume',0.32));
+  let volume=Number.isFinite(storedVolume)?clamp(storedVolume,0,1):0.32;
   let muted=store.get('gameAudioMuted','0')==='1';
 
   function ensure(){
     if(ctx)return ctx;
     const AC=window.AudioContext||window.webkitAudioContext;
     if(!AC)return null;
-    ctx=new AC();
-    master=ctx.createGain();
-    master.gain.value=muted?0:volume;
-    master.connect(ctx.destination);
+    try{ctx=new AC();master=ctx.createGain();master.gain.value=muted?0:volume;master.connect(ctx.destination);}
+    catch{ctx=null;master=null;return null;} // Áudio indisponível não interrompe a partida.
     return ctx;
   }
   async function resume(){const c=ensure();if(c&&c.state==='suspended'){try{await c.resume();}catch{}}}
@@ -33,6 +32,7 @@
     o.type=type;o.frequency.setValueAtTime(freq,at);
     if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(20,endFreq),at+dur);
     o.connect(g);o.start(at);o.stop(at+dur+0.02);
+    o.onended=()=>{o.disconnect();g.disconnect();};
   }
   function noise(dur=0.12,level=0.05,delay=0,lowpass=1800){
     if(!ensure()||muted||volume<=0)return;
@@ -41,6 +41,7 @@
     const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),g=gainNode(ctx.currentTime+delay,dur,level);
     filter.type='lowpass';filter.frequency.value=lowpass;src.buffer=buf;src.connect(filter);filter.connect(g);
     src.start(ctx.currentTime+delay);
+    src.onended=()=>{src.disconnect();filter.disconnect();g.disconnect();};
   }
   function play(kind){
     if(muted||volume<=0)return;

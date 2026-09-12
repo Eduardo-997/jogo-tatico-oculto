@@ -1,10 +1,15 @@
 {
   "name": "batalha-nas-sombras",
   "private": true,
-  "version": "1.15.67",
+  "version": "1.15.72",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "sync": "node scripts/sync-cores.mjs",
+    "test": "node --test tests/*.mjs",
+    "validate": "node scripts/validate-project.mjs",
+    "simulate:arena": "node scripts/simulate-arena.mjs",
+    "simulate:classic": "node scripts/simulate-classic.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

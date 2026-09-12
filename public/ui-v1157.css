@@ -304,16 +304,15 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 @media(max-width:600px){
   .mode-classic .board-scroll,.mode-online .board-scroll,.mode-training .board-scroll{overflow-x:hidden!important;width:100%;padding:6px!important}
   .mode-classic .board,.mode-online .board,.mode-training .board{
-    --bns-cell:calc((100vw - 72px)/8);
     --bns-axis:22px;
     --bns-gap:2px;
     width:100%!important;
     max-width:100%!important;
-    grid-template-columns:var(--bns-axis) repeat(8,minmax(0,var(--bns-cell)))!important;
+    grid-template-columns:var(--bns-axis) repeat(8,minmax(0,1fr))!important;
     gap:var(--bns-gap)!important;
   }
-  .mode-classic .cell,.mode-online .cell,.mode-training .cell{width:var(--bns-cell)!important;height:var(--bns-cell)!important;min-width:0!important;font-size:clamp(16px,5.2vw,22px)!important;border-radius:6px!important}
-  .mode-classic .rowaxis,.mode-online .rowaxis,.mode-training .rowaxis{width:var(--bns-axis)!important;height:var(--bns-cell)!important}
+  .mode-classic .cell,.mode-online .cell,.mode-training .cell{width:100%!important;height:auto!important;aspect-ratio:1/1;min-width:0!important;font-size:clamp(16px,5.2vw,22px)!important;border-radius:6px!important}
+  .mode-classic .rowaxis,.mode-online .rowaxis,.mode-training .rowaxis{width:var(--bns-axis)!important;height:auto!important;align-self:stretch}
   .mode-classic .axis,.mode-online .axis,.mode-training .axis{font-size:9px!important}
   .mode-classic .base-icon,.mode-online .base-icon,.mode-training .base-icon{font-size:clamp(15px,4.8vw,20px)!important}
   .mode-classic .base-label,.mode-online .base-label,.mode-training .base-label{font-size:6px!important;padding:0 1px!important}
@@ -324,7 +323,7 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
   .mode-classic .controls button,.mode-online .controls button,.mode-training .controls button{font-size:11px!important;padding:7px 4px!important}
 }
 @media(max-width:390px){
-  .mode-classic .board,.mode-online .board,.mode-training .board{--bns-cell:calc((100vw - 62px)/8);--bns-axis:18px}
+  .mode-classic .board,.mode-online .board,.mode-training .board{--bns-axis:18px}
 }
 
 
@@ -520,11 +519,11 @@ button:not(:disabled):active,a.mode-btn:active,a.toplink:active,.btn:active{tran
 .mode-arena .shared-piece-svg{filter:drop-shadow(0 2px 3px rgba(0,0,0,.82))}
 @media(max-width:600px){.piece-token.shared-primary{width:25px!important;height:25px!important}.stack-second.shared-stack{width:23px!important;height:23px!important}}
 
-/* v1.15.67 — referência visual da Arena restaurada para A–H / 1–15. */
+/* v1.15.68 — referência visual da Arena restaurada para A–H / 1–15. */
 .mode-arena .arena-axis-letter{font-size:10px}
 .mode-arena .arena-axis-number{font-size:8px}
 
 
-/* v1.15.67 — Arena: ataque público precisa ser impossível de perder de vista. */
+/* v1.15.68 — Arena: ataque público precisa ser impossível de perder de vista. */
 .mode-arena .tri-cell.public-impact-cell,.tri-cell.public-impact-cell{stroke:#ff875b!important;stroke-width:3.2!important;filter:brightness(1.10) drop-shadow(0 0 4px rgba(255,104,65,.72))!important;stroke-dasharray:4 3}
 .mode-arena .impact-mark-svg,.impact-mark-svg{filter:drop-shadow(0 0 5px rgba(255,108,67,.98)) drop-shadow(0 2px 2px #000)!important}

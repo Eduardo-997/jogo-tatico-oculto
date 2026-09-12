@@ -1,0 +1,34 @@
+Batalha nas Sombras v1.15.70 — TESTE GIT
+
+Base atual: v1.15.69 TESTE GIT.
+
+v1.15.70 — auditoria, etapa 1 (mecânicas)
+- Possessão atômica, deslocamento válido do protegido e recuperação sem empilhamento ilegal.
+- Escudeiro acompanha o Fantasma e a entrada em Presença Fantasma; vínculo inválido é limpo.
+- Equipes eliminadas na Arena não retornam via possessão; queda do time do Fantasma liberta o hospedeiro.
+- Doppelgänger: Tiro Certeiro, Kamikaze, duração do Bardo e ciclo do Galho-Vivo corrigidos.
+- Cópia do Escudeiro reconhecida em interceptação e posicionamento pós-confronto.
+- Ataques/Rajada não atingem Postos; impacto de Rajada registra duas casas no Clássico.
+- Fantasma em corpo ATQ0 não oferece ataque inválido à interface/IA.
+- npm test: regressões dos núcleos. npm run validate: sintaxe, referências e paridade.
+- npm run sync: gera cópias do Worker/Arena/bundles a partir das fontes em public/.
+- Melhorias estratégicas da IA, reconexão/replay Online e acabamento geral seguem para as próximas etapas.
+
+Histórico de implantação antigo (base v1.15.45):
+
+Principais mudanças desta versão:
+- Paranoia: agora é Vanguarda, com V2 / M2 / ATQ0 / Alc. Hab. 2.
+- Presença Fantasma: ataque comum faz o adversário acreditar que atingiu o próprio Paranoia; a detecção falsa do próximo turno permanece desconhecida.
+- Presença Fantasma em Confronto Direto: o adversário descobre que era falsa porque não sofre dano nem é repelido; a detecção falsa do próximo turno fica conhecida como falsa.
+- Druida: arquétipo alterado de Vanguarda para Executor.
+- Piromante: Alc. Hab. alterado para 2; texto da Rajada Dupla simplificado sem repetir a regra do ataque normal.
+- Replay: agora mostra a dificuldade usada na partida (Clássico e Arena, incluindo IA B/C separadas quando aplicável).
+- Dificuldade: Clássico preserva o último nível escolhido após recarregar/nova partida; Arena solo preserva separadamente os níveis de IA B e IA C.
+- IA: tabela tática sincronizada com os novos arquétipos de Paranoia e Druida, preservando informação oculta.
+- Online: restaurado importState público no árbitro do Clássico para reconexão/persistência de salas do Durable Object.
+
+Deploy:
+- Mantida a correção que remove o require inválido de ./rules.js em src/worker.js.
+- src/worker.js é ESM e embute as regras/árbitro do Clássico sem dependência relativa inexistente.
+- package.json: npm run deploy -> wrangler deploy.
+- wrangler.jsonc mantém os Durable Objects GameRoom e TriGameRoom.

@@ -38,28 +38,7 @@
   function restoreClassicDifficulty(){try{const d=localStorage.getItem(CLASSIC_DIFFICULTY_KEY);if(validDifficulty(d)){aiDifficulty=d;if(aiDifficultyEl)aiDifficultyEl.value=d;}}catch{}}
   function saveClassicDifficulty(d){if(!validDifficulty(d))return;aiDifficulty=d;try{localStorage.setItem(CLASSIC_DIFFICULTY_KEY,d);}catch{}}
   let status='Inspecione os personagens e marque ☐ Selecionar para montar a equipe.';
-  const ABILITY_TEXT={
-    "Arqueiro":"Tiro Certeiro: mostra no tabuleiro o alcance dobrado antes de ativar e pede confirmação. Depois de confirmado, o próximo ataque normal usa esse alcance maior naquele turno. Recarga: 1 turno próprio.",
-    "Ninja":"Bomba de Fumaça: ao ativar, fica completamente indetectável por PER, Vidente, armadilha da Sentinela e qualquer efeito de revelação até o fim do próximo turno próprio. Recarga: 2 turnos próprios.",
-    "Piromante":"Rajada Dupla: escolha 1 ou 2 casas diferentes dentro do Alc. Hab., confira a prévia e confirme para atacar as selecionadas. Recarga: 1 turno próprio.",
-    "Kamikaze":"Explode ao morrer e também pode usar Autodestruição como habilidade ativa. Antes de confirmar, o jogo mostra toda a área atingida. O Alc. Hab. funciona em anéis ao redor dele: Alc. Hab. 1 atinge o primeiro anel; Alc. Hab. 2 atinge os dois primeiros anéis, e assim por diante. A explosão causa 1 de dano inclusive em aliados.",
-    "Caçador":"Mantém 1 armadilha de dano oculta dentro do Alc. Hab. Pode prepará-la mesmo em uma casa já ocupada; ela não dispara na colocação. Quando um inimigo entrar nessa casa depois, sofre 1 de dano antes de qualquer Confronto Direto. Colocar outra armadilha substitui a anterior.",
-    "Paranoia":"Presença Fantasma: escolha exatamente 2 casas dentro do Alc. Hab. 2. Você vê as presenças; os inimigos não, e a PER inimiga as detecta como se fossem personagens. Se uma presença for atacada, o atacante acredita ter atingido o próprio Paranoia e, no próximo turno, recebe outra detecção falsa sem saber. Em Confronto Direto, a presença não causa dano nem repele: o adversário descobre que era falsa, mas ainda recebe uma detecção falsa conhecida no próximo turno. Máximo de 2 presenças por Paranoia; ao criar novas, as mais antigas desaparecem.",
-    "Escudeiro":"Pode compartilhar casa com 1 aliado. Vincular escolhe um aliado dentro do Alc. Hab.; Alc. Hab. 0 alcança apenas a própria casa. Ao criar o vínculo, o Escudeiro se reúne ao aliado e passa a acompanhar automaticamente seus movimentos. Enquanto vinculado, não se move sozinho; use a habilidade novamente para Desvincular, gastando o turno. Também intercepta ataques e dano em área para proteger o aliado.",
-    "Golem":"Absorver Rocha: consome uma Pedra adjacente. Golem normal recebe 1 de Armadura até o fim do próximo turno próprio; cada dano é reduzido em 1 e dano reduzido a 0 não o transforma. Como Golem de Lava, consumir uma Pedra concede +1 M permanente e cumulativo.",
-    "Cavaleiro":"Não possui habilidade ativa.",
-    "Slime":"Ao cair, divide-se em 2 Mini-Slimes. A perda só conta quando toda a linhagem morrer; os Mini-Slimes herdam seus bônus.",
-    "Zumbi":"Na primeira morte, não conta como eliminação. Levanta-se na rodada seguinte com 1 de Vida e, depois de 3 turnos próprios, cai definitivamente. Se morrer antes disso, a eliminação é imediata.",
-    "Druida":"Pode entrar em árvores vivas e não é detectado por PER enquanto estiver nelas. Desperta uma árvore dentro do Alc. Hab. como Galho-Vivo. O Galho-Vivo é uma unidade própria e usa um turno normal disponível; se o Druida morrer, ele volta a ser uma árvore normal.",
-    "Vidente":"Ao ativar, o tabuleiro mostra todas as casas possíveis dentro do Alc. Hab. Escolha a primeira casa e depois 1 casa adjacente por lado; as 2 ficam reveladas.",
-    "Mago do Espelho":"Cria 1 Espelho dentro do Alc. Hab. A distância é medida em passos ortogonais; com Alc. Hab. 2, uma casa diagonal também fica ao alcance. O Espelho gera falsa presença e reflete o primeiro ataque; criar outro substitui o anterior.",
-    "Necromante":"Ergue um Esqueleto usando um cadáver dentro do Alc. Hab. Limite de 1 Esqueleto vivo por Necromante.",
-    "Doppelgänger":"Ao passar por um cadáver, copia sua habilidade. Habilidades ativas copiadas usam o Alc. Hab. do próprio Doppelgänger; ao encontrar outra, escolhe manter a atual ou trocar.",
-    "Sentinela":"Mantém até 2 armadilhas ocultas dentro do Alc. Hab. Pode prepará-las mesmo em casas já ocupadas; elas não disparam na colocação. Um inimigo que entrar depois em uma delas fica com a posição revelada até o início do próximo turno daquela peça.",
-    "Bardo":"Escolhe 1 aliado dentro do Alc. Hab. e concede +1 ATQ, ALC, Alc. Hab., M ou Vida. Mantém apenas 1 aliado inspirado; o bônus dura até o fim do próximo turno do Bardo.",
-    "Trapaceiro":"Pode se mover pelas diagonais.",
-    "Fantasma":"Ao vencer um ataque ou Confronto Direto, possui o inimigo e passa a controlar aquele corpo com a Vida, atributos e habilidades da peça possuída. O antigo dono perde sua localização. O corpo possuído recebe dano normalmente; quando ele é derrotado, o Fantasma morre e a peça original volta ao dono."
-  };
+  const ABILITY_TEXT=window.BNSCharacterInfo.text;
   const TREE_CELLS=new Set(R.treeCells||['B3','G6']);
   const ROCK_CELLS=new Set(R.rockCells||['F2','C7']);
   const WATER_CELLS=new Set(R.waterCells||['D3','E6']);
@@ -102,7 +81,7 @@
     const oldMir=new Set((prev.ownMirrors||[]).map(m=>m.coord)),newMir=new Set((v.ownMirrors||[]).map(m=>m.coord));for(const c of newMir)if(!oldMir.has(c)){cellFx(c,'fx-summon','🪞','magic');heardMagic=true;}
     if((v.history?.[0]||'')!==(prev.history?.[0]||'')){panelFx(historyEl);const h=v.history?.[0]||'';if(h.includes('Espelho')&&h.includes('reflet')){for(const c of oldMir)if(!newMir.has(c))cellFx(c,'fx-reflect','↩','magic');heardReflect=true;}}
     if((v.intel?.[0]||'')!==(prev.intel?.[0]||'')){panelFx(intelEl);const p=activePiece(v)||activePiece(prev);if(p&&/presença|PER/i.test(v.intel?.[0]||'')){cellFx(p.coord,'fx-perception','◉','magic');heardPerception=true;}}
-    if(v.impactCell&&v.impactCell!==prev.impactCell){cellFx(v.impactCell,'fx-attack','💥','damage');heardHit=true;}
+    for(const c of v.impactCells||[v.impactCell].filter(Boolean))if(!(prev.impactCells||[prev.impactCell]).includes(c)){cellFx(c,'fx-attack','💥','damage');heardHit=true;}
     const oldSeer=new Set(prev.seerArea||[]),newSeer=new Set(v.seerArea||[]);if([...newSeer].some(c=>!oldSeer.has(c))){for(const c of newSeer)cellFx(c,'fx-seer');heardMagic=true;}
     if(prev.turn!==v.turn||prev.round!==v.round){clearFxClass(phaseEl,'fx-turn',680);if(v.turn==='player')Audio.play('turn');}
     if(heardExplosion)Audio.play('explosion');else if(heardHit)Audio.play('hit');else if(heardDeath)Audio.play('death');
@@ -151,7 +130,7 @@
     if(mode==='move')return a.committed?`${name}: ainda está se movendo · ${a.moveRemaining||0} M restante${Number(a.moveRemaining||0)===1?'':'s'}. Mova novamente ou use Parar movimento; Encerrar turno fica bloqueado enquanto houver M restante.`:`${name}: movimento preparado. Escolha uma casa para mover ou cancele.`;
     if(mode==='attack')return `${name}: falta escolher a casa do ataque.`;
     if(mode==='sureShotConfirm')return `${name}: falta confirmar ou cancelar o Tiro Certeiro.`;
-    if(mode==='pyro'){const n=(a.pyroTargets||[]).length;return `${name}: Rajada Dupla · ${n}/2 casas escolhidas. Escolha 1 ou 2 casas e confirme.`;}
+    if(mode==='pyro'){const n=(a.pyroTargets||[]).length;return `${name}: Rajada Dupla · ${n}/2 casas escolhidas. A confirmação aparece após escolher as 2 casas.`;}
     if(mode==='paranoiaPresence'){const n=(a.paranoiaTargets||[]).length;return `${name}: Presença Fantasma · ${n}/2 casas escolhidas. Complete as 2 casas e confirme.`;}
     if(mode==='seer')return `${name}: falta escolher as 2 casas da visão e confirmar.`;
     if(mode==='kamikaze')return `${name}: Autodestruição preparada. Falta confirmar ou cancelar.`;
@@ -203,7 +182,7 @@
     if(name==='Ninja'&&(p.ninjaSmokeCooldown||0)>0)parts.push(`🌫️ Bomba de Fumaça: ${p.ninjaSmokeCooldown} turno${p.ninjaSmokeCooldown===1?'':'s'}`);
     return parts.length?`<div class="cooldown-note"><b>⏳ Recarga:</b> ${parts.join(' · ')}</div>`:'';
   }
-  function pieceAbilityText(p){const key=p?.copied||p?.displayName||p?.name;return ABILITY_TEXT[key]||ABILITY_TEXT[p?.name]||'Sem habilidade ativa ou característica adicional.';}
+  function pieceAbilityText(p){return window.BNSCharacterInfo.abilityText(p);}
   function showPieceInfo(v,p,enemy=false){
     if(!p)return;
     inspectedPieceId=p.id;
@@ -394,7 +373,7 @@
     if(mode==='attack'){setActionVisual(attackBtn,true,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,true,false);return;}
     if(mode){setActionVisual(abilityBtn,true,true);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,true,false);return;}
     const canMove=!a.movementUsed&&Number(p.m||0)>0&&!p.linkedToId;
-    const canAttack=Number(p.a||0)>0||p.name==='Fantasma'||p.identity==='Fantasma';
+    const canAttack=Number(p.a||0)>0||(p.name==='Fantasma'&&!p.possessing);
     setActionVisual(moveBtn,canMove,false);setActionVisual(stopBtn,false,false);setActionVisual(attackBtn,canAttack,false);setActionVisual(abilityBtn,canUseAbilityNow(v,p),false);setActionVisual(endBtn,canEnd,false);setActionVisual(cancelBtn,!a.committed,false);
   }
 
@@ -429,15 +408,15 @@
           if(ordered[1]){const s2=document.createElement('span');s2.className=`stack-second art-stack shared-stack${ordered[1].activated?' spent-stack':''}`;const src=A.character?.(ordered[1].displayName||ordered[1].name);if(src)s2.appendChild(A.img(src,'piece-art',ordered[1].displayName||ordered[1].name));else s2.textContent=ordered[1].icon;s2.title=ordered[1].displayName||ordered[1].name;b.appendChild(s2);}
         }
         const eg=visibleGroups.get(c)||[];if(eg.length){const m=makePieceToken(eg[0],true);m.classList.add('marker','enemy-reveal');b.appendChild(m);addHpBadge(b,eg[0],true);if(eg[1]){const m2=document.createElement('span');m2.className='stack-second';m2.textContent=eg[1].icon;b.appendChild(m2);}}if(eg.length&&!seer.has(c)){const rm=A.img?.(A.effects?.revelada,'marker-art reveal-marker','Unidade revelada')||document.createElement('span');if(!rm.src){rm.className='marker reveal-marker';rm.textContent='👁️';}rm.title='Unidade revelada';appendCornerMarker(b,rm,'tl');}
-        if(v.impactCell===c){const m=A.img?.(A.effects?.dano,'marker-art','Dano')||document.createElement('span');if(!m.src){m.className='marker impact';m.textContent='💥';}appendCornerMarker(b,m,'bl');}if((v.combatCells||[]).includes(c)){const m=A.img?.(A.effects?.confronto,'marker-art','Confronto')||document.createElement('span');if(!m.src){m.className='marker combat-mark';m.textContent='⚔️';}m.title='Confronto Direto ocorreu aqui';appendCornerMarker(b,m,'br');}
+        if((v.impactCells||[v.impactCell]).includes(c)){const m=A.img?.(A.effects?.dano,'marker-art','Dano')||document.createElement('span');if(!m.src){m.className='marker impact';m.textContent='💥';}appendCornerMarker(b,m,'bl');}if((v.combatCells||[]).includes(c)){const m=A.img?.(A.effects?.confronto,'marker-art','Confronto')||document.createElement('span');if(!m.src){m.className='marker combat-mark';m.textContent='⚔️';}m.title='Confronto Direto ocorreu aqui';appendCornerMarker(b,m,'br');}
         for(const h of v.perceptionHints||[])if(h.coord===c){const m=document.createElement('span');m.className=`presence-hint ${h.kind||'orth'}`;m.textContent=h.kind==='exact'?'📍':h.kind==='diag'?'◇':'❗';m.title=h.knownFalse?'Detecção falsa conhecida — Eco da Presença Fantasma':h.kind==='exact'?'Presença detectada nesta casa':h.kind==='diag'?'Possível presença diagonal':'Possível presença ortogonal';if(h.knownFalse)m.classList.add('known-false');appendCornerMarker(b,m,'tr');}
       }
       const p=activePiece(v),a=v.activation;
       if(p&&v.turn==='player'&&!v.pendingCombat){
         if(a.mode==='move'&&a.moveRemaining>=(p.flying?1:(SWAMP_CELLS.has(c)?2:1))&&R.neighbors(p.coord,p.diag).includes(c)&&canShareUi(v,p,c)){const solid=(v.rocks||[]).includes(c)||!!(v.trees||[]).find(t=>t.coord===c&&t.state==='live');if(!(p.flying&&solid&&a.moveRemaining<=1))b.classList.add('highlight');}
         if(a.mode==='attack'&&R.attackCells(p).includes(c)&&!baseAt(v,c))b.classList.add('attack-highlight');
-        if(a.mode==='pyro'&&R.abilityCells(p).includes(c))b.classList.add('attack-highlight');
-        if(a.mode==='sureShotConfirm'&&R.attackCells({...p,range:(p.range||0)*2}).includes(c))b.classList.add('attack-highlight');
+        if(a.mode==='pyro'&&R.abilityCells(p).includes(c)&&!baseAt(v,c))b.classList.add('attack-highlight');
+        if(a.mode==='sureShotConfirm'&&R.attackCells({...p,range:(p.range||0)*2}).includes(c)&&!baseAt(v,c))b.classList.add('attack-highlight');
         if(a.mode==='paranoiaPresence'&&R.abilityCells(p,true).includes(c))b.classList.add('highlight');
         // Ao entrar em qualquer habilidade, a casa da própria unidade também aparece como origem.
         const abilityModes=['pyro','sureShotConfirm','paranoiaPresence','raise','mirror','awaken','spotTrap','damageTrap','bard','absorbRock','seer','kamikaze','shieldLink','shieldUnlink'];
@@ -445,7 +424,7 @@
         if(['raise','mirror','awaken','bard'].includes(a.mode)&&R.abilityCells(p).includes(c))b.classList.add('highlight');
         if(['spotTrap','damageTrap'].includes(a.mode)&&R.abilityCells(p,true).includes(c))b.classList.add('highlight');
         if(a.mode==='absorbRock'&&(v.rocks||[]).includes(c)&&R.neighbors(p.coord,false).includes(c))b.classList.add('highlight');
-        if(a.mode==='seer'){if(!seerPreview.size&&R.abilityCells(p,true).includes(c))b.classList.add('highlight','seer-range');else{const main=[...seerPreview][0];if(c===main)b.classList.add('highlight','seer-main');else if(R.neighbors(main,false).includes(c))b.classList.add('highlight','seer-next');}}if(a.mode==='kamikaze'&&(a.kamikazeCells||[]).includes(c))b.classList.add('attack-highlight','kamikaze-highlight');if(a.mode==='shieldLink'){const ah=p.ah||0;if(ownAtAll(v,c).some(x=>x.id!==p.id&&x.alive&&R.man(p.coord,x.coord)<=ah))b.classList.add('highlight');}
+        if(a.mode==='seer'){const legal=new Set(a.seerCells?.length?a.seerCells:R.abilityCells(p,true));if(!seerPreview.size&&legal.has(c))b.classList.add('highlight','seer-range');else{const main=[...seerPreview][0];if(c===main)b.classList.add('highlight','seer-main');else if(legal.has(c)&&R.neighbors(main,false).includes(c))b.classList.add('highlight','seer-next');}}if(a.mode==='kamikaze'&&(a.kamikazeCells||[]).includes(c))b.classList.add('attack-highlight','kamikaze-highlight');if(a.mode==='shieldLink'){const ah=p.ah||0;if(ownAtAll(v,c).some(x=>x.id!==p.id&&x.alive&&R.man(p.coord,x.coord)<=ah))b.classList.add('highlight');}
       }
     }
   }
@@ -467,10 +446,10 @@
     refreshPieceInfo(v);paint(v);renderTurnGuide(v);renderActionButtons(v);
     flushActionFx(v);applyStateFx(previousFxView,v);previousFxView=snapshotFx(v);
     combatChoice.classList.toggle('hidden',!v.pendingCombat);
-    doppelChoiceBox.classList.toggle('hidden',!v.doppelChoice);if(v.doppelChoice)doppelChoiceText.textContent=`Atual: ${v.doppelChoice.current} · Novo: ${v.doppelChoice.newAbility}`;
+    doppelChoiceBox.classList.toggle('hidden',!v.doppelChoice);if(v.doppelChoice){copyDoppelBtn.disabled=v.doppelChoice.canCopyNew===false;doppelChoiceText.textContent=`Atual: ${v.doppelChoice.current} · Novo: ${v.doppelChoice.newAbility}${v.doppelChoice.reason?' · '+v.doppelChoice.reason:''}`;}
     advanceCombatBtn.disabled=v.pendingCombat?.canAdvance===false;
     advanceCombatBtn.textContent=v.pendingCombat?.canAdvance===false?'Posição ocupada':'Posição da derrotada';
-    pyroConfirm.classList.toggle('hidden',v.activation?.mode!=='pyro');kamikazeBox.classList.toggle('hidden',v.activation?.mode!=='kamikaze');sureShotBox.classList.toggle('hidden',v.activation?.mode!=='sureShotConfirm');paranoiaBox.classList.toggle('hidden',v.activation?.mode!=='paranoiaPresence');if(v.activation?.mode==='paranoiaPresence')paranoiaChoiceText.textContent=`${(v.activation.paranoiaTargets||[]).length}/2 casas escolhidas. Máximo 2 presenças ativas por Paranoia.`;const sa=v.activation;let shieldTarget=null;if(sa?.mode==='shieldLink'&&pendingShieldTargetId)shieldTarget=v.ownPieces.find(x=>x.id===pendingShieldTargetId);if(sa?.mode==='shieldUnlink'){shieldConfirmTitle.textContent='🛡️ Confirmar desvinculação';shieldConfirmText.textContent='Desvincular gastará o turno do Escudeiro.';shieldConfirmBox.classList.remove('hidden');}else if(sa?.mode==='shieldLink'&&shieldTarget){shieldConfirmTitle.textContent='🛡️ Confirmar vínculo';shieldConfirmText.textContent=`Vincular a ${shieldTarget.displayName}. O Escudeiro irá até a casa do aliado e passará a acompanhá-lo.`;shieldConfirmBox.classList.remove('hidden');}else shieldConfirmBox.classList.add('hidden');
+    pyroConfirm.classList.toggle('hidden',v.activation?.mode!=='pyro'||(v.activation?.pyroTargets||[]).length!==2);kamikazeBox.classList.toggle('hidden',v.activation?.mode!=='kamikaze');sureShotBox.classList.toggle('hidden',v.activation?.mode!=='sureShotConfirm');paranoiaBox.classList.toggle('hidden',v.activation?.mode!=='paranoiaPresence');if(v.activation?.mode==='paranoiaPresence')paranoiaChoiceText.textContent=`${(v.activation.paranoiaTargets||[]).length}/2 casas escolhidas. Máximo 2 presenças ativas por Paranoia.`;const sa=v.activation;let shieldTarget=null;if(sa?.mode==='shieldLink'&&pendingShieldTargetId)shieldTarget=v.ownPieces.find(x=>x.id===pendingShieldTargetId);if(sa?.mode==='shieldUnlink'){shieldConfirmTitle.textContent='🛡️ Confirmar desvinculação';shieldConfirmText.textContent='Desvincular gastará o turno do Escudeiro.';shieldConfirmBox.classList.remove('hidden');}else if(sa?.mode==='shieldLink'&&shieldTarget){shieldConfirmTitle.textContent='🛡️ Confirmar vínculo';shieldConfirmText.textContent=`Vincular a ${shieldTarget.displayName}. O Escudeiro irá até a casa do aliado e passará a acompanhá-lo.`;shieldConfirmBox.classList.remove('hidden');}else shieldConfirmBox.classList.add('hidden');
     if(v.gameOver){setStatus(v.result==='player'?'Você venceu.':v.result==='enemy'?'Você perdeu.':'Empate.');const win=v.result==='player',draw=v.result==='draw',cfg=v.matchConfig||currentMatchConfig();Presentation.showEndScreen({key:`classic:${v.result}:${v.round}`,mode:'classic',result:v.result,icon:draw?'⚖️':win?'🏆':'☠️',title:draw?'EMPATE':win?'VITÓRIA':'DERROTA',tone:draw?'draw':win?'victory':'defeat',reason:v.surrenderedBy?(v.surrenderedBy==='player'?'Você desistiu da partida.':'O adversário desistiu da partida.'):draw?'As duas equipes chegaram ao próprio limite de perdas na mesma resolução.':win?`O adversário atingiu ${cfg.lossLimit.enemy} perdas originais.`:`Você atingiu ${cfg.lossLimit.player} perdas originais.`,round:v.round,summary:[{label:'Suas perdas',value:`${v.ownOriginalDeaths}/${cfg.lossLimit.player}`},{label:'Perdas inimigas',value:`${v.enemyOriginalDeaths}/${cfg.lossLimit.enemy}`},{label:'Rodadas disputadas',value:v.round}],onReplay:replay&&replay.length>1?()=>window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'}):null});}
     else {Presentation.hideEndScreen();if(v.turn==='enemy'&&!v.pendingCombat)statusEl.textContent='🤖 Vez da IA...'; else statusEl.textContent=status;}
     if(replayBtn)replayBtn.classList.toggle('hidden',!(v.gameOver&&replay&&replay.length>1));if(surrenderBtn)surrenderBtn.classList.toggle('hidden',v.phase!=='play'||v.gameOver);
@@ -555,9 +534,10 @@
   }
 
   function previewSeer(c){
-    if(!seerPreview.size){const v=view(),p=activePiece(v);if(!p||!R.abilityCells(p,true).includes(c)){setStatus(`Casa principal fora do Alc. Hab. ${p?.ah||0}.`);return;}seerPreview=new Set([c]);seerConfirm.classList.add('hidden');setStatus('Casa principal escolhida. Agora escolha 1 casa ligada por lado.');render();return;}
+    if(!seerPreview.size){const v=view(),p=activePiece(v),legal=new Set(v.activation?.seerCells?.length?v.activation.seerCells:R.abilityCells(p,true));if(!p||!legal.has(c)){setStatus(`Casa principal fora do Alc. Hab. ${p?.ah||0}.`);return;}seerPreview=new Set([c]);seerConfirm.classList.add('hidden');setStatus('Casa principal escolhida. Agora escolha 1 casa ligada por lado e ainda dentro do alcance.');render();return;}
     const main=[...seerPreview][0];
     if(c===main){seerPreview.clear();seerConfirm.classList.add('hidden');setStatus('Escolha novamente a casa principal.');render();return;}
+    {const v=view(),p=activePiece(v),legal=new Set(v.activation?.seerCells?.length?v.activation.seerCells:R.abilityCells(p,true));if(!legal.has(c)){setStatus(`A segunda casa também precisa estar dentro do Alc. Hab. ${p?.ah||0}.`);return;}}
     if(!R.neighbors(main,false).includes(c)){setStatus('A segunda casa precisa estar ligada por lado à principal.');return;}
     seerPreview=new Set([main,c]);seerConfirm.classList.remove('hidden');setStatus('2/2 casas selecionadas. Confirme a visão.');render();
   }

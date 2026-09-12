@@ -1,20 +1,70 @@
-Batalha nas Sombras v1.15.67 — TESTE GIT
+Batalha nas Sombras v1.15.72 — TESTE GIT
 
-Base: v1.15.45 TESTE GIT.
+Base: v1.15.71; revisão de casos extremos, cumulativa à auditoria.
+Estado completo: SAVE_PROJETO_v1_15_72.md.
+Histórico antigo: docs/HISTORICO_DEPLOY_ATE_v1_15_70.txt.
 
-Principais mudanças desta versão:
-- Paranoia: agora é Vanguarda, com V2 / M2 / ATQ0 / Alc. Hab. 2.
-- Presença Fantasma: ataque comum faz o adversário acreditar que atingiu o próprio Paranoia; a detecção falsa do próximo turno permanece desconhecida.
-- Presença Fantasma em Confronto Direto: o adversário descobre que era falsa porque não sofre dano nem é repelido; a detecção falsa do próximo turno fica conhecida como falsa.
-- Druida: arquétipo alterado de Vanguarda para Executor.
-- Piromante: Alc. Hab. alterado para 2; texto da Rajada Dupla simplificado sem repetir a regra do ataque normal.
-- Replay: agora mostra a dificuldade usada na partida (Clássico e Arena, incluindo IA B/C separadas quando aplicável).
-- Dificuldade: Clássico preserva o último nível escolhido após recarregar/nova partida; Arena solo preserva separadamente os níveis de IA B e IA C.
-- IA: tabela tática sincronizada com os novos arquétipos de Paranoia e Druida, preservando informação oculta.
-- Online: restaurado importState público no árbitro do Clássico para reconexão/persistência de salas do Durable Object.
+EXECUÇÃO E PUBLICAÇÃO
+- Local com Worker e Online: npm install; npm run dev.
+- Clássico: /index.html; Online: /multiplayer.html.
+- Arena solo/Online: /triplayer.html; Treino: /training.html.
+- Arquivos abertos diretamente por file:// não fornecem o servidor WebSocket.
+- Para publicar, o próprio usuário executa npm run deploy quando aprovar.
+- Nenhum deploy ou alteração em sala real foi executado nesta revisão.
+- O name em wrangler.jsonc é histórico, não a versão do pacote. Não o renomeie
+  automaticamente: alteraria o destino do Worker e os dados de suas salas.
+- Preservar bindings GAME_ROOMS/TRI_ROOMS, classes e migrations existentes.
 
-Deploy:
-- Mantida a correção que remove o require inválido de ./rules.js em src/worker.js.
-- src/worker.js é ESM e embute as regras/árbitro do Clássico sem dependência relativa inexistente.
-- package.json: npm run deploy -> wrangler deploy.
-- wrangler.jsonc mantém os Durable Objects GameRoom e TriGameRoom.
+FONTES E SINCRONIZAÇÃO
+- public/rules.js e public/referee.js: regras/núcleo Clássico.
+- public/tri-core.js e public/tri-map.js: Arena.
+- public/ai-worker.js: estratégia Clássico; TriAI no núcleo da Arena.
+- public/tri-ui.js: interface Arena.
+- public/character-info.js: descrições compartilhadas das quatro interfaces.
+- src/worker.js: servidor autoritativo; seu núcleo Clássico é gerado.
+- src/room-protocol.js: identidade, validação, fila, persistência e replay.
+- npm run sync gera núcleo embutido do Worker, cópias src da Arena,
+  bundles globais e fonte da IA empacotada.
+- Não editar cópias geradas nem reintroduzir require('./rules.js') no Worker.
+- Espelho usa limite de 1 ativo por fonte e não tem recarga. Campos antigos
+  mirrorCooldown/mirrorBlocked são compatibilidade; não representam regra ativa.
+- Mistura intencional de CommonJS (Clássico) e ESM (Arena/servidor).
+  Não adicionar type:module ao package.json sem migrar o CommonJS.
+- Names das folhas CSS são históricos; os parâmetros ?v invalidam o cache.
+
+VALIDAÇÃO
+- npm test: regressões permanentes de mecânicas, IA, frontend e Online.
+- npm run validate: sintaxe, referências HTML, IDs e paridade das cópias.
+- npm run simulate:classic: 80 partidas contra oponente parado.
+- npm run simulate:arena: 120 partidas por padrão.
+- GAMES=60 npm run simulate:arena: 240 partidas, quatro dificuldades.
+- O limite de 5.000 ações do simulador detecta travamentos; NÃO é empate do jogo.
+- VM, handlers e mocks de Durable Objects não substituem navegador/Cloudflare real.
+- Validar visualmente celular, áudio e marcadores após publicar a versão de teste.
+
+ONLINE
+- Cada navegador/perfil conserva um token separado por host/sala/modalidade.
+- Uma reconexão com o mesmo token retoma o lado e substitui a conexão anterior.
+- Dois jogadores no mesmo computador usam perfis/navegadores separados.
+- Token não é enviado no URL, na visão do adversário ou no replay.
+- Não compartilhe o armazenamento local do navegador: ele contém seu acesso à sala.
+- Sem token em partida iniciada, não é permitido ocupar lugar desconectado.
+- Salas antigas sem identidade migram uma vez por assento; não há como recuperar
+  retroativamente uma identidade que versões antigas nunca gravaram.
+- Sala encerrada continua encerrada; use outro código para uma nova partida.
+- Preparação confirmada pode ser cancelada antes do início; na Arena não é
+  alterada silenciosamente enquanto o jogador está pronto.
+- Replay novo grava a semente do Eco e ações em blocos. Replays antigos sem
+  semente não permitem recuperar resultados aleatórios históricos exatos.
+- Limites: mensagem 16 KiB; 40 mensagens/segundo/conexão; 64 ações na fila;
+  16 conexões simultâneas por sala. Não é autenticação de conta nem proteção
+  contra todos os tipos de abuso externo.
+
+DECISÕES PRESERVADAS
+- Sem nova regra de empate por inatividade/morte súbita.
+- Rendição da Arena encerra a Arena inteira, conforme regra vigente.
+- Doppelgänger copia as ativas compatíveis existentes; não ganha passivas gerais.
+- Coordenadas, geometria, biomas e balanceamento mantidos.
+- Assets de compatibilidade (Coringa/Trapaceiro) e General futuro preservados.
+  O PNG de Presença Fantasma conserva resolução original; otimizar/redesenhar
+  assets é opcional, não uma correção de regra.

@@ -5,9 +5,11 @@ __refRoot.GameReferee = class GameReferee {
   #R = __refRoot.GameRules;
   #s;
   constructor(){ this.reset(); }
+  #random(){let seed=(this.#s.rngState??0x6d2b79f5)>>>0;seed=(Math.imul(seed,1664525)+1013904223)>>>0;this.#s.rngState=seed;return seed/4294967296;}
 
   reset(){
     this.#s={
+      rngState:Math.floor(Math.random()*4294967296)>>>0,
       phase:'setup', mode:null, round:1, turn:'player', roundStarter:'player', idSeq:1, gameOver:false, result:null, surrenderedBy:null, aiDifficulty:'normal', matchConfig:{teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}},
       pieces:{player:[],enemy:[]}, bases:[], chosenBaseBonuses:{player:[],enemy:[]}, corpses:[], mirrors:[], pendingSlimeSplits:[],
       history:{player:[],enemy:[]}, intel:{player:[],enemy:[]}, impact:{player:null,enemy:null}, combatMarks:{player:[],enemy:[]}, combatHold:{player:false,enemy:false}, perceptionHints:{player:[],enemy:[]},
@@ -66,7 +68,9 @@ __refRoot.GameReferee = class GameReferee {
     if(side!=='player'&&side!=='enemy') return this.#fail('Lado inválido.');
     if(!Array.isArray(setup)||setup.length!==expectedCount) return this.#fail(`É necessário posicionar exatamente ${expectedCount} ${expectedCount===1?'personagem':'personagens'}.`);
     if(!Array.isArray(bases)||bases.length!==2) return this.#fail('É necessário posicionar exatamente 2 Postos de Operação.');
-    const names=new Set(setup.map(x=>x.name)),coords=new Set(setup.map(x=>x.coord)),baseCoords=new Set(bases);
+    if(setup.some(x=>!x||typeof x!=='object'||typeof x.name!=='string'||typeof x.coord!=='string'||! /^[A-H][1-8]$/.test(x.coord)||!this.#R.defs.some(d=>d.name===(x.name==='Coringa'?'Trapaceiro':x.name))))return this.#fail('Personagem ou casa inicial inválidos.');
+    if(bases.some(c=>typeof c!=='string'||! /^[A-H][1-8]$/.test(c)))return this.#fail('Casa do Posto inválida.');
+    const names=new Set(setup.map(x=>x.name==='Coringa'?'Trapaceiro':x.name)),coords=new Set(setup.map(x=>x.coord)),baseCoords=new Set(bases);
     if(names.size!==expectedCount||coords.size!==expectedCount) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
     if(baseCoords.size!==2) return this.#fail('Os dois Postos precisam ficar em casas diferentes.');
     const minRow=side==='player'?1:5,maxRow=side==='player'?4:8;
@@ -108,6 +112,7 @@ __refRoot.GameReferee = class GameReferee {
     const cfg=this.normalizeMatchConfig(config),expectedCount=cfg.teamSize.player;
     if(!Array.isArray(playerSetup)||playerSetup.length!==expectedCount) return this.#fail(`É necessário posicionar exatamente ${expectedCount} ${expectedCount===1?'personagem':'personagens'}.`);
     if(!Array.isArray(playerBases)||playerBases.length!==2) return this.#fail('É necessário posicionar exatamente 2 Postos de Operação.');
+    const valid=this.validateSetup('player',playerSetup,playerBases,expectedCount);if(!valid.ok)return valid;
     const names=new Set(playerSetup.map(x=>x.name)), coords=new Set(playerSetup.map(x=>x.coord));
     const baseCoords=new Set(playerBases);
     if(names.size!==expectedCount||coords.size!==expectedCount) return this.#fail('Personagens e casas iniciais precisam ser únicos.');
@@ -142,9 +147,10 @@ __refRoot.GameReferee = class GameReferee {
 
   startTrainingGame(playerSetup,enemySetup,playerBases,enemyBases){
     if(this.#s.phase!=='setup')return this.#fail('O treino já começou.');
-    const all=[...(playerSetup||[]),...(enemySetup||[])];
     if(!Array.isArray(playerSetup)||playerSetup.length!==4||!Array.isArray(enemySetup)||enemySetup.length!==4)return this.#fail('O Treino usa 4 peças em cada lado (8 no total).');
     if(!Array.isArray(playerBases)||playerBases.length!==2||!Array.isArray(enemyBases)||enemyBases.length!==2)return this.#fail('O Treino usa exatamente 2 Postos de Operação em cada lado.');
+    const all=[...playerSetup,...enemySetup];
+    if(all.some(x=>!x||typeof x.name!=='string'||typeof x.coord!=='string'||! /^[A-H][1-8]$/.test(x.coord)||!this.#R.defs.some(d=>d.name===(x.name==='Coringa'?'Trapaceiro':x.name)))||[...playerBases,...enemyBases].some(c=>typeof c!=='string'||! /^[A-H][1-8]$/.test(c)))return this.#fail('Personagem ou casa inválidos no Treino.');
     const coords=new Set(),baseCoords=new Set([...playerBases,...enemyBases]);
     if(baseCoords.size!==4)return this.#fail('Os 4 Postos do Treino precisam ficar em casas diferentes.');
     for(const x of all){
@@ -257,8 +263,17 @@ __refRoot.GameReferee = class GameReferee {
   #isGhost(p){return !!p&&(p.identity==='Fantasma'||p.name==='Fantasma')&&!p.possession;}
   #abilityDistance(p,c){return this.#R.man(p.coord,c);}
   #inAbilityRange(p,c,allowSelf=false){const ah=this.#R.defOf(p).ah||0,dist=this.#abilityDistance(p,c);return (allowSelf?dist>=0:dist>0)&&dist<=ah;}
+  #isShieldUnit(p){return !!p&&(p.name==='Escudeiro'||(p.name==='Doppelgänger'&&p.copied==='Escudeiro'));}
   #linkedShieldFor(p){if(!p)return null;return this.#pieces(p.owner).find(x=>x.alive&&x.linkedToId===p.id)||null;}
   #clearShieldLinks(p){if(!p)return;if(p.linkedToId)p.linkedToId=null;for(const q of this.#pieces(p.owner))if(q.linkedToId===p.id)q.linkedToId=null;}
+  #impactCells(side){const x=this.#s.impact[side];return Array.isArray(x)?x:x?[x]:[];}
+  #markImpact(side,c){for(const viewer of ['player','enemy'])if(viewer!==side)this.#s.impact[viewer]=[...new Set([...this.#impactCells(viewer),c])];}
+  #canAdvanceCombat(pc){
+    if(!pc||!this.#pieceById(pc.winnerSide,pc.winnerId))return false;
+    if(pc.protectedAllyId)return !this.#piecesAt(pc.winnerSide,pc.ownCell).some(x=>x.id!==pc.winnerId);
+    return !this.#piecesAt(this.#other(pc.winnerSide),pc.deadCell).length;
+  }
+  #doppelChoiceView(side){const ch=this.#s.doppelChoice[side];if(!ch)return null;const p=this.#pieceById(side,ch.pieceId),blocked=p&&this.#isShieldUnit(p)&&ch.newAbility!=='Escudeiro'&&this.#piecesAt(side,p.coord).length>1;return {...ch,canCopyNew:!blocked,reason:blocked?'Separe as peças antes de trocar a cópia do Escudeiro; desvincule primeiro, se necessário.':''};}
   #noteReplay(type,side,data={}){const e={type,side,round:this.#s.round,...structuredClone(data)},cur=this.#s.replayEvent;if(!cur)this.#s.replayEvent=e;else if(cur.type==='sequence'&&Array.isArray(cur.events))cur.events.push(e);else this.#s.replayEvent={type:'sequence',side,round:this.#s.round,events:[cur,e]};}
   #spottedFor(viewer,p){if(this.#isUndetectable(p))return false;const x=this.#s.spotReveals?.[viewer]?.[p.id];return !!x&&p.alive;}
   #siegeActive(){return this.#s.phase==='play'&&this.#s.bases.length>=4&&this.#s.bases.every(b=>b.sabotaged);}
@@ -268,9 +283,9 @@ __refRoot.GameReferee = class GameReferee {
   #pieces(side){return this.#s.pieces[side];}
   #pieceById(side,id){return this.#pieces(side).find(p=>p.id===id&&p.alive);}
   #piecesAt(side,c){return this.#pieces(side).filter(p=>p.alive&&p.coord===c);}
-  #pieceAt(side,c){const ps=this.#piecesAt(side,c);return ps.find(p=>p.name==='Escudeiro')||ps[0]||null;}
-  #shieldAt(side,c){return this.#piecesAt(side,c).find(p=>p.name==='Escudeiro')||null;}
-  #protectedTarget(side,c){const ps=this.#piecesAt(side,c);if(!ps.length)return null;return ps.find(p=>p.name==='Escudeiro')||ps[0];}
+  #pieceAt(side,c){const ps=this.#piecesAt(side,c);return ps.find(p=>this.#isShieldUnit(p))||ps[0]||null;}
+  #shieldAt(side,c){return this.#piecesAt(side,c).find(p=>this.#isShieldUnit(p))||null;}
+  #protectedTarget(side,c){const ps=this.#piecesAt(side,c);if(!ps.length)return null;return ps.find(p=>this.#isShieldUnit(p))||ps[0];}
   #canShareCell(side,p,c){
     if(this.#treeBlocks(p,c)||this.#baseAt(c))return false;
     if(this.#pieceAt(this.#other(side),c))return true;
@@ -280,7 +295,7 @@ __refRoot.GameReferee = class GameReferee {
   }
   #corpseAt(c){return this.#s.corpses.find(x=>x.coord===c);}
   #mirrorAt(c,owner){return this.#s.mirrors.find(m=>m.coord===c&&m.owner===owner);}
-  #slimeLineageAlive(side,sourceId){return this.#pieces(side).some(p=>p.alive&&p.summonType==='miniSlime'&&p.slimeLineageId===sourceId);}
+  #slimeLineageAlive(side,sourceId){return this.#pieces(side).some(p=>(p.alive||p.possessedBy||p.recoveryPending)&&p.summonType==='miniSlime'&&p.slimeLineageId===sourceId);}
   #originalDeaths(side){
     return this.#pieces(side).filter(p=>p.original&&!p.alive&&!p.possessedBy&&!(p.name==='Zumbi'&&!p.zombieFinal)&&(p.name!=='Slime'||!this.#slimeLineageAlive(side,p.id))).length;
   }
@@ -301,24 +316,24 @@ __refRoot.GameReferee = class GameReferee {
     const extraEffects=[...(p.effects||[]).filter(e=>viewerSide===p.owner||e.public!==false)];
     if(p.paranoiaEchoPending&&p.paranoiaEchoKnownFalse&&viewerSide===p.owner)extraEffects.push({id:'paranoia-echo',name:'Eco da Presença Fantasma',icon:'🧠',remaining:1,kind:'debuff',tick:'turn'});
     if((p.ninjaSmokeRemaining||0)>0&&viewerSide===p.owner)extraEffects.push({id:'ninja-smoke',name:'Bomba de Fumaça',icon:'🌫️',remaining:p.ninjaSmokeRemaining,kind:'buff',tick:'turn'});
-    return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,flying:!!d.flying,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,pyroCooldown:p.pyroCooldown||0,paranoiaEchoPending:viewerSide===p.owner?!!p.paranoiaEchoPending:false,paranoiaEchoKnownFalse:viewerSide===p.owner?!!p.paranoiaEchoKnownFalse:false,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemArmor:((p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0)?1:0),golemArmorExpireAfterTurn:p.golemArmorExpireAfterTurn||0,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
+return {id:p.id,name:p.name,displayName:d.name,icon:d.icon,type:d.type,typeIcon:d.typeIcon||'',hp:p.hp,maxHp:d.v,coord:possessedAway?null:p.coord,alive:possessedAway?false:p.alive,possessedAway,possessing:!!p.possession,activated:p.activated,original:!!p.original,summonType:p.summonType||null,summonerId:viewerSide===p.owner?(p.summonerId||null):null,druidId:viewerSide===p.owner?(p.druidId||null):null,form:p.form||null,copied:p.copied||null,mirrorCooldown:p.mirrorCooldown||0,m:d.m,a:d.a,range:d.range,per:d.per,ah:d.ah||0,diag:!!d.diag,flying:!!d.flying,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,radarAdvanced:!!p.bonusRadarAdvanced,radarExpanded:!!p.bonusRadarExpanded,zombiePending:!!p.zombiePending,zombieTurnsLeft:p.zombieTurnsLeft||0,sureShotCooldown:p.sureShotCooldown||0,sureShotActive:!!p.sureShotActive,pyroCooldown:p.pyroCooldown||0,paranoiaEchoPending:viewerSide===p.owner?!!p.paranoiaEchoPending:false,paranoiaEchoKnownFalse:viewerSide===p.owner?!!p.paranoiaEchoKnownFalse:false,ninjaSmokeCooldown:p.ninjaSmokeCooldown||0,ninjaSmokeRemaining:p.ninjaSmokeRemaining||0,golemArmor:((p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0)?1:0),golemArmorExpireAfterTurn:p.golemArmorExpireAfterTurn||0,linkedToId:viewerSide===p.owner?(p.linkedToId||null):null,effects:extraEffects.map(e=>({id:e.id||'',name:e.name||'Efeito temporário',icon:e.icon||'⏳',remaining:Math.max(0,Number(e.remaining)||0),kind:e.kind||'neutral',tick:e.tick||'round'}))};
   }
 
   #getView(side){
     const other=this.#other(side), act=this.#activation(side), visible=[],siegeCells=this.#siegeCells(),siegeSet=new Set(siegeCells);
     for(const e of this.#pieces(other)) if(e.alive&&!this.#isUndetectable(e)&&(this.#s.seer[side].has(e.coord)||this.#spottedFor(side,e)||siegeSet.has(e.coord))) visible.push(this.#publicPiece(e,side));
     const pc=this.#s.pendingCombat;
-    const pending=pc&&pc.winnerSide===side?{canChoose:true,canAdvance:!!pc.protectedAllyId||!this.#piecesAt(other,pc.deadCell).length}:null;
+    const pending=pc&&pc.winnerSide===side?{canChoose:true,canAdvance:this.#canAdvanceCombat(pc)}:null;
     return structuredClone({
       phase:this.#s.phase, round:this.#s.round, turn:this.#s.turn, gameOver:this.#s.gameOver, result:this.#s.result, surrenderedBy:this.#s.surrenderedBy||null,
       ownPieces:this.#pieces(side).map(p=>this.#publicPiece(p,side)), visibleOpponents:visible,
       bases:this.#s.bases.map(b=>({id:b.id,owner:b.owner,coord:b.coord,sabotaged:b.sabotaged})),
-      trees:(this.#s.trees||[]).map(t=>({...t})), rocks:[...(this.#s.rocks||[])], rockHp:{...(this.#s.rockHp||{})}, water:[...(this.#s.water||[])], swamps:[...(this.#s.swamps||[])], ownTraps:(this.#s.traps?.[side]||[]).map(t=>({id:t.id,coord:t.coord,kind:t.kind})), ownFalsePresences:(this.#s.falsePresences?.[side]||[]).map(f=>({id:f.id,coord:f.coord,seq:f.seq})),
+      trees:(this.#s.trees||[]).map(t=>({...t})), rocks:[...(this.#s.rocks||[])], rockHp:{...(this.#s.rockHp||{})}, water:[...(this.#s.water||[])], swamps:[...(this.#s.swamps||[])], ownTraps:(this.#s.traps?.[side]||[]).map(t=>({id:t.id,coord:t.coord,kind:t.kind,placerId:t.placerId||null})), ownFalsePresences:(this.#s.falsePresences?.[side]||[]).map(f=>({id:f.id,coord:f.coord,seq:f.seq})),
       chosenBaseBonuses:[...this.#s.chosenBaseBonuses[side]], baseBonusCatalog:this.#R.baseBonuses.map(b=>({...b})),
       ownOriginalDeaths:this.#originalDeaths(side), enemyOriginalDeaths:this.#originalDeaths(other), matchConfig:structuredClone(this.#s.matchConfig||{teamSize:{player:4,enemy:4},lossLimit:{player:3,enemy:3}}), corpses:this.#s.corpses.map(c=>({coord:c.coord})),
-      ownMirrors:this.#s.mirrors.filter(m=>m.owner===side).map(m=>({coord:m.coord})), seerArea:[...this.#s.seer[side]], impactCell:this.#s.impact[side], combatCells:[...(this.#s.combatMarks?.[side]||[])],
+      ownMirrors:this.#s.mirrors.filter(m=>m.owner===side).map(m=>({coord:m.coord,mageId:m.mageId||null})), seerArea:[...this.#s.seer[side]], impactCells:[...this.#impactCells(side)], impactCell:this.#impactCells(side).at(-1)||null, combatCells:[...(this.#s.combatMarks?.[side]||[])],
       history:[...this.#s.history[side]], intel:[...this.#s.intel[side]], perceptionHints:(this.#s.perceptionHints[side]||[]).map(h=>({...h})),
-      activation:act?{...act}:null, pendingCombat:pending, doppelChoice:this.#s.doppelChoice[side]?{...this.#s.doppelChoice[side]}:null,
+      activation:act?{...act}:null, pendingCombat:pending, doppelChoice:this.#doppelChoiceView(side),
       availablePieceIds:this.#pieces(side).filter(p=>p.alive&&(this.#s.mode==='training'||(this.#hasActivationLeft(side)&&!p.activated))).map(p=>p.id),
       roundActivationsUsed:this.#s.mode==='training'?null:(this.#s.roundActivations?.[side]||0), roundActivationLimit:this.#s.mode==='training'?null:this.#activationLimit(side), mode:this.#s.mode,
       siegeActive:siegeCells.length>0,siegeCells
@@ -357,7 +372,7 @@ __refRoot.GameReferee = class GameReferee {
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side);if(!a)return this.#fail('Nenhuma peça selecionada.');
     if(a.mode==='move')return this.#stopMove(side);
-    a.mode=null;a.moveRemaining=0;a.pyroTargets=[];a.paranoiaTargets=[];a.kamikazeCells=[];return this.#ok('Ação cancelada. A peça continua selecionada.');
+    a.mode=null;a.moveRemaining=0;a.pyroTargets=[];a.paranoiaTargets=[];a.kamikazeCells=[];a.seerCells=[];return this.#ok('Ação cancelada. A peça continua selecionada.');
   }
 
   #commit(side){
@@ -428,7 +443,7 @@ __refRoot.GameReferee = class GameReferee {
       else if(orthHits.length){for(const c of orthPossible.filter(hintable))hints.push({coord:c,kind:'orth'});}
       if(expanded&&diagHits.length){for(const c of diagPossible.filter(hintable))hints.push({coord:c,kind:'diag'});}
       if(echo){
-        const pool=orthPossible.filter(hintable);echoCell=pool[Math.floor(Math.random()*Math.max(1,pool.length))]||null;
+        const pool=orthPossible.filter(hintable);echoCell=pool[Math.floor(this.#random()*Math.max(1,pool.length))]||null;
         if(echoCell){if(advanced)hints.push({coord:echoCell,kind:'exact',knownFalse:echoKnown});else for(const c of orthPossible.filter(hintable))hints.push({coord:c,kind:'orth',knownFalse:echoKnown});}
       }
     }
@@ -459,11 +474,11 @@ __refRoot.GameReferee = class GameReferee {
     const a=this.#activation(side),p=this.#activePiece(side); if(!a||!p||a.mode!=='attack')return this.#fail('Ataque não iniciado.');
     if(!this.#R.attackCells(p).includes(to))return this.#fail('Casa fora do alcance.');
     if(this.#baseAt(to))return this.#fail('Postos de Operação não podem ser atacados; precisam ser sabotados.');
-    this.#commit(side);this.#noteReplay('attack',side,{piece:this.#R.defOf(p).name,from:p.coord,cells:[to]});
+    this.#commit(side);this.#markImpact(side,to);this.#noteReplay('attack',side,{piece:this.#R.defOf(p).name,from:p.coord,cells:[to]});
     if(this.#isGhost(p)){
       const target=this.#protectedTarget(this.#other(side),to);
-      if(target){this.#possess(side,p,target);this.#addHistory(side,`👻 Fantasma possuiu ${this.#R.defOf(target).name}.`);this.#addHistory(this.#other(side),'👻 Uma de suas peças foi possuída; sua localização foi perdida.');}
-      else {this.#addHistory(side,'👻 O Fantasma tentou possuir a casa, mas não encontrou ninguém.');this.#s.impact[this.#other(side)]=to;}
+      if(target&&this.#possess(side,p,target)){this.#addHistory(side,`👻 Fantasma possuiu ${this.#R.defOf(target).name}.`);this.#addHistory(this.#other(side),'👻 Uma de suas peças foi possuída; sua localização foi perdida.');}
+      else this.#addHistory(side,'👻 A tentativa de possessão não se completou.');
       a.mode=null;return this.#finishActivation(side);
     }
     this.#hitAttack(side,p,to);a.mode=null;return this.#finishActivation(side);
@@ -471,7 +486,7 @@ __refRoot.GameReferee = class GameReferee {
 
   #selectPyroTarget(side,to){
     const bad=this.#validateTurn(side);if(bad)return bad;
-    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='pyro'||p.name!=='Piromante')return this.#fail('Ataque do Piromante não iniciado.');
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='pyro'||this.#effectiveAbility(p)!=='pyroBurst')return this.#fail('Ataque do Piromante não iniciado.');
     if(!this.#inAbilityRange(p,to))return this.#fail(`O Piromante só pode escolher casas dentro do Alc. Hab. ${this.#R.defOf(p).ah}.`);
     if(this.#baseAt(to))return this.#fail('O Piromante não pode atacar Postos de Operação.');
     a.pyroTargets=Array.isArray(a.pyroTargets)?a.pyroTargets:[];
@@ -482,8 +497,8 @@ __refRoot.GameReferee = class GameReferee {
 
   #confirmPyroAttack(side){
     const bad=this.#validateTurn(side);if(bad)return bad;
-    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='pyro'||p.name!=='Piromante')return this.#fail('Ataque do Piromante não iniciado.');
-    const targets=[...(a.pyroTargets||[])];if(targets.length<1||targets.length>2)return this.#fail('Escolha 1 ou 2 casas antes de confirmar.');
+    const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='pyro'||this.#effectiveAbility(p)!=='pyroBurst')return this.#fail('Ataque do Piromante não iniciado.');
+    const targets=[...new Set(a.pyroTargets||[])];if(targets.length!==2)return this.#fail('Escolha exatamente 2 casas antes de confirmar.');
     this.#commit(side);p.pyroCooldown=2;a.mode=null;a.pyroTargets=[];this.#noteReplay('ability',side,{piece:'Piromante',ability:'Rajada Dupla',from:p.coord,cells:[...targets],text:`Ataque de habilidade em ${targets.length} casa${targets.length===1?'':'s'}.`});
     this.#addHistory(side,`🔥 Piromante usou Rajada Dupla em ${targets.length} casa${targets.length===1?'':'s'}.`);
     for(const c of targets)this.#hitAttack(side,p,c);
@@ -496,12 +511,12 @@ __refRoot.GameReferee = class GameReferee {
     if(a.mode==='move'&&a.committed)return this.#fail('Primeiro termine o movimento.');
     const ab=this.#effectiveAbility(p),ah=this.#R.defOf(p).ah||0;
     if(ab==='sureShot'){if((p.sureShotCooldown||0)>0)return this.#fail(`🏹 Tiro Certeiro em recarga por mais ${p.sureShotCooldown} turno.`);a.mode='sureShotConfirm';return this.#ok('🏹 Confira a área marcada: o Tiro Certeiro dobrará o ALC do Arqueiro neste turno. Confirme para ativar.',{ability:'sureShot',confirm:true,cells:this.#sureShotPreviewCells(p)});}
-    if(ab==='pyroBurst'){if((p.pyroCooldown||0)>0)return this.#fail(`🔥 Rajada Dupla em recarga por mais ${p.pyroCooldown} turno${p.pyroCooldown===1?'':'s'}.`);a.mode='pyro';a.pyroTargets=[];return this.#ok(`🔥 Escolha 1 ou 2 casas diferentes dentro do Alc. Hab. ${ah} e confirme a Rajada Dupla.`,{ability:'pyroBurst'});}
+    if(ab==='pyroBurst'){if((p.pyroCooldown||0)>0)return this.#fail(`🔥 Rajada Dupla em recarga por mais ${p.pyroCooldown} turno${p.pyroCooldown===1?'':'s'}.`);a.mode='pyro';a.pyroTargets=[];return this.#ok(`🔥 Escolha 2 casas diferentes dentro do Alc. Hab. ${ah}. A confirmação aparecerá depois da segunda escolha.`,{ability:'pyroBurst'});}
     if(ab==='phantomPresence'){a.mode='paranoiaPresence';a.paranoiaTargets=[];return this.#ok(`🧠 Escolha 2 casas dentro do Alc. Hab. ${ah} para criar Presenças Fantasmas. Você verá as presenças; o inimigo não.`,{ability:'phantomPresence'});}
     if(ab==='absorbRock'){const legal=this.#R.neighbors(p.coord,false).filter(c=>this.#rockAt(c));if(!legal.length)return this.#fail('🗿 Não há nenhuma pedra adjacente para consumir.');a.mode='absorbRock';return this.#ok('🗿 Escolha uma pedra adjacente para consumir.',{ability:'absorbRock'});}
     if(ab==='smoke'){if((p.ninjaSmokeCooldown||0)>0)return this.#fail(`🌫️ Bomba de Fumaça em recarga por mais ${p.ninjaSmokeCooldown} turno${p.ninjaSmokeCooldown===1?'':'s'}.`);this.#commit(side);p.ninjaSmokeRemaining=1;p.ninjaSmokeCooldown=3;this.#addHistory(side,'🌫️ Ninja lançou Bomba de Fumaça e ficará indetectável até o fim do próximo turno próprio.');this.#noteReplay('ability',side,{piece:this.#R.defOf(p).name,ability:'Bomba de Fumaça',coord:p.coord,text:'Indetectável até o fim do próximo turno próprio.'});const done=this.#finishActivation(side);return {...done,status:'🌫️ Bomba de Fumaça ativa: esta unidade não pode ser detectada até o fim do próximo turno próprio.'};}
     if(ab==='kamikaze'){a.mode='kamikaze';const cells=this.#R.blastCells(p.coord,ah||1);a.kamikazeCells=[...cells];return this.#ok(`💣 Autodestruição pronta. Alc. Hab. ${ah||1} atinge ${ah===1?'o primeiro anel':'os '+(ah||1)+' anéis'} ao redor. Confirme para explodir.`,{ability:'kamikaze',blastCells:cells});}
-    if(ab==='seer'){a.mode='seer';return this.#ok(`👁️ Escolha a primeira casa dentro do Alc. Hab. ${ah} e depois 1 casa ligada por lado.`,{ability:'seer'});}
+    if(ab==='seer'){a.mode='seer';a.seerCells=[p.coord,...this.#R.abilityCells(p)];return this.#ok(`👁️ Escolha 2 casas ligadas, ambas dentro do Alc. Hab. ${ah}.`,{ability:'seer',cells:[...a.seerCells]});}
     if(ab==='shieldLink'){const actor=this.#R.defOf(p).name;if(p.linkedToId){a.mode='shieldUnlink';return this.#ok(`🛡️ ${actor} está vinculado. Confirme para desvincular e gastar este turno.`,{ability:'shieldUnlink',confirm:true});}const ah=this.#R.defOf(p).ah||0,targets=this.#pieces(side).filter(x=>x.id!==p.id&&x.alive&&this.#R.man(p.coord,x.coord)<=ah&&(x.coord===p.coord||this.#piecesAt(side,x.coord).length<2));if(!targets.length)return this.#fail(`Nenhum aliado disponível dentro do Alc. Hab. ${ah}.`);a.mode='shieldLink';return this.#ok(`🛡️ Escolha um aliado dentro do Alc. Hab. ${ah}. Alc. Hab. 0 alcança a própria casa.`,{ability:'shieldLink'});}
     if(ab==='raise'){
       const has=this.#pieces(side).some(x=>x.alive&&x.summonType==='skeleton'&&x.summonerId===p.id);if(has)return this.#fail('Este Necromante já controla um Esqueleto vivo.');
@@ -554,7 +569,7 @@ __refRoot.GameReferee = class GameReferee {
     const bad=this.#validateTurn(side); if(bad)return bad;
     const a=this.#activation(side),p=this.#activePiece(side);if(!a||!p||a.mode!=='seer')return this.#fail('Visão não iniciada.');
     if(!Array.isArray(cells)||cells.length!==2||new Set(cells).size!==2)return this.#fail('Selecione 2 casas ligadas.');
-    const main=cells[0],second=cells[1];if(this.#R.man(p.coord,main)>this.#R.defOf(p).ah)return this.#fail(`A primeira casa está fora do Alc. Hab. ${this.#R.defOf(p).ah}.`);if(!this.#R.neighbors(main,false).includes(second))return this.#fail('A segunda casa precisa estar ligada por lado à primeira.');
+    const main=cells[0],second=cells[1],legal=new Set(a.seerCells?.length?a.seerCells:[p.coord,...this.#R.abilityCells(p)]);if(!legal.has(main)||!legal.has(second))return this.#fail(`As duas casas precisam estar dentro do Alc. Hab. ${this.#R.defOf(p).ah}.`);if(!this.#R.neighbors(main,false).includes(second))return this.#fail('A segunda casa precisa estar ligada por lado à primeira.');
     this.#commit(side);this.#s.seer[side]=new Set(cells);const seen=this.#pieces(this.#other(side)).filter(e=>e.alive&&!this.#isUndetectable(e)&&this.#s.seer[side].has(e.coord)).length;
     this.#addIntel(side,`👁️ Área do Vidente: ${seen} ${seen===1?'presença detectada':'presenças detectadas'} nas 2 casas.`);this.#addHistory(side,'👁️ Vidente ativou visão em 2 casas ligadas.');this.#noteReplay('seer',side,{piece:this.#R.defOf(p).name,cells:[...cells],seen});this.#s.seerExpires[side]=true;a.mode=null;return this.#finishActivation(side);
   }
@@ -648,7 +663,7 @@ __refRoot.GameReferee = class GameReferee {
     const per=Math.max(0,this.#R.defOf(p).per||0),knownFalse=!!p.paranoiaEchoKnownFalse;
     p.paranoiaEchoPending=false;p.paranoiaEchoReadyTurn=0;p.paranoiaEchoKnownFalse=false;
     const a=this.#activation(side),orth=this.#R.perceptionCells(p.coord,per,false),pool=orth.filter(c=>!this.#solidTerrain(c)&&!this.#pieceAt(side,c)&&!this.#baseAt(c));
-    const advanced=!!p.bonusRadarAdvanced,cell=pool[Math.floor(Math.random()*Math.max(1,pool.length))];
+    const advanced=!!p.bonusRadarAdvanced,cell=pool[Math.floor(this.#random()*Math.max(1,pool.length))];
     if(cell){this.#s.perceptionHints[side]=advanced?[{coord:cell,kind:'exact',knownFalse}]:pool.map(c=>({coord:c,kind:'orth',knownFalse}));if(a)a.lastPerception=true;}
     const text=knownFalse?'Eco da Presença Fantasma: detecção falsa conhecida.':(advanced&&cell?`presença ortogonal em ${cell}`:'presença inimiga no alcance ortogonal.');
     this.#addIntel(side,knownFalse?'🧠 Eco da Presença Fantasma: esta detecção é falsa e conhecida.':`${this.#R.defOf(p).icon} ${this.#R.defOf(p).name}: ${advanced&&cell?'📡 '+text:'⚠️ '+text}`);
@@ -660,17 +675,36 @@ __refRoot.GameReferee = class GameReferee {
     return any;
   }
   #possess(side,ghost,target){
-    if(!ghost?.alive||!target?.alive)return false;const targetSide=target.owner,coord=target.coord;
+    if(!ghost?.alive||!target?.alive||target.possession)return false;
+    const targetSide=target.owner,coord=target.coord,from=ghost.coord,follower=this.#linkedShieldFor(ghost);
+    const traveling=follower?.alive&&follower.coord===from?follower:null,ignored=new Set([ghost.id,target.id,...(traveling?[traveling.id]:[])]);
+    const others=this.#piecesAt(targetSide,coord).filter(x=>x.id!==target.id),moves=[],reserved=new Set([coord]);
+    if(this.#baseAt(coord)||this.#piecesAt(side,coord).some(x=>!ignored.has(x.id)))return false;
+    // Primeiro valida toda a troca; uma possessão impedida não altera vínculos ou peças.
+    for(const ally of others){const dest=this.#R.neighbors(coord,false).find(c=>!reserved.has(c)&&!this.#solidTerrain(c)&&!this.#baseAt(c)&&!['player','enemy'].some(s=>this.#piecesAt(s,c).some(x=>!ignored.has(x.id))));if(!dest)return false;moves.push([ally,dest]);reserved.add(dest);}
     this.#clearShieldLinks(target);
-    ghost.possession={hostSide:targetSide,hostId:target.id,hostSnapshot:structuredClone(target),ghostState:{name:'Fantasma',form:ghost.form||null,copied:ghost.copied||null,bonusM:ghost.bonusM||0,bonusV:ghost.bonusV||0,bonusA:ghost.bonusA||0,bonusRange:ghost.bonusRange||0,bonusAH:ghost.bonusAH||0,effects:structuredClone(ghost.effects||[])}};
+    ghost.possession={hostSide:targetSide,hostId:target.id,hostSnapshot:structuredClone(target),ghostState:structuredClone(ghost)};
     target.alive=false;target.possessedBy=ghost.id;target.coord=null;
-    ghost.name=target.name;ghost.form=target.form||null;ghost.copied=target.copied||null;ghost.hp=target.hp;ghost.coord=coord;ghost.bonusM=target.bonusM||0;ghost.bonusV=target.bonusV||0;ghost.bonusA=target.bonusA||0;ghost.bonusRange=target.bonusRange||0;ghost.bonusAH=target.bonusAH||0;ghost.bonusPer=target.bonusPer||0;ghost.bonusRadarAdvanced=!!target.bonusRadarAdvanced;ghost.bonusRadarExpanded=!!target.bonusRadarExpanded;ghost.golemArmorExpireAfterTurn=target.golemArmorExpireAfterTurn||0;ghost.sureShotCooldown=target.sureShotCooldown||0;ghost.sureShotActive=!!target.sureShotActive;ghost.paranoiaEchoPending=!!target.paranoiaEchoPending;ghost.paranoiaEchoKnownFalse=!!target.paranoiaEchoKnownFalse;ghost.paranoiaEchoReadyTurn=target.paranoiaEchoReadyTurn||0;ghost.ninjaSmokeCooldown=target.ninjaSmokeCooldown||0;ghost.ninjaSmokeRemaining=target.ninjaSmokeRemaining||0;ghost.mirrorCooldown=target.mirrorCooldown||0;ghost.turnsTaken=target.turnsTaken||0;ghost.effects=structuredClone(target.effects||[]);
-    const others=this.#piecesAt(targetSide,coord).filter(x=>x.id!==target.id);for(const ally of others){const dest=this.#R.neighbors(coord,false).find(c=>!this.#solidTerrain(c)&&!this.#baseAt(c)&&!this.#pieceAt(targetSide,c)&&!this.#pieceAt(side,c));if(dest)ally.coord=dest;}
+    for(const key of ['name','form','copied','hp','summonType','bonusM','bonusV','bonusA','bonusRange','bonusAH','bonusPer','bonusRadarAdvanced','bonusRadarExpanded','golemArmorExpireAfterTurn','sureShotCooldown','sureShotActive','pyroCooldown','paranoiaEchoPending','paranoiaEchoKnownFalse','paranoiaEchoReadyTurn','ninjaSmokeCooldown','ninjaSmokeRemaining','mirrorCooldown','turnsTaken'])ghost[key]=target[key]??null;
+    ghost.coord=coord;ghost.effects=structuredClone(target.effects||[]);
+    for(const [ally,dest] of moves){this.#clearShieldLinks(ally);ally.coord=dest;}
+    if(traveling)traveling.coord=coord;
     return true;
   }
+  #recoveryCell(target,origin){
+    const legal=c=>{if(this.#treeBlocks(target,c)||this.#baseAt(c)||this.#pieceAt(this.#other(target.owner),c))return false;const own=this.#piecesAt(target.owner,c).filter(x=>x.id!==target.id);return !own.length||(own.length===1&&(this.#isShieldUnit(target)||this.#isShieldUnit(own[0])));};
+    const cells=[];for(let y=0;y<8;y++)for(let x=0;x<8;x++)cells.push(this.#R.coord(x,y));cells.sort((a,b)=>this.#R.man(origin,a)-this.#R.man(origin,b));
+    return cells.find(legal)||null;
+  }
+  #processHostRecoveries(){for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(!p.recoveryPending)continue;const c=this.#recoveryCell(p,p.recoveryOrigin);if(!c)continue;p.coord=c;p.alive=true;p.possessedBy=null;p.recoveryPending=false;this.#addHistory(side,`👻 Sua peça recuperada voltou em ${c}.`);}}
+  #repairShieldLinks(){for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(!p.linkedToId)continue;const target=this.#pieceById(side,p.linkedToId);if(!p.alive||!this.#isShieldUnit(p)||!target||target.coord!==p.coord)p.linkedToId=null;}}
   #breakPossession(ghost){
-    const pos=ghost?.possession;if(!pos)return null;const coord=ghost.coord,hostName=ghost.name,target=this.#rawPieceById(pos.hostSide,pos.hostId);if(hostName==='Druida'){const branch=this.#pieces(ghost.owner).find(x=>x.alive&&x.summonType==='livingBranch'&&x.druidId===ghost.id);if(branch){const c=branch.coord;this.#clearShieldLinks(branch);branch.alive=false;this.#s.trees=this.#s.trees.filter(t=>t.coord!==c);this.#s.trees.push({coord:c,state:'live',hp:3});}}if(hostName==='Bardo')this.#clearBardEffects(ghost.id,ghost.owner);if(target){const snap=pos.hostSnapshot;Object.assign(target,snap);target.alive=true;target.possessedBy=null;target.coord=coord;}
-    const gs=pos.ghostState;ghost.name='Fantasma';ghost.identity='Fantasma';ghost.form=gs.form;ghost.copied=gs.copied;ghost.bonusM=gs.bonusM;ghost.bonusV=gs.bonusV;ghost.bonusA=gs.bonusA;ghost.bonusRange=gs.bonusRange;ghost.bonusAH=gs.bonusAH;ghost.effects=gs.effects;ghost.possession=null;ghost.hp=0;this.#clearShieldLinks(ghost);ghost.alive=false;ghost.coord=coord;this.#createCorpse(ghost);this.#addHistory(ghost.owner,'☠️ Seu Fantasma foi expulso e morreu; o hospedeiro voltou ao dono original.');this.#addHistory(pos.hostSide,'👻 Sua peça foi recuperada após a morte do Fantasma.');return target;
+    const pos=ghost?.possession;if(!pos)return null;
+    const coord=ghost.coord,target=this.#rawPieceById(pos.hostSide,pos.hostId);
+    this.#collapseDruidBranches(ghost);this.#clearBardEffects(ghost.id,ghost.owner);this.#clearShieldLinks(ghost);
+    const gs=pos.ghostState;Object.assign(ghost,gs);ghost.name='Fantasma';ghost.identity='Fantasma';ghost.summonType=gs.summonType||null;ghost.possession=null;ghost.hp=0;ghost.linkedToId=null;ghost.alive=false;ghost.coord=coord;this.#createCorpse(ghost);
+    if(target){Object.assign(target,pos.hostSnapshot,{effects:structuredClone(target.effects||[]),hp:target.hp});target.linkedToId=null;const dest=this.#recoveryCell(target,coord);target.coord=dest;target.alive=!!dest;target.possessedBy=dest?null:ghost.id;target.recoveryPending=!dest;target.recoveryOrigin=coord;}
+    this.#addHistory(ghost.owner,'☠️ Seu Fantasma foi expulso e morreu; o hospedeiro voltou ao dono original.');this.#addHistory(pos.hostSide,target?.alive?'👻 Sua peça foi recuperada após a morte do Fantasma.':'👻 Sua peça foi recuperada e aguarda uma casa válida para retornar.');return target;
   }
 
   #sabotageBase(side,baseId,bonusId,targetPieceId=null){
@@ -706,23 +740,23 @@ __refRoot.GameReferee = class GameReferee {
       this.#clearShieldLinks(p);p.alive=false;this.#s.trees.push({coord:p.coord,state:'dead'});this.#addHistory(p.owner,'🌲 Galho-Vivo caiu e virou uma árvore morta.');return;
     }
     this.#clearShieldLinks(p);p.alive=false;if(p.name==='Zumbi')p.zombieFinal=true;
-    if(p.name==='Druida')this.#collapseDruidBranches(p);
-    if(p.name==='Bardo')this.#clearBardEffects(p.id,p.owner);
+    this.#collapseDruidBranches(p);
+    this.#clearBardEffects(p.id,p.owner);
     if(p.name==='Slime'&&p.original)this.#s.pendingSlimeSplits.push({owner:p.owner,coord:p.coord,lineageId:p.id,bonusM:p.bonusM||0,bonusV:p.bonusV||0,bonusA:p.bonusA||0,bonusRange:p.bonusRange||0,bonusAH:p.bonusAH||0,bonusPer:p.bonusPer||0,bonusRadarAdvanced:!!p.bonusRadarAdvanced,bonusRadarExpanded:!!p.bonusRadarExpanded,effects:(p.effects||[]).map(e=>structuredClone(e))});else this.#createCorpse(p);
     if(p.summonType==='miniSlime'&&p.slimeLineageId&&!this.#slimeLineageAlive(p.owner,p.slimeLineageId)){this.#addHistory(p.owner,'☠️ O último Mini-Slime caiu. A linhagem do Slime foi eliminada e agora conta como 1 perda.');this.#addHistory(this.#other(p.owner),'☠️ Uma eliminação inimiga foi confirmada.');}
-    if(p.name==='Kamikaze'&&p.original)this.#explodeKamikaze(p);
+    if(this.#effectiveAbility(p)==='kamikaze'&&p.original)this.#explodeKamikaze(p);
   }
-  #collapseDruidBranches(druid){for(const b of this.#pieces(druid.owner).filter(x=>x.alive&&x.summonType==='livingBranch'&&x.druidId===druid.id)){const c=b.coord;this.#clearShieldLinks(b);b.alive=false;this.#s.trees.push({coord:c,state:'live'});this.#addHistory(druid.owner,'🌳 Com a morte do Druida, Galho-Vivo voltou a ser uma árvore normal.');}}
-  #clearBardEffects(bardId,side){for(const q of this.#pieces(side)){const removed=(q.effects||[]).filter(e=>e.sourceBardId===bardId),temp=removed.reduce((n,e)=>n+Math.max(0,Number(e.tempLife)||0),0);q.effects=(q.effects||[]).filter(e=>e.sourceBardId!==bardId);if(temp&&q.alive)q.hp=Math.max(1,q.hp-temp);const max=this.#R.defOf(q).v;if(q.hp>max)q.hp=max;}}
+  #collapseDruidBranches(druid){for(const b of this.#pieces(druid.owner).filter(x=>x.alive&&x.summonType==='livingBranch'&&x.druidId===druid.id)){const c=b.coord;this.#clearShieldLinks(b);b.alive=false;this.#s.trees=this.#s.trees.filter(t=>t.coord!==c);this.#s.trees.push({coord:c,state:'live',hp:3});this.#addHistory(druid.owner,'🌳 Com a morte do Druida, Galho-Vivo voltou a ser uma árvore normal.');}}
+  #clearBardEffects(bardId,side){for(const q of ['player','enemy'].flatMap(s=>this.#pieces(s))){const removed=(q.effects||[]).filter(e=>e.sourceBardId===bardId),temp=removed.reduce((n,e)=>n+Math.max(0,Number(e.tempLife)||0),0);q.effects=(q.effects||[]).filter(e=>e.sourceBardId!==bardId);if(temp&&q.alive)q.hp=Math.max(1,q.hp-temp);const max=this.#R.defOf(q).v;if(q.hp>max)q.hp=max;}}
   #processZombieRevives(){for(const side of ['player','enemy'])for(const p of this.#pieces(side)){if(!p.zombiePending||p.zombieReviveRound>this.#s.round)continue;const free=c=>c&&!this.#solidTerrain(c)&&!this.#baseAt(c)&&!this.#pieceAt('player',c)&&!this.#pieceAt('enemy',c);let c=free(p.zombieDeathCoord)?p.zombieDeathCoord:this.#R.neighbors(p.zombieDeathCoord,false).find(free);if(!c)continue;p.coord=c;p.hp=1;p.alive=true;p.zombiePending=false;p.zombieRevived=true;p.zombieTurnsLeft=3;p.activated=false;this.#addHistory(side,`🧟 Zumbi se levantou em ${c} com 1 Vida e terá 3 turnos antes de cair definitivamente.`);}}
-  #expireBardAfterTurn(bard){bard.turnsTaken=(bard.turnsTaken||0)+1;for(const q of this.#pieces(bard.owner)){const expired=(q.effects||[]).filter(e=>e.sourceBardId===bard.id&&bard.turnsTaken>=(e.expireAfterSourceTurn||Infinity));if(!expired.length)continue;const temp=expired.reduce((n,e)=>n+Math.max(0,Number(e.tempLife)||0),0);q.effects=(q.effects||[]).filter(e=>!expired.includes(e));if(temp&&q.alive)q.hp=Math.max(1,q.hp-temp);const max=this.#R.defOf(q).v;if(q.hp>max)q.hp=max;this.#addHistory(bard.owner,`🎵 A Inspiração em ${this.#R.defOf(q).name} terminou.`);}}
+  #expireBardAfterTurn(bard){bard.turnsTaken=(bard.turnsTaken||0)+1;for(const q of ['player','enemy'].flatMap(s=>this.#pieces(s))){const expired=(q.effects||[]).filter(e=>e.sourceBardId===bard.id&&bard.turnsTaken>=(e.expireAfterSourceTurn||Infinity));if(!expired.length)continue;const temp=expired.reduce((n,e)=>n+Math.max(0,Number(e.tempLife)||0),0);q.effects=(q.effects||[]).filter(e=>!expired.includes(e));if(temp&&q.alive)q.hp=Math.max(1,q.hp-temp);const max=this.#R.defOf(q).v;if(q.hp>max)q.hp=max;this.#addHistory(bard.owner,`🎵 A Inspiração em ${this.#R.defOf(q).name} terminou.`);}}
 
   #damage(p,n){
     if(!p||!p.alive)return{dead:true,transform:false};
     const wasPossessed=!!p.possession,possessedHostName=wasPossessed?this.#R.defOf(p).name:null;
-    let pending=Math.max(0,Number(n)||0);for(const e of p.effects||[]){if(!pending)break;const temp=Math.max(0,Number(e.tempLife)||0);if(!temp)continue;const used=Math.min(temp,pending);e.tempLife=temp-used;pending-=used;}
-    const armorActive=(p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0);const armorReduced=armorActive&&pending>0?Math.min(1,pending):0;pending-=armorReduced;
-    p.hp-=pending;if(pending>0&&p.name==='Golem'&&!p.form&&p.hp>0){p.form='lava';p.hp=1+(p.bonusV||0);return{dead:false,transform:true};}
+    const incoming=Math.max(0,Number(n)||0),armorActive=(p.golemArmorExpireAfterTurn||0)>(p.turnsTaken||0),armorReduced=armorActive?Math.min(1,incoming):0,actual=incoming-armorReduced;
+    let pending=actual;for(const e of p.effects||[]){if(!pending)break;const temp=Math.max(0,Number(e.tempLife)||0);if(!temp)continue;const used=Math.min(temp,pending);e.tempLife=temp-used;pending-=used;}
+    p.hp-=actual;if(actual>0&&p.name==='Golem'&&!p.form&&p.hp>0){p.form='lava';p.hp=1+(p.bonusV||0)+(p.effects||[]).reduce((sum,e)=>sum+Math.max(0,Number(e.tempLife)||0),0);return{dead:false,transform:true,armorReduced};}
     if(p.hp<=0){if(wasPossessed){this.#breakPossession(p);return{dead:false,transform:false,possessionBroken:true,hostName:possessedHostName};}const zombieWasFirst=p.name==='Zumbi'&&p.original&&!p.zombieRevived;this.#kill(p);return{dead:!zombieWasFirst&&!p.alive,transform:false,zombieDown:zombieWasFirst};}return{dead:false,transform:false,armorReduced:typeof armorReduced==='number'?armorReduced:0};
   }
   #explodeKamikaze(p){
@@ -741,14 +775,15 @@ __refRoot.GameReferee = class GameReferee {
   }
 
   #hitAttack(side,attacker,to){
+    this.#markImpact(side,to);
     const other=this.#other(side),d=this.#R.defOf(attacker),mir=this.#mirrorAt(to,other);
-    if(mir){this.#s.mirrors=this.#s.mirrors.filter(m=>m!==mir);const res=this.#damage(attacker,d.a);this.#addHistory(side,`🪞 O ataque do seu ${d.name} foi refletido por um Espelho.${res.dead?' Seu atacante morreu.':res.possessionBroken?' A possessão foi quebrada.':''}`);this.#addHistory(other,`🪞 Seu Espelho refletiu um ataque.${res.dead?' O atacante inimigo morreu.':''}`);this.#resolveSlimeSplits();return;}
-    const friendly=this.#protectedTarget(side,to),hostile=this.#protectedTarget(other,to),target=friendly||hostile,dist=this.#R.man(attacker.coord,to);if(!target&&this.#damageTerrain(to,d.a,side,d.name)){this.#s.impact[other]=to;return;}if(!target){const fake=this.#falsePresenceAt(other,to);if(fake){this.#removeFalsePresence(other,fake);this.#markParanoiaEcho(attacker,false);this.#addHistory(side,`⚔️ Paranoia inimigo foi atingido por ${d.name}.`);this.#addHistory(other,'🧠 Uma de suas Presenças Fantasmas foi destruída por um ataque; o adversário acredita ter atingido Paranoia.');this.#s.impact[other]=to;return;}this.#addHistory(side,`${d.icon} ${d.name} atacou, mas não atingiu ninguém.`);this.#addIntel(other,'💥 Ataque inimigo detectado: a casa atingida foi marcada no tabuleiro.');this.#s.impact[other]=to;return;}
-    const targetSide=target.owner,stacked=this.#piecesAt(targetSide,to).length>1&&target.name==='Escudeiro';const before=this.#R.defOf(target).name,res=this.#damage(target,d.a),friendlyFire=targetSide===side,slimeSplit=target.name==='Slime'&&target.original&&res.dead;
-    if(res.possessionBroken){this.#addHistory(side,`👻 O golpe expulsou o Fantasma de ${res.hostName}; a peça foi recuperada pelo dono original.`);this.#addHistory(targetSide,`👻 ${res.hostName} foi recuperado após a morte do Fantasma.`);this.#s.impact[targetSide]=to;return;}
-    if(res.zombieDown){this.#addHistory(side,`🧟 ${before} caiu, mas ainda não conta como eliminação.`);this.#addHistory(targetSide,`🧟 Seu Zumbi caiu e tentará voltar.`);return;}
+    if(mir){this.#s.mirrors=this.#s.mirrors.filter(m=>m!==mir);const reflectedTarget=this.#protectedTarget(side,attacker.coord)||attacker,intercepted=reflectedTarget.id!==attacker.id,res=this.#damage(reflectedTarget,d.a);this.#addHistory(side,`🪞 O ataque do seu ${d.name} foi refletido por um Espelho.${intercepted?' Seu Escudeiro interceptou o reflexo e protegeu o atacante.':''}${res.dead?` ${intercepted?'O Escudeiro':'Seu atacante'} morreu.`:res.possessionBroken?' A possessão foi quebrada.':''}`);this.#addHistory(other,`🪞 Seu Espelho refletiu um ataque.${intercepted?' O Escudeiro inimigo interceptou o reflexo.':''}${res.dead?` ${intercepted?'O Escudeiro inimigo':'O atacante inimigo'} morreu.`:''}`);this.#resolveSlimeSplits();return;}
+    const friendly=this.#protectedTarget(side,to),hostile=this.#protectedTarget(other,to),target=friendly||hostile,dist=this.#R.man(attacker.coord,to);if(!target&&this.#damageTerrain(to,d.a,side,d.name)){return;}if(!target){const fake=this.#falsePresenceAt(other,to);if(fake){this.#removeFalsePresence(other,fake);this.#markParanoiaEcho(attacker,false);this.#addHistory(side,`⚔️ Paranoia inimigo foi atingido por ${d.name}.`);this.#addHistory(other,'🧠 Uma de suas Presenças Fantasmas foi destruída por um ataque; o adversário acredita ter atingido Paranoia.');return;}this.#addHistory(side,`${d.icon} ${d.name} atacou, mas não atingiu ninguém.`);this.#addIntel(other,'💥 Ataque inimigo detectado: a casa atingida foi marcada no tabuleiro.');return;}
+    const targetSide=target.owner,stacked=this.#piecesAt(targetSide,to).length>1&&this.#isShieldUnit(target);const before=this.#R.defOf(target).name,res=this.#damage(target,d.a),friendlyFire=targetSide===side,slimeSplit=target.name==='Slime'&&target.original&&res.dead;
+    if(res.possessionBroken){this.#addHistory(side,!friendlyFire&&dist>1?'☠️ Um alvo distante foi eliminado.':`👻 O golpe expulsou o Fantasma de ${res.hostName}; a peça foi recuperada pelo dono original.`);this.#addHistory(targetSide,`👻 ${res.hostName} foi recuperado após a morte do Fantasma.`);return;}
+    if(res.zombieDown){this.#addHistory(side,!friendlyFire&&dist>1?'🎯 Um alvo distante foi atingido, mas nenhuma eliminação foi confirmada.':`🧟 ${before} caiu, mas ainda não conta como eliminação.`);this.#addHistory(targetSide,`🧟 Seu Zumbi caiu e tentará voltar.`);return;}
     if(friendlyFire){this.#addHistory(side,slimeSplit?`🟢 Seu Slime foi rompido pelo seu ${d.name} e vai se dividir.`:res.dead?`⚠️ Seu ${before} foi eliminado pelo seu ${d.name}.`:res.transform?'🌋 Você atingiu seu Golem e o transformou em Golem de Lava.':`⚠️ Seu ${before} foi atingido pelo seu ${d.name}.`);if(stacked)this.#addIntel(side,'🛡️ Seu Escudeiro interceptou o ataque aliado e protegeu a outra peça.');}
-    else{if(dist===1)this.#addHistory(side,slimeSplit?`🟢 Slime inimigo foi rompido por ${d.name} e se dividiu.`:res.dead?`☠️ ${before} inimigo eliminado por ${d.name}.`:res.transform?'🌋 Golem inimigo virou Golem de Lava.':`⚔️ ${before} inimigo foi atingido por ${d.name}.`);else this.#addHistory(side,slimeSplit?'🎯 O alvo distante foi atingido, mas nenhuma eliminação foi confirmada.':res.dead?'☠️ Um alvo distante foi eliminado.':'🎯 Um alvo distante foi atingido.');if(stacked)this.#addIntel(side,'🛡️ O Escudeiro inimigo interceptou o dano destinado à casa.');if(dist===1)this.#addHistory(other,slimeSplit?`🟢 Seu Slime foi rompido por ${d.name} e vai se dividir.`:res.dead?`☠️ Seu ${before} foi eliminado por ${d.name}.`:res.transform?'🌋 Seu Golem virou Golem de Lava.':`⚔️ Seu ${before} foi atingido por ${d.name}.`);else this.#addHistory(other,slimeSplit?'🟢 Seu Slime foi atingido por ataque distante e vai se dividir.':res.dead?`☠️ Seu ${before} foi eliminado por ataque distante.`:`🎯 Seu ${before} foi atingido por ataque distante.`);if(stacked)this.#addIntel(other,'🛡️ Seu Escudeiro protegeu a outra peça na mesma casa.');this.#s.impact[other]=to;}
+    else{if(dist===1)this.#addHistory(side,slimeSplit?`🟢 Slime inimigo foi rompido por ${d.name} e se dividiu.`:res.dead?`☠️ ${before} inimigo eliminado por ${d.name}.`:res.transform?'🌋 Golem inimigo virou Golem de Lava.':`⚔️ ${before} inimigo foi atingido por ${d.name}.`);else this.#addHistory(side,slimeSplit?'🎯 O alvo distante foi atingido, mas nenhuma eliminação foi confirmada.':res.dead?'☠️ Um alvo distante foi eliminado.':'🎯 Um alvo distante foi atingido.');if(stacked)this.#addIntel(side,'🛡️ O Escudeiro inimigo interceptou o dano destinado à casa.');if(dist===1)this.#addHistory(other,slimeSplit?`🟢 Seu Slime foi rompido por ${d.name} e vai se dividir.`:res.dead?`☠️ Seu ${before} foi eliminado por ${d.name}.`:res.transform?'🌋 Seu Golem virou Golem de Lava.':`⚔️ Seu ${before} foi atingido por ${d.name}.`);else this.#addHistory(other,slimeSplit?'🟢 Seu Slime foi atingido por ataque distante e vai se dividir.':res.dead?`☠️ Seu ${before} foi eliminado por ataque distante.`:`🎯 Seu ${before} foi atingido por ataque distante.`);if(stacked)this.#addIntel(other,'🛡️ Seu Escudeiro protegeu a outra peça na mesma casa.');}
     this.#resolveSlimeSplits();
   }
 
@@ -760,6 +795,7 @@ __refRoot.GameReferee = class GameReferee {
   }
   #chooseDoppelCopy(side,copyNew){
     const ch=this.#s.doppelChoice?.[side];if(!ch)return this.#fail('Nenhuma escolha do Doppelgänger disponível.');
+    if(copyNew&&!this.#doppelChoiceView(side).canCopyNew)return this.#fail(this.#doppelChoiceView(side).reason);
     const p=this.#pieceById(side,ch.pieceId);if(p&&copyNew)p.copied=ch.newAbility;this.#s.doppelChoice[side]=null;
     this.#addIntel(side,copyNew?`🎭 Doppelgänger agora mantém ${ch.newAbility}.`:`🎭 Doppelgänger manteve ${ch.current}.`);
     return this.#ok('Escolha do Doppelgänger confirmada.');
@@ -769,16 +805,19 @@ __refRoot.GameReferee = class GameReferee {
     const defenderSide=this.#other(attackerSide),r=this.#R.directWinner(att,def),aName=this.#R.defOf(att).name,dName=this.#R.defOf(def).name;const a=this.#activation(attackerSide);if(a){a.mode=null;a.moveRemaining=0;}
     for(const s of ['player','enemy'])this.#s.combatMarks[s]=[...new Set([...(this.#s.combatMarks[s]||[]),to])];this.#s.combatHold[attackerSide]=true;this.#noteReplay('combat',attackerSide,{coord:to,attacker:aName,defender:dName});
     if(r==='tie'){att.coord=from;this.#addHistory(attackerSide,`↩️ ${aName} foi repelido por ${dName}.`);this.#addHistory(defenderSide,`↩️ ${aName} inimigo foi repelido pelo seu ${dName}.`);return this.#finishActivation(attackerSide);}
-    const attackerWins=r==='att',winner=attackerWins?att:def,loser=attackerWins?def:att;
+    const attackerWins=r==='att',winner=attackerWins?att:def,loser=attackerWins?def:att,loserCell=loser===att?from:to,shield=!this.#isShieldUnit(loser)?this.#shieldAt(loser.owner,loserCell):null;
     if(this.#isGhost(winner)){
-      this.#possess(winner.owner,winner,loser);const dest=loser===def?to:from;winner.coord=dest;this.#addHistory(winner.owner,`👻 Fantasma venceu o Confronto e possuiu ${this.#R.defOf(loser).name}.`);this.#addHistory(loser.owner,'👻 Sua peça foi possuída em Confronto Direto e desapareceu da sua visão.');return this.#finishActivation(attackerSide);
+      const possessionTarget=shield||loser;
+      if(!this.#possess(winner.owner,winner,possessionTarget)){att.coord=from;this.#addHistory(attackerSide,'👻 A possessão no Confronto não se completou; as peças permaneceram na origem.');this.#addHistory(defenderSide,'👻 A possessão no Confronto não se completou; as peças permaneceram na origem.');return this.#finishActivation(attackerSide);}
+      if(shield){const msg=`🛡️ Escudeiro interceptou o Fantasma no Confronto e protegeu ${this.#R.defOf(loser).name}.`;this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);}else{this.#addHistory(winner.owner,`👻 Fantasma venceu o Confronto e possuiu ${this.#R.defOf(loser).name}.`);this.#addHistory(loser.owner,'👻 Sua peça foi possuída em Confronto Direto e desapareceu da sua visão.');}return this.#finishActivation(attackerSide);
     }
+    if(shield){const protectedName=this.#R.defOf(loser).name,res=this.#damage(shield,1);this.#resolveSlimeSplits();att.coord=from;const msg=`🛡️ Escudeiro interceptou o dano do Confronto e protegeu ${protectedName}.${res.dead?' O Escudeiro foi eliminado.':' O Escudeiro sofreu 1 de dano.'}`;this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);}
     const before=this.#R.defOf(loser).name,res=this.#damage(loser,1);this.#resolveSlimeSplits();
     if(res.possessionBroken){att.coord=from;const msg=`👻 O Confronto expulsou o Fantasma de ${res.hostName}; a peça original foi recuperada.`;this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);}
     if(!res.dead){att.coord=from;const msg=res.zombieDown?`🧟 ${before} caiu no Confronto, mas ainda não conta como eliminação.`:res.transform?`🌋 ${this.#R.defOf(winner).name} venceu o Confronto contra ${before}; ${before} sofreu 1 e virou Golem de Lava.`:`⚔️ ${this.#R.defOf(winner).name} venceu o Confronto e causou 1 em ${before}, que sobreviveu.`;this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);}
     if(!winner.alive){const msg=`💥 ${before} morreu, mas a reação também eliminou ${this.#R.defOf(winner).name}.`;this.#addHistory(attackerSide,msg);this.#addHistory(defenderSide,msg);return this.#finishActivation(attackerSide);}
     const slimeSplit=loser.name==='Slime'&&loser.original,directMsg=slimeSplit?`🟢 Slime foi rompido por ${this.#R.defOf(winner).name} no Confronto Direto e se dividiu.`:`☠️ ${before} eliminado por ${this.#R.defOf(winner).name} em Confronto Direto.`;this.#addHistory(attackerSide,directMsg);this.#addHistory(defenderSide,directMsg);
-    const ownCell=winner===att?from:to,deadCell=winner===att?to:from,winnerSide=winner.owner;const protectedAlly=loser.name==='Escudeiro'?this.#piecesAt(loser.owner,deadCell).find(x=>x.id!==loser.id):null;const shieldProtected=loser.name==='Escudeiro'&&protectedAlly&&protectedAlly.alive;winner.coord=ownCell;this.#s.pendingCombat={winnerId:winner.id,winnerSide,ownCell,deadCell,afterSide:attackerSide,protectedAllyId:shieldProtected?protectedAlly.id:null,protectedSide:shieldProtected?protectedAlly.owner:null};return this.#ok('Confronto resolvido. O vencedor deve escolher onde termina.',{pendingCombat:true});
+    const ownCell=winner===att?from:to,deadCell=winner===att?to:from,winnerSide=winner.owner;const protectedAlly=this.#isShieldUnit(loser)?this.#piecesAt(loser.owner,deadCell).find(x=>x.id!==loser.id):null;const shieldProtected=this.#isShieldUnit(loser)&&protectedAlly&&protectedAlly.alive;winner.coord=ownCell;this.#s.pendingCombat={winnerId:winner.id,winnerSide,ownCell,deadCell,afterSide:attackerSide,protectedAllyId:shieldProtected?protectedAlly.id:null,protectedSide:shieldProtected?protectedAlly.owner:null};return this.#ok('Confronto resolvido. O vencedor deve escolher onde termina.',{pendingCombat:true});
   }
 
   #chooseCombatPosition(side,advance){
@@ -786,16 +825,23 @@ __refRoot.GameReferee = class GameReferee {
     const winner=this.#pieceById(side,p.winnerId);
     const protectedAlly=p.protectedAllyId&&p.protectedSide?this.#pieceById(p.protectedSide,p.protectedAllyId):null;
     if(winner){
-      let doAdvance=!!advance;
+      let doAdvance=!!advance&&this.#canAdvanceCombat(p);
       if(!protectedAlly&&doAdvance&&this.#piecesAt(this.#other(side),p.deadCell).length)doAdvance=false;
       if(protectedAlly&&doAdvance){const blockers=this.#piecesAt(side,p.ownCell).filter(x=>x.id!==winner.id);if(blockers.length)doAdvance=false;}
-      winner.coord=doAdvance?p.deadCell:p.ownCell;const linkedShield=this.#linkedShieldFor(winner);if(linkedShield?.alive&&linkedShield.coord===p.ownCell)linkedShield.coord=winner.coord;
+      winner.coord=doAdvance?p.deadCell:p.ownCell;
       if(protectedAlly&&protectedAlly.alive){
         const allyDest=doAdvance?p.ownCell:p.deadCell;
         const enemyBlock=this.#piecesAt(side,allyDest).some(x=>x.id!==winner.id);
         if(!enemyBlock)protectedAlly.coord=allyDest;
         else {winner.coord=p.ownCell;protectedAlly.coord=p.deadCell;}
       }
+      // O vínculo não pode terminar com Escudeiro e aliado em casas diferentes.
+      // Se o vencedor for o aliado seguido, leva o Escudeiro; se o próprio Escudeiro
+      // vinculado vencer e avançar, leva também o alvo do vínculo.
+      const linkedShield=this.#linkedShieldFor(winner);
+      if(linkedShield?.alive&&linkedShield.coord===p.ownCell)linkedShield.coord=winner.coord;
+      const linkedTarget=winner.linkedToId?this.#pieceById(side,winner.linkedToId):null;
+      if(linkedTarget?.alive&&linkedTarget.coord===p.ownCell)linkedTarget.coord=winner.coord;
       this.#checkDoppel(side,winner);
     }
     const after=p.afterSide;this.#s.pendingCombat=null;return this.#finishActivation(after);
@@ -822,8 +868,8 @@ __refRoot.GameReferee = class GameReferee {
   }
 
   #finishActivation(side){
-    const active=this.#activation(side),hadActivation=!!active,p=this.#activePiece(side);if(p&&this.#paranoiaEchoReady(p)&&!active?.movementUsed)this.#triggerParanoiaEchoWithoutMove(side,p);if(this.#s.mode!=='training'&&hadActivation)this.#s.roundActivations[side]=(this.#s.roundActivations?.[side]||0)+1;if(p&&p.alive){if(p.name==='Arqueiro'||p.identity==='Arqueiro'){p.sureShotActive=false;if((p.sureShotCooldown||0)>0)p.sureShotCooldown--;}if((p.pyroCooldown||0)>0)p.pyroCooldown--;if((p.ninjaSmokeCooldown||0)>0)p.ninjaSmokeCooldown--;if((p.ninjaSmokeRemaining||0)>0&&p.ninjaSmokeCooldown<2)p.ninjaSmokeRemaining--;p.activated=this.#s.mode==='training'?false:true;this.#tickPieceEffects(p,'turn');if(p.name==='Bardo'||p.identity==='Bardo')this.#expireBardAfterTurn(p);else p.turnsTaken=(p.turnsTaken||0)+1;if((p.golemArmorExpireAfterTurn||0)>0&&(p.turnsTaken||0)>=p.golemArmorExpireAfterTurn){p.golemArmorExpireAfterTurn=0;this.#addHistory(side,'🛡️ A Armadura do Golem terminou.');}if(p.name==='Zumbi'&&p.zombieTurnsLeft>0){p.zombieTurnsLeft--;if(p.zombieTurnsLeft<=0){this.#addHistory(side,'🧟 Os 3 turnos do Zumbi terminaram; ele caiu definitivamente.');this.#kill(p,true);}}}
-    this.#s.activation[side]=null;this.#s.impact[side]=null;if(this.#s.combatHold?.[side])this.#s.combatHold[side]=false;else if(this.#s.combatMarks)this.#s.combatMarks[side]=[];if(this.#s.mode==='training'){this.#s.turn=side;return this.#ok('Ação de treino encerrada. Você pode usar qualquer peça novamente.',{training:true});}if(this.#checkEnd())return this.#ok('Partida encerrada.',{gameOver:true});this.#advanceAfterActivation(side);return this.#ok('Turno encerrado.',{turn:this.#s.turn});
+    const active=this.#activation(side),hadActivation=!!active,p=this.#activePiece(side);if(p&&this.#paranoiaEchoReady(p)&&!active?.movementUsed)this.#triggerParanoiaEchoWithoutMove(side,p);if(this.#s.mode!=='training'&&hadActivation)this.#s.roundActivations[side]=(this.#s.roundActivations?.[side]||0)+1;if(p&&p.alive){p.sureShotActive=false;if((p.sureShotCooldown||0)>0)p.sureShotCooldown--;if((p.pyroCooldown||0)>0)p.pyroCooldown--;if((p.ninjaSmokeCooldown||0)>0)p.ninjaSmokeCooldown--;if((p.ninjaSmokeRemaining||0)>0&&p.ninjaSmokeCooldown<2)p.ninjaSmokeRemaining--;p.activated=this.#s.mode==='training'?false:true;this.#tickPieceEffects(p,'turn');this.#expireBardAfterTurn(p);if((p.golemArmorExpireAfterTurn||0)>0&&(p.turnsTaken||0)>=p.golemArmorExpireAfterTurn){p.golemArmorExpireAfterTurn=0;this.#addHistory(side,'🛡️ A Armadura do Golem terminou.');}if(p.name==='Zumbi'&&p.zombieTurnsLeft>0){p.zombieTurnsLeft--;if(p.zombieTurnsLeft<=0){this.#addHistory(side,'🧟 Os 3 turnos do Zumbi terminaram; ele caiu definitivamente.');this.#kill(p,true);}}}
+    this.#s.activation[side]=null;this.#s.impact[side]=[];this.#processHostRecoveries();this.#repairShieldLinks();if(this.#s.combatHold?.[side])this.#s.combatHold[side]=false;else if(this.#s.combatMarks)this.#s.combatMarks[side]=[];if(this.#s.mode==='training'){this.#s.turn=side;return this.#ok('Ação de treino encerrada. Você pode usar qualquer peça novamente.',{training:true});}if(this.#checkEnd())return this.#ok('Partida encerrada.',{gameOver:true});this.#advanceAfterActivation(side);return this.#ok('Turno encerrado.',{turn:this.#s.turn});
   }
 
   #advanceAfterActivation(side){

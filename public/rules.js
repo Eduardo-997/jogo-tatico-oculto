@@ -75,7 +75,7 @@ __gameRoot.GameRules = (() => {
     const rawM=Math.max(0,(base.m||0)+(p.bonusM||0)+temp.m);
     const rawA=Math.max(0,(base.a||0)+(p.bonusA||0)+temp.a);
     let rawRange=Math.max(0,(base.range||0)+(p.bonusRange||0)+temp.range);
-    if((p.name==='Arqueiro'||p.identity==='Arqueiro')&&p.sureShotActive)rawRange*=2;
+    if(p.sureShotActive)rawRange*=2;
     return {...base,
       v:rawV,m:rawM,a:rawA,range:rawRange,
       per:Math.max(0,(base.per??1)+(p.bonusPer||0)+temp.per),
@@ -88,7 +88,7 @@ __gameRoot.GameRules = (() => {
     // Peças internas do Árbitro não possuem esses campos diretos, então continuam usando defOf(p).
     const attack=Number.isFinite(Number(p?.a))?Number(p.a):d.a;
     const range=Number.isFinite(Number(p?.range))?Number(p.range):d.range;
-    if(attack<=0 && p.name!=='Fantasma')return out;
+    if(attack<=0 && !((p.name==='Fantasma'||p.identity==='Fantasma')&&!p.possession&&!p.possessing))return out;
     for(let y=0;y<8;y++) for(let x=0;x<8;x++){
       const c=coord(x,y); if(c!==p.coord&&man(p.coord,c)<=range) out.push(c);
     }

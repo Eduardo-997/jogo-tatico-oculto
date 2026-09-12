@@ -1,0 +1,11 @@
+{
+  "games": 80,
+  "completed": 80,
+  "actions": 18440,
+  "invalid": [],
+  "stalled": [],
+  "invariants": [],
+  "results": {
+    "enemy": 80
+  }
+}
