@@ -35,7 +35,7 @@ for(const group of [assets.terrain,assets.structures,assets.effects,assets.arche
   }
 }
 const version=JSON.parse(read('package.json')).version;
-for(const page of ['index.html','multiplayer.html','triplayer.html','training.html']){
+for(const page of ['index.html','multiplayer.html','triplayer.html','training.html','generals.html']){
   const html=read('public/'+page);
   assert.ok(html.includes(`aria-label="Versão do jogo">v${version}</span>`),'Versão visível incorreta em '+page);
   for(const [,cache] of html.matchAll(/\?v=(\d+\.\d+\.\d+)/g))assert.equal(cache,version,'Cache HTML fora da versão em '+page);
@@ -54,3 +54,16 @@ for(const page of ['index.html','multiplayer.html','triplayer.html']){
 }
 console.log(JSON.stringify({javascriptSyntax:js,localHtmlReferences:refs,missingReferences:0,duplicateHtmlIds:0,workerParity:true,arenaParity:true,aiBundleParity:true},null,2));
 console.log(JSON.stringify({dynamicAssetReferences:assetReferences,assetCacheVersion:version,surrenderPlacement:true},null,2));
+const brainBody=read('public/ai-worker.js').split("if(typeof self!=='undefined')self.onmessage=")[0].replace(/^'use strict';\s*/,'');
+assert.ok(read('public/classic-ai.mjs').includes(brainBody),'IA dos Generais fora de sincronia');
+assert.equal(/\b(?:eval\(|new Function\b)/.test(read('public/classic-ai.mjs')),false,'IA do servidor não pode depender de eval');
+console.log(JSON.stringify({generalBrainParity:true,generalModePages:1},null,2));
+for(const[source,target,namespace,imports]of [
+  ['classic-ai.mjs','classic-ai-global.js','ClassicBrains',null],
+  ['generals-core.mjs','generals-core-global.js','GeneralGame','const {createClassicBrain}=window.ClassicBrains;'],
+  ['generals-ui.mjs','generals-ui-global.js',null,'const {GENERAL_SIDES,defaultGeneralControl,makeGeneralBrains,brainSnapshots,generalStep,applyGeneralAction}=window.GeneralGame;']
+]){
+  let body=read('public/'+source);const names=[...body.matchAll(/^export (?:const|function) (\w+)/gm)].map(m=>m[1]);body=body.replace(/^export /gm,'');if(imports)body=body.replace(/^import [^\n]+;\n/,imports+'\n');
+  assert.equal(read('public/'+target),'(function(){\n'+body+(namespace?'\nwindow.'+namespace+'={'+names.join(',')+'};':'')+'\n})();\n','Bundle de Generais fora de sincronia: '+target);
+}
+console.log(JSON.stringify({generalGlobalBundleParity:true},null,2));

@@ -48,7 +48,12 @@ export async function joinSeat(room,ws,msg,sides){
   const token=typeof msg.seatToken==='string'?msg.seatToken:'';
   let chosen=token?sides.find(side=>room.seatTokens[side]===token):null;
   if(token&&!chosen){room.send(ws,{type:'error',message:'A reconexão não corresponde a esta sala. Confira o código ou use uma nova sala.'});try{ws.close(1008,'Reconexão inválida');}catch{}return;}
-  if(!chosen&&!room.started)chosen=sides.find(side=>!activeSocket(room,side));
+  if(!chosen&&!room.started){
+    if(room.generals&&msg.side!=null){
+      if(!sides.includes(msg.side)||activeSocket(room,msg.side)||room.seatTokens[msg.side]){room.send(ws,{type:'error',message:'Esse lado está ocupado ou é inválido. Escolha o outro general.'});return;}
+      chosen=msg.side;
+    }else chosen=sides.find(side=>!activeSocket(room,side)&&(!room.generals||!room.seatTokens[side]));
+  }
   // Salas antigas sem tokens podem migrar uma única vez para assentos reservados.
   if(!chosen&&room.started)chosen=sides.find(side=>(room.legacySeats||[]).includes(side)&&!room.seatTokens[side]&&!activeSocket(room,side));
   if(!chosen){room.send(ws,{type:'error',message:room.started?'Partida já iniciada. Reconecte pelo navegador original ou use outro código de sala.':'Sala cheia.'});try{ws.close(1008,'Assento indisponível');}catch{}return;}

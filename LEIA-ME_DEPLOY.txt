@@ -1,19 +1,21 @@
-Batalha nas Sombras v1.15.75 — TESTE GIT
+Batalha nas Sombras v1.15.76 — TESTE GIT
 
-Base: v1.15.74; foco SVG reforçado e versão visível nas quatro telas.
+Base: v1.15.75; novo modo Generais no tabuleiro Clássico (local e Online).
 Inclui recuperação local, identificação de unidades e Rendição junto das ações.
-Estado completo: SAVE_PROJETO_v1_15_75.md; SAVEs anteriores são históricos.
+Estado completo: SAVE_PROJETO_v1_15_76.md; SAVEs anteriores são históricos.
 Histórico antigo: docs/HISTORICO_DEPLOY_ATE_v1_15_70.txt.
 
 EXECUÇÃO E PUBLICAÇÃO
 - Local com Worker e Online: npm install; npm run dev.
 - Clássico: /index.html; Online: /multiplayer.html.
 - Arena solo/Online: /triplayer.html; Treino: /training.html.
+- Generais: /generals.html; local IA x IA também funciona com os bundles
+  globais do ZIP. Online precisa do servidor, como os outros modos Online.
 - Arquivos abertos diretamente por file:// não fornecem o servidor WebSocket.
 - Publicar somente com autorização explícita do usuário.
-- Nesta tarefa foi autorizada a publicação da v1.15.75 no repositório
-  Eduardo-997/jogo-tatico-oculto; Git aciona o build Cloudflare existente.
-- Resultado e commit de publicação são informados na mensagem final.
+- A v1.15.75 está publicada no repositório Eduardo-997/jogo-tatico-oculto;
+  esta v1.15.76 ainda não foi publicada. Não assumir autorização anterior
+  de deploy como autorização para publicar automaticamente toda versão.
 - Clássico contra IA e Arena solo salvam a partida em sessionStorage nesta
   aba desde a v1.15.73; atualizar a página tenta recuperar o estado.
 - Salvar depende da permissão/cota do navegador. Não é uma cópia na nuvem,
@@ -40,11 +42,20 @@ FONTES E SINCRONIZAÇÃO
 - Mistura intencional de CommonJS (Clássico) e ESM (Arena/servidor).
   Não adicionar type:module ao package.json sem migrar o CommonJS.
 - Names das folhas CSS são históricos; os parâmetros ?v invalidam o cache.
+- Generais: fonte da IA em public/ai-worker.js. npm run sync gera a fábrica
+  public/classic-ai.mjs (uma memória por lado) e bundles globais de Generais.
+- Fonte de interface: public/generals-ui.mjs; controlador: generals-core.mjs.
+- Salas Online de Generais usam /ws?generals=1 e namespace GENERALS:,
+  sem novos bindings ou migrações de Durable Objects. IA avança por alarmes.
 
 VALIDAÇÃO
-- v1.15.75: 489 testes passaram, 35 arquivos JS/MJS válidos, 79 referências
+- v1.15.76: 521 testes passaram, 44 arquivos JS/MJS válidos, 95 referências
   HTML e 70 referências dinâmicas de assets existentes.
-- Resultado atual: docs/VALIDACAO_v1_15_75.json.
+- Resultado atual: docs/VALIDACAO_v1_15_76.json.
+- GAMES=40 RESTORE=1 SEED_OFFSET=40000 npm run simulate:generals:
+  160 partidas IA x IA, 160 encerradas; 43.919 ações sem ações inválidas,
+  ocupação/vínculos ilegais ou travamentos na bateria. Recuperação a cada
+  31 ações testada. Sem garantia de todos os caminhos ou balanceamento.
 - Matrizes e simulações amplas da v1.15.73 são histórico, não novas simulações
   da v1.15.75: veja docs/VALIDACAO_v1_15_73.json.
 - npm test: regressões permanentes de mecânicas, IA, frontend e Online.
