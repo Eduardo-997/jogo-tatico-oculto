@@ -12,8 +12,16 @@
     return JSON.stringify({round:s.round,turn:s.turn,gameOver:s.gameOver,result:s.result,matchConfig:s.matchConfig||null,aiDifficulty:s.aiDifficulty||null,pieces:{player:(s.pieces?.player||[]).map(replayPiece),enemy:(s.pieces?.enemy||[]).map(replayPiece)},activation:s.activation||{},roundActivations:s.roundActivations||{},rockHp:s.rockHp||{},spotReveals:s.spotReveals||{},hints:s.hints||s.perceptionHints||{},impact:s.impact||{},bases:s.bases||[],corpses:s.corpses||[],mirrors:s.mirrors||[],trees:s.trees||[],rocks:s.rocks||[],water:s.water||[],swamps:s.swamps||[],traps:s.traps||{},falsePresences:s.falsePresences||{},history:s.history||{},replayEvent:s.replayEvent||null});
   }
   class Recorder{
-    constructor(exporter,opts={}){this.exporter=exporter;this.opts=opts;this.items=[];this.lastSig='';}
-    clear(){this.items=[];this.lastSig='';}
+    constructor(exporter,opts={}){this.exporter=exporter;this.opts=opts;this.items=[];this.lastSig='';this.partial=false;}
+    clear(){this.items=[];this.lastSig='';this.partial=false;}
+    restore(frames,partial=false){
+      if(!Array.isArray(frames))return false;
+      this.items=frames.slice(-600).map(f=>({label:String(f.label||''),state:clone(f.state),t:Number(f.t)||Date.now()}));
+      this.partial=!!partial;
+      if(this.partial&&this.items.length&&!this.items[0].label.startsWith('Trecho recente'))this.items[0].label='Trecho recente — '+this.items[0].label;
+      this.lastSig=this.items.length?meaningful(this.items.at(-1).state):'';
+      return true;
+    }
     capture(label=''){
       let state;try{state=parse(this.exporter());}catch{return false;}
       const sig=meaningful(state);if(sig===this.lastSig)return false;this.lastSig=sig;

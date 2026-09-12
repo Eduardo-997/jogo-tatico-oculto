@@ -38,5 +38,12 @@
     }
     return text[name]||text[p?.name]||'Sem habilidade ativa ou característica adicional.';
   }
-  window.BNSCharacterInfo=Object.freeze({text,abilityText});
+  function unitLabel(p,coordinate=c=>c){
+    const kind=p?.possessing?'possuído pelo Fantasma':p?.summonType==='miniSlime'?'divisão do Slime':p?.summonType?'invocação':p?.original?'original':'unidade';
+    const location=p?.coord?coordinate(p.coord):null;
+    return `${p?.icon||''} ${p?.displayName||p?.name||'Unidade'} — ${kind}${location?` — ${location}`:''}`.trim();
+  }
+  const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const unitHtml=(p,coordinate)=>escapeHtml(unitLabel(p,coordinate));
+  window.BNSCharacterInfo=Object.freeze({text,abilityText,unitLabel,unitHtml});
 })();

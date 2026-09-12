@@ -1,0 +1,18 @@
+{
+  "parameters": {
+    "GAMES": 20,
+    "SEED_OFFSET": 20000,
+    "CHECKPOINT": 1
+  },
+  "games": 80,
+  "completed": 80,
+  "actions": 20764,
+  "invalid": [],
+  "stalled": [],
+  "invariants": [],
+  "results": {
+    "enemy": 77,
+    "player": 2,
+    "draw": 1
+  }
+}

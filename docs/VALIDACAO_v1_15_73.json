@@ -1,0 +1,106 @@
+{
+  "version": "1.15.73",
+  "base": "1.15.72",
+  "deployed": false,
+  "tests": {
+    "runner": 480,
+    "passed": 480,
+    "failed": 0,
+    "skipped": 0,
+    "combinatorialCases": {
+      "directCombat": 2000,
+      "bardBonuses": 500,
+      "shieldNormalAndArea": 190,
+      "total": 2690
+    }
+  },
+  "integrity": {
+    "javascriptSyntax": 34,
+    "localHtmlReferences": 79,
+    "missingReferences": 0,
+    "duplicateHtmlIds": 0,
+    "workerParity": true,
+    "arenaParity": true,
+    "aiBundleParity": true,
+    "assets": 67,
+    "assetsUnchanged": true,
+    "arenaMapUnchanged": true,
+    "wranglerUnchanged": true
+  },
+  "simulations": {
+    "parameters": {
+      "SEED_OFFSET": 20000,
+      "CHECKPOINT": 1,
+      "difficulties": 4,
+      "maxActionsPerGame": 5000
+    },
+    "classic": {
+      "games": 80,
+      "completed": 80,
+      "actions": 20764,
+      "invalid": [],
+      "stalled": [],
+      "invariants": [],
+      "results": {
+        "enemy": 77,
+        "player": 2,
+        "draw": 1
+      },
+      "scenario": "IA contra oponente parado; perseguição/passivas, não IA versus IA"
+    },
+    "arena": {
+      "games": 240,
+      "completed": 240,
+      "actions": 100924,
+      "invalid": 0,
+      "stalled": 0,
+      "maxRound": 70,
+      "invariants": [],
+      "results": {
+        "B": 99,
+        "C": 64,
+        "A": 71,
+        "draw": 6
+      },
+      "scenario": "três IAs usando visão filtrada"
+    },
+    "totals": {
+      "games": 320,
+      "completed": 320,
+      "actions": 121688,
+      "invalid": 0,
+      "stalled": 0,
+      "invariantViolations": 0
+    },
+    "targetedBardReproduction": {
+      "games": 4,
+      "completed": 4,
+      "actions": 2304,
+      "invalid": 0,
+      "stalled": 0
+    }
+  },
+  "manual": {
+    "userConfirmed": [
+      "Escudeiro",
+      "Vidente/Piromante",
+      "Movimento parcial",
+      "Reconexão Arena Online",
+      "Aparência celular parece correta",
+      "Treino: recuperação Slime possuído"
+    ],
+    "notPerformedInThisRevision": [
+      "navegador real/Chromium",
+      "F5 real em navegador",
+      "toque/áudio/contraste",
+      "teste Online real novo",
+      "deploy v1.15.73"
+    ]
+  },
+  "limits": [
+    "Não prova ausência de bugs em toda combinação possível.",
+    "Checkpoint nesta aba depende de sessionStorage e é compatível apenas com o formato/build validado.",
+    "Replay salvo pode ser só trecho recente; memória estratégica dos controladores é reconstruída.",
+    "IA x IA/espectador na interface e regra geral de empate ficam para decisões futuras."
+  ]
+}

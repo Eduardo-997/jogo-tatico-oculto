@@ -449,8 +449,9 @@ function bardStatScore(target,stat){
 }
 function bestBardChoice(view,p){
   const mates=ownAlive(view).filter(x=>x.id!==p.id&&man(p.coord,x.coord)<=Math.max(0,p.ah||0));if(!mates.length)return null;
+  const needsAttack=ownAlive(view).every(x=>(x.a||0)<=0&&!isGhost(x));
   let best=null;for(const t of mates)for(const stat of ['attack','range','abilityRange','move','life']){
-    let score=bardStatScore(t,stat);
+    let score=bardStatScore(t,stat)+(needsAttack&&stat==='attack'?80:0);
     if(difficulty==='extreme'){
       const nearHot=neighbors(t.coord,true).reduce((q,c)=>q+heat(c),0);score+=nearHot*(stat==='attack'||stat==='life'?2.2:0.8);
       if(stat==='abilityRange'&&effectiveAbility(t))score+=4;
@@ -680,6 +681,7 @@ function decide(view,lastResult){
   const ability=effectiveAbility(p),utility=['bard','seer','phantomPresence','spotTrap','damageTrap','mirror'].includes(ability),stationary=memory.utilityAt[p.id];
   const searching=!(view.visibleOpponents||[]).length&&(view.round>8||alive.filter(x=>x.original).length<=2);
   const canMove=!a.movementUsed&&p.m>0&&!p.linkedToId&&legalMoveOptions(view,p,p.m).length;
+  if(ability==='bard'&&alive.every(x=>(x.a||0)<=0&&!isGhost(x))&&bestBardChoice(view,p))return {type:'startAbility'};
   if(canMove&&utility&&(searching||(stationary?.coord===p.coord&&stationary.count>=1)))return {type:'startMove'};
   if(p.linkedToId&&ability==='shieldLink'&&searching){const host=alive.find(x=>x.id===p.linkedToId);if(host&&(host.m||0)<=0&&p.m>0)return {type:'startAbility'};}
 
@@ -709,6 +711,7 @@ function rememberIssued(action,view){
 }
 
 if(typeof self!=='undefined')self.onmessage=e=>{
+  if(e.data?.type==='reset'){resetMemory({});return;}
   const {id,view,lastResult,difficulty:requestedDifficulty}=e.data||{};
   difficulty=['easy','normal','hard','extreme'].includes(requestedDifficulty)?requestedDifficulty:'normal';
   const action=decide(view,lastResult||null);

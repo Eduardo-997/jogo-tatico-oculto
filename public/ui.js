@@ -6,7 +6,8 @@
   const ai=referee.createClient('enemy');
   const aiWorker=window.createGameAiWorker();
   const replay=window.GameReplay?new window.GameReplay.Recorder(()=>referee.exportState(),{kind:'classic'}):null;
-  let aiReq=0,aiScheduled=false,aiLastResult=null;
+  let aiReq=0,aiScheduled=false,aiTimer=null,aiAwaiting=null,aiLastResult=null;
+  const checkpoint=window.BNSLocalCheckpoint.create('classic',{coords:Array.from({length:64},(_,i)=>R.coord(i%8,Math.floor(i/8))),names:R.defs.map(d=>d.name)});
 
   const $=s=>document.querySelector(s);
   const roster=$('#roster'),board=$('#board'),historyEl=$('#history'),intelEl=$('#intel'),statusEl=$('#status'),availableEl=$('#available');
@@ -238,7 +239,7 @@
       const label=baseTargetArea.querySelector('.small.muted');if(label)label.textContent=`Escolha quem recebe ${bonus.icon} ${bonus.name}:`;
       let targets=v.ownPieces.filter(p=>p.alive);
       if(bonus.id==='range')targets=targets.filter(p=>p.a>0);if(bonus.id==='abilityRange')targets=targets.filter(p=>(p.ah||0)>0);
-      for(const t of targets){const b=document.createElement('button');b.type='button';b.className='target-btn';b.innerHTML=`<b>${t.icon} ${t.displayName}${t.original?'':' <span class="muted">(invocação)</span>'}</b><span>V${t.hp}/${t.maxHp} · M${t.m} · ATQ${t.a} · ALC${t.range} · PER${t.per} · Alc. Hab. ${t.ah||0}</span>`;b.addEventListener('click',()=>{const r=player.sabotageBase(base.id,bonus.id,t.id);setStatus(r.status);closeBasePanel();afterMutation();});baseTargetGrid.appendChild(b);}
+      for(const t of targets){const b=document.createElement('button');b.type='button';b.className='target-btn';b.innerHTML=`<b>${window.BNSCharacterInfo.unitHtml(t)}</b><span>V${t.hp}/${t.maxHp} · M${t.m} · ATQ${t.a} · ALC${t.range} · PER${t.per} · Alc. Hab. ${t.ah||0}</span>`;b.addEventListener('click',()=>{const r=player.sabotageBase(base.id,bonus.id,t.id);setStatus(r.status);closeBasePanel();afterMutation();});baseTargetGrid.appendChild(b);}
       baseTargetArea.classList.remove('hidden');setStatus(`Escolha qual personagem recebe ${bonus.icon} ${bonus.name}.`);return;
     }
     const r=player.sabotageBase(base.id,bonus.id,null);setStatus(r.status);closeBasePanel();afterMutation();
@@ -453,7 +454,7 @@
     if(v.gameOver){setStatus(v.result==='player'?'Você venceu.':v.result==='enemy'?'Você perdeu.':'Empate.');const win=v.result==='player',draw=v.result==='draw',cfg=v.matchConfig||currentMatchConfig();Presentation.showEndScreen({key:`classic:${v.result}:${v.round}`,mode:'classic',result:v.result,icon:draw?'⚖️':win?'🏆':'☠️',title:draw?'EMPATE':win?'VITÓRIA':'DERROTA',tone:draw?'draw':win?'victory':'defeat',reason:v.surrenderedBy?(v.surrenderedBy==='player'?'Você desistiu da partida.':'O adversário desistiu da partida.'):draw?'As duas equipes chegaram ao próprio limite de perdas na mesma resolução.':win?`O adversário atingiu ${cfg.lossLimit.enemy} perdas originais.`:`Você atingiu ${cfg.lossLimit.player} perdas originais.`,round:v.round,summary:[{label:'Suas perdas',value:`${v.ownOriginalDeaths}/${cfg.lossLimit.player}`},{label:'Perdas inimigas',value:`${v.enemyOriginalDeaths}/${cfg.lossLimit.enemy}`},{label:'Rodadas disputadas',value:v.round}],onReplay:replay&&replay.length>1?()=>window.GameReplay.open(replay.frames(),{title:'Replay do Clássico'}):null});}
     else {Presentation.hideEndScreen();if(v.turn==='enemy'&&!v.pendingCombat)statusEl.textContent='🤖 Vez da IA...'; else statusEl.textContent=status;}
     if(replayBtn)replayBtn.classList.toggle('hidden',!(v.gameOver&&replay&&replay.length>1));if(surrenderBtn)surrenderBtn.classList.toggle('hidden',v.phase!=='play'||v.gameOver);
-    return v;
+    saveLocalGame();return v;
   }
 
   function toggleSetupCharacter(d){
@@ -542,25 +543,26 @@
     seerPreview=new Set([main,c]);seerConfirm.classList.remove('hidden');setStatus('2/2 casas selecionadas. Confirme a visão.');render();
   }
 
-  function showBardChoice(input){const targets=Array.isArray(input)?input:[input];bardChoiceButtons.innerHTML='';if(targets.length>1){bardChoiceText.textContent='Há duas unidades nesta casa. Quem receberá a Inspiração?';for(const target of targets){const b=document.createElement('button');b.type='button';b.textContent=`${target.icon} ${target.displayName}`;b.addEventListener('click',()=>showBardChoice(target));bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');return;}const target=targets[0];bardChoiceText.textContent=`${target.icon} ${target.displayName} — escolha o bônus até o fim do próximo turno do Bardo.`;for(const [stat,label] of [['attack','⚔️ +1 ATQ'],['range','🎯 +1 ALC'],['abilityRange','✨ +1 Alc. Hab.'],['move','👣 +1 M'],['life','❤️ +1 Vida']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{bardChoiceBox.classList.add('hidden');const r=player.bardBuff(target.id,stat);setStatus(r.status);afterMutation();});bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');}
+  function showBardChoice(input){const targets=Array.isArray(input)?input:[input];bardChoiceButtons.innerHTML='';if(targets.length>1){bardChoiceText.textContent='Há duas unidades nesta casa. Quem receberá a Inspiração?';for(const target of targets){const b=document.createElement('button');b.type='button';b.textContent=`${window.BNSCharacterInfo.unitLabel(target)}`;b.addEventListener('click',()=>showBardChoice(target));bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');return;}const target=targets[0];bardChoiceText.textContent=`${window.BNSCharacterInfo.unitLabel(target)} — escolha o bônus até o fim do próximo turno do Bardo.`;for(const [stat,label] of [['attack','⚔️ +1 ATQ'],['range','🎯 +1 ALC'],['abilityRange','✨ +1 Alc. Hab.'],['move','👣 +1 M'],['life','❤️ +1 Vida']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>{bardChoiceBox.classList.add('hidden');const r=player.bardBuff(target.id,stat);setStatus(r.status);afterMutation();});bardChoiceButtons.appendChild(b);}bardChoiceBox.classList.remove('hidden');}
   function hideBardChoice(){bardChoiceBox.classList.add('hidden');bardChoiceButtons.innerHTML='';}
 
   function afterMutation(){
-    hideBardChoice();const v=render(),av=ai.getView();if(replay)replay.capture(v.history?.[0]||'Ação do jogador');
+    hideBardChoice();const v=render(),av=ai.getView();if(replay)replay.capture(v.history?.[0]||'Ação do jogador');saveLocalGame();
     if(!v.gameOver&&(av.pendingCombat||av.doppelChoice||v.turn==='enemy'))scheduleAi(850);
   }
 
   function scheduleAi(delay=180){
-    if(aiScheduled)return;aiScheduled=true;setTimeout(()=>{aiScheduled=false;runAiStep();},delay);
+    if(aiScheduled)return;aiScheduled=true;const generation=aiReq;aiTimer=setTimeout(()=>{if(generation!==aiReq)return;aiTimer=null;aiScheduled=false;runAiStep();},delay);
   }
+  function cancelAi(){clearTimeout(aiTimer);aiTimer=null;aiScheduled=false;aiAwaiting=null;aiLastResult=null;aiReq++;aiWorker.postMessage({type:'reset'});}
   function runAiStep(){
     const pv=view(),av=ai.getView();if(pv.gameOver||av.gameOver)return;
     if(!av.pendingCombat&&!av.doppelChoice&&av.turn!=='enemy')return;
-    const id=++aiReq;aiWorker.postMessage({id,view:av,lastResult:aiLastResult,difficulty:aiDifficulty});
+    const id=++aiReq;aiAwaiting=id;aiWorker.postMessage({id,view:av,lastResult:aiLastResult,difficulty:aiDifficulty});
   }
   aiWorker.onmessage=e=>{
-    const {action}=e.data||{};if(!action)return;
-    const av=ai.getView();if(av.gameOver)return;if(!av.pendingCombat&&av.turn!=='enemy')return;
+    const {id,action}=e.data||{};if(!action||id!==aiAwaiting||id!==aiReq)return;aiAwaiting=null;
+    const av=ai.getView();if(av.gameOver)return;if(!av.pendingCombat&&!av.doppelChoice&&av.turn!=='enemy')return;
     let r;
     switch(action.type){
       case 'select': r=ai.selectPiece(action.pieceId);break;
@@ -582,7 +584,7 @@
       default:r={ok:true,status:'IA aguardando.'};
     }
     aiLastResult={action:{...action},ok:r?.ok!==false,status:r?.status||''};
-    const pv=render();if(replay){const postAi=ai.getView();replay.capture(postAi.history?.[0]||'Ação da IA');}
+    const pv=render();if(replay){const postAi=ai.getView();replay.capture(postAi.history?.[0]||'Ação da IA');}saveLocalGame();
     if(pv.pendingCombat||pv.gameOver)return;
     if(pv.turn==='enemy')scheduleAi(300);
     else if(pv.turn==='player')setStatus(`Rodada ${pv.round}. Selecione sua próxima peça disponível.`),render();
@@ -598,7 +600,7 @@
   keepDoppelBtn.addEventListener('click',()=>{const r=player.chooseDoppelCopy(false);setStatus(r.status);render();});
   copyDoppelBtn.addEventListener('click',()=>{const r=player.chooseDoppelCopy(true);setStatus(r.status);render();});
 
-  resetBtn.addEventListener('click',()=>{const keepSelected=[...selected],keepPos=new Map(setupPos),keepBases=new Map(setupBasePos),keepDifficulty=aiDifficultyEl?.value||aiDifficulty||'normal';if(replay)replay.clear();previousFxView=null;pendingActionFx=[];aiLastResult=null;aiDifficulty=keepDifficulty;if(aiDifficultyEl)aiDifficultyEl.value=keepDifficulty;referee.reset();selected=keepSelected;setupSelected=null;setupBaseSelected=null;setupPos=keepPos;setupBasePos=keepBases;openedBaseId=null;pendingBaseBonusId=null;pendingShieldTargetId=null;closeBasePanel();seerPreview.clear();seerConfirm.classList.add('hidden');pyroConfirm.classList.add('hidden');hideStackChoice();hideBardChoice();combatChoice.classList.add('hidden');rosterCollapsed=false;rosterFilter='all';filterButtons.forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));inspectedPieceId=null;pieceInfoTitle.textContent='Ficha da unidade';pieceInfoBody.innerHTML='<div class="muted empty-inspector">Clique em uma peça para ver vida, movimento, ataque, alcance, percepção e bônus.</div>';if(setupInspector){setupInspector.classList.add('hidden');setupInspectorBody.innerHTML='';}setStatus('Formação anterior restaurada. Ajuste se quiser e clique em ✓ Pronto para jogar novamente.');render();});
+  resetBtn.addEventListener('click',()=>{cancelAi();checkpoint.clear();const keepSelected=[...selected],keepPos=new Map(setupPos),keepBases=new Map(setupBasePos),keepDifficulty=aiDifficultyEl?.value||aiDifficulty||'normal';if(replay)replay.clear();previousFxView=null;pendingActionFx=[];aiLastResult=null;aiDifficulty=keepDifficulty;if(aiDifficultyEl)aiDifficultyEl.value=keepDifficulty;referee.reset();selected=keepSelected;setupSelected=null;setupBaseSelected=null;setupPos=keepPos;setupBasePos=keepBases;openedBaseId=null;pendingBaseBonusId=null;pendingShieldTargetId=null;closeBasePanel();seerPreview.clear();seerConfirm.classList.add('hidden');pyroConfirm.classList.add('hidden');hideStackChoice();hideBardChoice();combatChoice.classList.add('hidden');rosterCollapsed=false;rosterFilter='all';filterButtons.forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'));inspectedPieceId=null;pieceInfoTitle.textContent='Ficha da unidade';pieceInfoBody.innerHTML='<div class="muted empty-inspector">Clique em uma peça para ver vida, movimento, ataque, alcance, percepção e bônus.</div>';if(setupInspector){setupInspector.classList.add('hidden');setupInspectorBody.innerHTML='';}setStatus('Formação anterior restaurada. Ajuste se quiser e clique em ✓ Pronto para jogar novamente.');render();});
   if(surrenderBtn)surrenderBtn.addEventListener('click',()=>{const v=view();if(v.phase!=='play'||v.gameOver)return;if(!confirm('Desistir da partida? A partida será encerrada e o Replay ficará disponível.'))return;const r=player.surrender();setStatus(r.status);if(r.ok&&replay)replay.capture('🏳️ Desistência');render();});
   moveBtn.addEventListener('click',()=>{const r=player.startMove();setStatus(r.status);render();});
   stopBtn.addEventListener('click',()=>{const r=player.stopMove();setStatus(r.status);afterMutation();});
@@ -628,6 +630,30 @@
   for(const el of [playerTeamSizeEl,enemyTeamSizeEl,playerLossLimitEl,enemyLossLimitEl])if(el)el.addEventListener('change',syncMatchSettings);
   if(resetMatchSettingsBtn)resetMatchSettingsBtn.addEventListener('click',()=>{playerTeamSizeEl.value=4;enemyTeamSizeEl.value=4;playerLossLimitEl.value=3;enemyLossLimitEl.value=3;syncMatchSettings();setStatus('Configurações padrão restauradas: 4 × 4 e 3 perdas para derrota.');});
 
+  function saveLocalGame(){
+    if(view().phase!=='play')return;
+    return checkpoint.write(referee.exportState(),{frames:replay?.items||[],meta:{selected:[...selected],positions:[...setupPos],bases:[...setupBasePos],difficulty:aiDifficulty,seer:[...seerPreview],shield:pendingShieldTargetId,replayPartial:!!replay?.partial}});
+  }
+  function restoreLocalGame(){
+    const saved=checkpoint.read();if(!saved)return false;
+    const before=referee.exportState();
+    try{
+      referee.importState(saved.state);const v=view(),m=saved.meta||{};
+      const validCoord=c=>typeof c==='string'&&/^[A-H][1-8]$/.test(c);
+      if(!Array.isArray(m.selected)||m.selected.length!==v.matchConfig.teamSize.player||new Set(m.selected).size!==m.selected.length||m.selected.some(n=>!R.defs.some(d=>d.name===n))||!Array.isArray(m.positions)||m.positions.length!==m.selected.length||m.positions.some(p=>!Array.isArray(p)||p.length!==2||!validCoord(p[0])||!m.selected.includes(p[1]))||new Set(m.positions.map(p=>p[1])).size!==m.selected.length||!Array.isArray(m.bases)||m.bases.length!==2||m.bases.some(p=>!Array.isArray(p)||p.length!==2||![1,2].includes(p[0])||!validCoord(p[1]))||new Set(m.bases.map(p=>p[0])).size!==2||new Set([...m.positions.map(p=>p[0]),...m.bases.map(p=>p[1])]).size!==m.positions.length+2)throw new Error('Formação inválida.');
+      selected=[...m.selected];setupPos=new Map(m.positions);setupBasePos=new Map(m.bases);
+      aiDifficulty=validDifficulty(m.difficulty)?m.difficulty:'normal';if(aiDifficultyEl)aiDifficultyEl.value=aiDifficulty;
+      const cfg=v.matchConfig;for(const [el,n]of [[playerTeamSizeEl,cfg.teamSize.player],[enemyTeamSizeEl,cfg.teamSize.enemy],[playerLossLimitEl,cfg.lossLimit.player],[enemyLossLimitEl,cfg.lossLimit.enemy]])if(el)el.value=n;
+      seerPreview=new Set(v.activation?.mode==='seer'&&Array.isArray(m.seer)?m.seer.filter(c=>R.abilityCells(activePiece(v),true).includes(c)).slice(0,2):[]);
+      seerConfirm.classList.toggle('hidden',seerPreview.size!==2);
+      pendingShieldTargetId=v.activation?.mode==='shieldLink'&&v.ownPieces.some(p=>p.alive&&p.id===m.shield)?m.shield:null;
+      if(replay){replay.restore(saved.frames,saved.replayTruncated);replay.capture('Partida recuperada após atualizar a página');}
+      setStatus(saved.replayTruncated?'Partida local recuperada. O replay salvo contém apenas o trecho mais recente.':'Partida local recuperada nesta aba.');
+      return true;
+    }catch{referee.importState(before);selected=[];setupPos=new Map();setupBasePos=new Map();checkpoint.clear();return false;}
+  }
+  window.addEventListener('pagehide',saveLocalGame);
   restoreClassicDifficulty();
-  buildBoard();render();
+  const resumed=restoreLocalGame();buildBoard();render();
+  if(resumed){const av=ai.getView();if(!av.gameOver&&(av.pendingCombat||av.doppelChoice||av.turn==='enemy'))scheduleAi(300);}
 })();

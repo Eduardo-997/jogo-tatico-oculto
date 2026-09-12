@@ -1,0 +1,137 @@
+{
+  "parameters": {
+    "GAMES": 60,
+    "SEED_OFFSET": 20000,
+    "CHECKPOINT": 1
+  },
+  "phase": "antes da correção estratégica do Bardo",
+  "games": 240,
+  "completed": 239,
+  "actions": 106286,
+  "invalid": 0,
+  "stalled": 1,
+  "maxRound": 429,
+  "invariants": [],
+  "results": {
+    "B": 99,
+    "C": 62,
+    "A": 74,
+    "draw": 4
+  },
+  "stallDetails": [
+    {
+      "difficulty": "extreme",
+      "game": 53,
+      "seed": 173053,
+      "round": 429,
+      "turn": "B",
+      "alive": {
+        "A": [
+          {
+            "id": "a2",
+            "name": "Bardo",
+            "identity": "Bardo",
+            "coord": "C12",
+            "hp": 1,
+            "copied": null
+          }
+        ],
+        "B": [
+          {
+            "id": "b6",
+            "name": "Bardo",
+            "identity": "Bardo",
+            "coord": "C16",
+            "hp": 2,
+            "copied": null
+          },
+          {
+            "id": "b8",
+            "name": "Vidente",
+            "identity": "Fantasma",
+            "coord": "C04",
+            "hp": 2,
+            "copied": null
+          }
+        ],
+        "C": []
+      },
+      "bases": [
+        {
+          "id": "bA1",
+          "owner": "A",
+          "coord": "A31",
+          "sabotaged": true,
+          "disabled": false
+        },
+        {
+          "id": "bA2",
+          "owner": "A",
+          "coord": "A28",
+          "sabotaged": true,
+          "disabled": false
+        },
+        {
+          "id": "bB1",
+          "owner": "B",
+          "coord": "B15",
+          "sabotaged": true,
+          "disabled": false
+        },
+        {
+          "id": "bB2",
+          "owner": "B",
+          "coord": "B12",
+          "sabotaged": true,
+          "disabled": false
+        },
+        {
+          "id": "bC1",
+          "owner": "C",
+          "coord": "C31",
+          "sabotaged": false,
+          "disabled": true
+        },
+        {
+          "id": "bC2",
+          "owner": "C",
+          "coord": "C28",
+          "sabotaged": false,
+          "disabled": true
+        }
+      ],
+      "history": {
+        "A": [
+          "↩️ Bardo empatou com Bardo do Jogador B e foi repelido.",
+          "🔄 Rodada 429 começou. Ordem de prioridade: C → A → B.",
+          "↩️ Bardo empatou com Bardo do Jogador B e foi repelido.",
+          "↩️ Seu Bardo empatou com Bardo do Jogador B.",
+          "🔄 Rodada 428 começou. Ordem de prioridade: B → C → A.",
+          "↩️ Bardo empatou com Bardo do Jogador B e foi repelido.",
+          "🔄 Rodada 427 começou. Ordem de prioridade: A → B → C.",
+          "↩️ Seu Bardo empatou com Bardo do Jogador B."
+        ],
+        "B": [
+          "🎵 Bardo inspirou Vidente: +1 Vida até o fim do próximo turno do Bardo.",
+          "↩️ Seu Bardo empatou com Bardo do Jogador A.",
+          "🔄 Rodada 429 começou. Ordem de prioridade: C → A → B.",
+          "👁️ Vidente abriu uma visão de 2 casas ligadas.",
+          "↩️ Seu Bardo empatou com Bardo do Jogador A.",
+          "🎵 A Inspiração em Vidente terminou.",
+          "↩️ Bardo empatou com Bardo do Jogador A e foi repelido.",
+          "🔄 Rodada 428 começou. Ordem de prioridade: B → C → A."
+        ],
+        "C": [
+          "🔄 Rodada 429 começou. Ordem de prioridade: C → A → B.",
+          "🔄 Rodada 428 começou. Ordem de prioridade: B → C → A.",
+          "🔄 Rodada 427 começou. Ordem de prioridade: A → B → C.",
+          "🔄 Rodada 426 começou. Ordem de prioridade: C → A → B.",
+          "🔄 Rodada 425 começou. Ordem de prioridade: B → C → A.",
+          "🔄 Rodada 424 começou. Ordem de prioridade: A → B → C.",
+          "🔄 Rodada 423 começou. Ordem de prioridade: C → A → B.",
+          "🔄 Rodada 422 começou. Ordem de prioridade: B → C → A."
+        ]
+      }
+    }
+  ]
+}

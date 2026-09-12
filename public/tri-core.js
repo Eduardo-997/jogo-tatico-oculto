@@ -359,8 +359,9 @@ export class TriAI{
   }
   bardChoice(view,p){
     const own=this.own(view),mates=own.filter(x=>x.id!==p.id&&graphDistance(p.coord,x.coord)<=p.ah);let best=null;
+    const needsAttack=own.every(x=>(x.a||0)<=0&&!(x.name==='Fantasma'&&!x.possessing));
     const score=(x,stat)=>{let s=0;if(stat==='attack')s=(x.a>0?16:3)+(x.name==='Trapaceiro'||x.name==='Ninja'||x.name==='Cavaleiro'?7:0)-(x.name==='Kamikaze'?10:0);if(stat==='range')s=x.a>0&&x.range<20?12+(x.name==='Ninja'?8:0):-999;if(stat==='abilityRange')s=(x.ah||0)>0?16+(['Vidente','Druida','Caçador','Sentinela','Bardo'].includes(x.name)?7:0):-999;if(stat==='move')s=10+(x.m===0?15:0)+(x.name==='Paranoia'||x.name==='Caçador'||x.name==='Sentinela'?5:0);if(stat==='life')s=10+(x.maxHp<=1?10:0)+(x.hp<=1?7:0);if(this.difficulty==='extreme')s+=this.hotAround(x.coord)*(stat==='life'||stat==='attack'?1.8:.6);return s;};
-    for(const x of mates)for(const stat of ['attack','range','abilityRange','move','life']){const s=score(x,stat);if(!best||s>best.s)best={targetId:x.id,stat,s};}return best;
+    for(const x of mates)for(const stat of ['attack','range','abilityRange','move','life']){const s=score(x,stat)+(needsAttack&&stat==='attack'?80:0);if(!best||s>best.s)best={targetId:x.id,stat,s};}return best;
   }
   baseBonusChoice(view,p,base){
     const used=new Set(view.chosenBaseBonuses||[]),bonuses=(view.baseBonusCatalog||[]).filter(b=>!used.has(b.id)),own=this.own(view);let best=null;
@@ -391,6 +392,7 @@ export class TriAI{
     if((visible.length||attackCells(p).some(c=>this.contactType[c]&&view.round-(this.contactRound[c]||0)<=this.cfg().ttl))&&(p.a>0||(p.name==='Fantasma'&&!p.possessing)))return{type:'startAttack'};
     const moveOpts=(p.diag?allNeighbors(p.coord):normalNeighbors(p.coord)).filter(c=>this.canMoveTo(view,p,c,p.m)),ab=this.ability(p),utility=new Set(['phantomPresence','seer','spotTrap','damageTrap','bard','mirror','awaken','raise','absorbRock','shieldLink']),canAdvance=!a.movementUsed&&p.m>0&&!p.linkedToId&&moveOpts.length>0,repeatUtility=(this.stationaryUtility[p.id]||0)>=1,searchPressure=(view.visibleOpponents||[]).length===0&&(view.round>=8||own.length<=2);
     // Habilidades de preparação não podem prender a IA eternamente na mesma casa. Após uma ativação utilitária parada — ou sob pressão de busca no fim da partida — ela avança em direção a inimigos/Postos antes de repetir a habilidade.
+    if(ab==='bard'&&own.every(x=>(x.a||0)<=0&&!(x.name==='Fantasma'&&!x.possessing))&&this.bardChoice(view,p))return{type:'startAbility'};
     if(canAdvance&&utility.has(ab)&&(repeatUtility||searchPressure))return{type:'startMove'};
     if(p.linkedToId&&ab==='shieldLink'&&searchPressure){const host=own.find(x=>x.id===p.linkedToId);if(host&&(host.m||0)<=0&&p.m>0)return{type:'startAbility'};}
     if(this.shouldAbility(view,p))return{type:'startAbility'};

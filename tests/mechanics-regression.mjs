@@ -23,6 +23,8 @@ function fixture(e,lists={},extra={}){
   r.importState(JSON.stringify(s));return r;
 }
 const state=r=>JSON.parse(r.exportState());
+const checkpointVM=vm.createContext({window:{}});vm.runInContext(read('public/local-checkpoint.js'),checkpointVM);
+const checkpointFor=e=>checkpointVM.window.BNSLocalCheckpoint.create(e.tri?'arena':'classic',{coords:e.cells(),names:R.defs.map(d=>d.name)});
 function forceTurn(e,r,side){const s=state(r);s.turn=side;s.gameOver=false;for(const x of e.sides){s.activation[x]=null;s.roundActivations[x]=0;for(const p of s.pieces[x])p.activated=false;}r.importState(JSON.stringify(s));}
 function action(c,name,...args){const result=c[name](...args);assert.equal(result.ok,true,`${name}: ${result.status}`);return result;}
 function invariant(e,r){const s=state(r),alive=Object.values(s.pieces).flat().filter(p=>p.alive),groups=new Map();for(const p of alive){assert.ok(e.cells().includes(p.coord),'vivo fora do mapa');const group=groups.get(p.coord)||[];group.push(p);groups.set(p.coord,group);if(p.linkedToId){const q=alive.find(x=>x.owner===p.owner&&x.id===p.linkedToId);assert.ok(q&&q.coord===p.coord,'vínculo separado');}}for(const ps of groups.values()){assert.ok(ps.length<=2,'mais de duas peças na casa');assert.equal(new Set(ps.map(x=>x.owner)).size,1,'adversários na mesma casa');if(ps.length===2)assert.ok(ps.some(x=>x.name==='Escudeiro'||x.name==='Doppelgänger'&&x.copied==='Escudeiro'),'dupla sem Escudeiro');}}
@@ -82,3 +84,55 @@ test('IA Clássico não tenta atacar Fantasma já possuindo corpo ATQ0',()=>{con
 test('IA Clássico reconhece recarga e alcance próprio do Arqueiro copiado',()=>{const ai=require('../public/ai-worker.js'),e=engines[1],r=fixture(e,{player:[['Cavaleiro','D2','target']],enemy:[['Doppelgänger','D4','actor',{copied:'Arqueiro'}]]},{seer:{player:{__set:[]},enemy:{__set:['D2']}}});forceTurn(e,r,'enemy');const cl=e.client(r,'enemy');action(cl,'selectPiece','actor');ai.setDifficulty('normal');ai.resetMemory(cl.getView());assert.equal(ai.decide(cl.getView()).type,'startAbility');});
 test('IA Clássico respeita invocação por fonte, não global do time',()=>{const ai=require('../public/ai-worker.js'),e=engines[1],r=fixture(e,{player:[['Cavaleiro','H8','target']],enemy:[['Doppelgänger','D4','actor',{copied:'Necromante'}],['Necromante','H6','source'],['Esqueleto','G6','skeleton',{summonType:'skeleton',summonerId:'source',original:false}]]},{corpses:[{coord:'D3',name:'Cavaleiro'}]});forceTurn(e,r,'enemy');const cl=e.client(r,'enemy');action(cl,'selectPiece','actor');const view=cl.getView();assert.equal(view.ownPieces.find(p=>p.id==='skeleton').summonerId,'source');ai.setDifficulty('normal');ai.resetMemory(view);assert.equal(ai.decide(view).type,'startAbility');});
 test('IA Clássico usa todo Alc. Hab. da Rajada e completa duas escolhas',()=>{const ai=require('../public/ai-worker.js'),e=engines[1],r=fixture(e,{player:[['Cavaleiro','D2','target']],enemy:[['Piromante','D4','actor']]},{seer:{player:{__set:[]},enemy:{__set:['D2']}}});forceTurn(e,r,'enemy');const cl=e.client(r,'enemy');action(cl,'selectPiece','actor');action(cl,'startAbility');ai.setDifficulty('normal');ai.resetMemory(cl.getView());let act=ai.decide(cl.getView());assert.equal(act.type,'pyroSelect');assert.equal(act.to,'D2');action(cl,'selectPyroTarget',act.to);act=ai.decide(cl.getView());assert.equal(act.type,'pyroSelect');action(cl,'selectPyroTarget',act.to);assert.equal(ai.decide(cl.getView()).type,'pyroConfirm');});
+
+// Matriz de pares: atributos naturais, mais +1 M para exercitar CD também em M0.
+for(const e of engines){
+  const [a,b]=e.sides,o=e.origin,n=e.n(o)[0],checkpoint=e.mode==='solo'||e.tri?checkpointFor(e):null;
+  for(const attacker of R.defs)test(`${e.label}: matriz de Confronto ${attacker.name} contra os 20 personagens`,()=>{
+    for(const defender of R.defs){
+      const r=fixture(e,{[a]:[[attacker.name,o,'att',{bonusM:1}]],[b]:[[defender.name,n,'def']]}),cl=e.client(r,a);
+      const A=attacker.type,D=defender.type,expected=A===D?'tie':A==='J'?'att':D==='J'?'def':(A==='R'&&D==='S'||A==='S'&&D==='P'||A==='P'&&D==='R')?'att':'def';
+      assert.equal((e.tri?T.directWinner:R.directWinner)(state(r).pieces[a][0],state(r).pieces[b][0]),expected,`${attacker.name}/${defender.name}`);
+      action(cl,'selectPiece','att');action(cl,'startMove');action(cl,'moveStep',n);
+      const s=state(r);if(s.pendingCombat)action(e.client(r,s.pendingCombat.winnerSide),'chooseCombatPosition',false);
+      invariant(e,r);
+      const roundTrip=new e.C();roundTrip.importState(r.exportState());invariant(e,roundTrip);
+      for(const side of e.sides)assert.deepEqual(JSON.parse(JSON.stringify(e.client(roundTrip,side).getView())),JSON.parse(JSON.stringify(e.client(r,side).getView())),`${attacker.name}/${defender.name}: visão após round trip`);
+      // Importação preenche defaults de invocações; após normalizar, não deve mudar novamente.
+      const normalized=new e.C();normalized.importState(roundTrip.exportState());assert.deepEqual(state(normalized),state(roundTrip),`${attacker.name}/${defender.name}: normalização estável`);
+      if(checkpoint)assert.equal(checkpoint.valid(r.exportState()),true,`${attacker.name}/${defender.name}: checkpoint`);
+    }
+  });
+  for(const [stat,key]of [['attack','a'],['range','range'],['abilityRange','ah'],['move','m'],['life','maxHp']])test(`${e.label}: Bardo ${stat} nos 20 personagens e expiração`,()=>{
+    for(const target of R.defs){
+      const r=fixture(e,{[a]:[['Bardo',o,'source'],[target.name,n,'target']]}),cl=e.client(r,a),before=cl.getView().ownPieces.find(p=>p.id==='target');
+      action(cl,'selectPiece','source');action(cl,'startAbility');action(cl,'bardBuff','target',stat);
+      const buffed=cl.getView().ownPieces.find(p=>p.id==='target');assert.equal(buffed[key],before[key]+1,target.name);
+      if(stat==='life')assert.equal(buffed.hp,before.hp+1,target.name);
+      forceTurn(e,r,a);action(cl,'selectPiece','source');action(cl,'endActivation');
+      const after=cl.getView().ownPieces.find(p=>p.id==='target');assert.equal(after[key],before[key],target.name);assert.equal(after.hp,before.hp,target.name);invariant(e,r);
+    }
+  });
+  test(`${e.label}: checkpoint de movimento parcial e retomada não termina ativação`,()=>{
+    const r=fixture(e,{[a]:[['Ninja',o,'actor']]}),cl=e.client(r,a);action(cl,'selectPiece','actor');action(cl,'startMove');action(cl,'moveStep',n);
+    const restored=new e.C();restored.importState(r.exportState());const other=e.client(restored,a);assert.equal(other.endActivation().ok,false);action(other,'stopMove');action(other,'endActivation');invariant(e,restored);if(checkpoint)assert.equal(checkpoint.valid(restored.exportState()),true);
+  });
+  test(`${e.label}: possessão de Mini-Slime sobrevive checkpoint e recuperação`,()=>{
+    const r=fixture(e,{[a]:[['Fantasma',o,'ghost'],['Arqueiro',e.n(o)[1],'shooter']],[b]:[['Slime',n,'source',{alive:false,hp:0}],['Mini-Slime',n,'mini',{original:false,summonType:'miniSlime',slimeLineageId:'source'}]]}),cl=e.client(r,a);
+    action(cl,'selectPiece','ghost');action(cl,'startAttack');action(cl,'attack',n);if(checkpoint)assert.equal(checkpoint.valid(r.exportState()),true);
+    const restored=new e.C();restored.importState(r.exportState());forceTurn(e,restored,a);const own=e.client(restored,a);action(own,'selectPiece','shooter');action(own,'startAttack');action(own,'attack',n);
+    const mini=state(restored).pieces[b].find(p=>p.id==='mini');assert.equal(mini.alive,true);assert.equal(mini.possessedBy,null);assert.equal(mini.slimeLineageId,'source');invariant(e,restored);if(checkpoint)assert.equal(checkpoint.valid(restored.exportState()),true);
+  });
+  for(const area of [false,true])test(`${e.label}: Escudeiro protege os outros 19 personagens de ${area?'Rajada Dupla':'ataque normal'}`,()=>{
+    for(const target of R.defs.filter(d=>d.name!=='Escudeiro')){
+      const shooter=e.n(o)[1],r=fixture(e,{[a]:[[target.name,n,'target'],['Escudeiro',n,'guard',{linkedToId:'target'}]],[b]:[[area?'Piromante':'Arqueiro',shooter,'shooter']]}),before=e.client(r,a).getView().ownPieces.find(p=>p.id==='target');forceTurn(e,r,b);const cl=e.client(r,b);action(cl,'selectPiece','shooter');
+      if(area){action(cl,'startAbility');action(cl,'selectPyroTarget',n);action(cl,'selectPyroTarget',o);action(cl,'confirmPyroAttack');}else{action(cl,'startAttack');action(cl,'attack',n);}
+      const after=state(r);assert.equal(after.pieces[a].find(p=>p.id==='target').hp,before.hp,target.name);assert.equal(after.pieces[a].find(p=>p.id==='target').alive,true,target.name);assert.equal(after.pieces[a].find(p=>p.id==='guard').hp,1,target.name);invariant(e,r);if(checkpoint)assert.equal(checkpoint.valid(r.exportState()),true,target.name);
+    }
+  });
+  test(`${e.label}: Bardo da IA dá ATQ a aliado quando o exército não tem ataque`,()=>{
+    const side=e.tri?'A':'enemy',foe=e.tri?'B':'player',r=fixture(e,{[side]:[['Bardo',o,'source'],['Vidente',n,'ally']],[foe]:[['Bardo',e.n(o)[1],'foe']]},{round:30});forceTurn(e,r,side);const cl=e.client(r,side);action(cl,'selectPiece','source');
+    let decide;if(e.tri){const brain=new T.TriAI(side,'extreme');brain.stationaryUtility.source=10;decide=v=>brain.decide(v);}else{const brain=require('../public/ai-worker.js');brain.setDifficulty('extreme');brain.resetMemory(cl.getView());brain.memory.utilityAt.source={coord:o,count:10};decide=v=>brain.decide(v);}
+    assert.equal(decide(cl.getView()).type,'startAbility');action(cl,'startAbility');const chosen=decide(cl.getView());assert.equal(chosen.stat,'attack');assert.equal(chosen.targetId||chosen.targetPieceId,'ally');action(cl,'bardBuff','ally','attack');assert.equal(cl.getView().ownPieces.find(p=>p.id==='ally').a,1);
+  });
+}

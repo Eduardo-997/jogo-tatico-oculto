@@ -3,6 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import vm from 'node:vm';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const walk=d=>fs.readdirSync(d,{withFileTypes:true}).flatMap(x=>x.isDirectory()&&!['node_modules','.git'].includes(x.name)?walk(path.join(d,x.name)):x.isFile()?[path.join(d,x.name)]:[]);
@@ -22,4 +23,34 @@ const worker=read('src/worker.js');assert.equal(worker.includes("require('./rule
 assert.equal(worker.slice(worker.indexOf("'use strict';"),worker.indexOf('const actionMap=')).trim(),(withoutCjs(read('public/rules.js'))+'\n\n'+withoutCjs(read('public/referee.js'))).trim());
 const packed=read('public/ai.js').match(/  const source = ("(?:\\.|[^"\\])*");\n/);assert.ok(packed,'Fonte da IA empacotada ausente');assert.equal(JSON.parse(packed[1]),read('public/ai-worker.js'));
 assert.equal(read('public/tri-ui-global.js').includes('import '),false,'Import ESM indevido no bundle global');
+// Validate paths built dynamically by the asset registry, not just HTML links.
+const assetContext={window:{}};
+vm.runInNewContext(read('public/assets.js'),assetContext);
+const assets=assetContext.window.BNSAssets;
+let assetReferences=0;
+for(const group of [assets.terrain,assets.structures,assets.effects,assets.archetypes]){
+  for(const ref of Object.values(group)){
+    assert.ok(fs.existsSync(path.join(root,'public',ref.split('?')[0])),'Asset dinâmico ausente: '+ref);
+    assetReferences++;
+  }
+}
+const version=JSON.parse(read('package.json')).version;
+for(const page of ['index.html','multiplayer.html','triplayer.html','training.html']){
+  const html=read('public/'+page);
+  assert.ok(html.includes(`aria-label="Versão do jogo">v${version}</span>`),'Versão visível incorreta em '+page);
+  for(const [,cache] of html.matchAll(/\?v=(\d+\.\d+\.\d+)/g))assert.equal(cache,version,'Cache HTML fora da versão em '+page);
+}
+const characterMap=read('public/assets.js').match(/const charMap=\{([\s\S]*?)\n  \};/);
+assert.ok(characterMap,'Registro de personagens ausente');
+for(const [,name] of characterMap[1].matchAll(/'([^']+)'\s*:/g)){
+  const ref=assets.character(name);
+  assert.ok(ref&&fs.existsSync(path.join(root,'public',ref.split('?')[0])),'Asset de personagem ausente: '+name);
+  assetReferences++;
+}
+assert.ok(read('public/assets.js').includes(`?v=${version}`),'Cache de assets fora da versão do pacote');
+for(const page of ['index.html','multiplayer.html','triplayer.html']){
+  const html=read('public/'+page),button=html.indexOf('id="surrenderBtn"'),cancel=html.indexOf(page==='triplayer.html'?'id="cancelBtn"':'id="cancel"');
+  assert.ok(button>cancel&&cancel>=0,'Rendição deve ficar depois das ações em '+page);
+}
 console.log(JSON.stringify({javascriptSyntax:js,localHtmlReferences:refs,missingReferences:0,duplicateHtmlIds:0,workerParity:true,arenaParity:true,aiBundleParity:true},null,2));
+console.log(JSON.stringify({dynamicAssetReferences:assetReferences,assetCacheVersion:version,surrenderPlacement:true},null,2));

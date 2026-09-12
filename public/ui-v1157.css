@@ -32,6 +32,11 @@ body{line-height:1.42}
 }
 .brand-block{flex:1 1 275px;min-width:240px;padding:2px 0}
 .brand-block h1{line-height:1.1}
+.game-version{display:block;margin-top:5px;color:#c9b68f;font-size:11px;font-weight:600;font-family:Inter,Segoe UI,Arial,sans-serif;letter-spacing:.03em}
+/* SVG focus uses the actual cell stroke, never its rectangular bounding box.
+   Kept in the stylesheet too: keyboard focus stays correct before JS starts. */
+.mode-arena .board-svg,.mode-arena .board-svg *{outline:none!important;box-shadow:none!important}
+.mode-arena .tri-cell:focus,.mode-arena .tri-cell.keyboard-focus{stroke:#fff2a8!important;stroke-width:4!important}
 .brand-block .header-sub{max-width:620px;color:#b8ad9b!important}
 .topbar-actions{flex:1 1 620px;justify-content:flex-end!important;align-items:center!important}
 .topbar-actions>a,.topbar-actions>button,.topbar-actions>.ai-difficulty,.topbar-actions>.audio-controls{min-height:38px}

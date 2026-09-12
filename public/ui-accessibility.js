@@ -21,7 +21,7 @@
     el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click();}});
   }
   const set=(el,name,value)=>{if(el.getAttribute(name)!==value)el.setAttribute(name,value);};
-  const style=document.createElement('style');style.textContent='.tri-cell:focus-visible{stroke:#fff2a8!important;stroke-width:4!important;outline:none}[data-piece]:focus-visible{outline:3px solid #fff2a8}.cell:focus-visible{outline:3px solid #fff2a8;outline-offset:2px}';document.head.appendChild(style);
+  const style=document.createElement('style');style.textContent='.tri-cell:focus,.tri-cell.keyboard-focus{stroke:#fff2a8!important;stroke-width:4!important;outline:none!important}.board-svg [tabindex]:focus,.board-svg [tabindex]:focus-visible{outline:none!important}.cell:focus-visible{outline:3px solid #fff2a8;outline-offset:2px}';document.head.appendChild(style);
   function visible(el){for(let p=el;p&&p.nodeType===1;p=p.parentElement){if(p.hidden||p.classList.contains('hidden'))return false;const css=getComputedStyle(p);if(css.display==='none'||css.visibility==='hidden')return false;}return true;}
   const focusable=dialog=>[...dialog.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]')].filter(visible);
   let dialogs=[],lastDialog=null;

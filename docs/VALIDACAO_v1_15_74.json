@@ -1,0 +1,17 @@
+{
+  "version": "1.15.74",
+  "tests": {"total": 484, "passed": 484, "failed": 0, "skipped": 0},
+  "javascriptSyntax": 35,
+  "localHtmlReferences": 79,
+  "dynamicAssetReferences": 70,
+  "missingReferences": 0,
+  "duplicateHtmlIds": 0,
+  "workerParity": true,
+  "arenaParity": true,
+  "aiBundleParity": true,
+  "surrenderPlacement": true,
+  "realBrowserTest": false,
+  "deployed": false,
+  "generalsModeImplemented": false,
+  "newSimulations": false
+}

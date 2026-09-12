@@ -1,5 +1,10 @@
 import * as T from '../public/tri-core.js';
 import * as M from '../public/tri-map.js';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const checkpointContext=vm.createContext({window:{}});
+vm.runInContext(fs.readFileSync(new URL('../public/local-checkpoint.js',import.meta.url),'utf8'),checkpointContext);
+const checkpoint=checkpointContext.window.BNSLocalCheckpoint.create('arena',{coords:M.TRI_MAP.ids,names:T.TRI_DEFS.map(d=>d.name)});
 
 function invariantErrors(ref){
   const s=JSON.parse(ref.exportState()),errors=[];
@@ -25,7 +30,7 @@ const originalRandom=Math.random;
 const seeded=seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
 for(const [di,difficulty] of difficulties.entries()){
   for(let game=0;game<Math.max(1,Number(process.env.GAMES)||30);game++){
-    const seed=150000+di*1000+game;Math.random=seeded(seed);
+    const seed=150000+(Number(process.env.SEED_OFFSET)||0)+di*1000+game;Math.random=seeded(seed);
     const ref=new T.TriReferee(),a=ref.autoSetup('A',difficulty,4),start=ref.startSolo(a.setup,a.bases,{B:difficulty,C:difficulty});
     if(!start.ok)throw new Error(`setup failed ${difficulty}: ${start.status}`);
     const ais=Object.fromEntries(T.TRI_SIDES.map(side=>[side,new T.TriAI(side,difficulty)]));
@@ -42,7 +47,7 @@ for(const [di,difficulty] of difficulties.entries()){
         const fallback=client.getView().pendingCombat?{type:'combatChoice',advance:false}:client.getView().doppelChoice?{type:'doppel',copyNew:false}:{type:'end'};
         T.applyTriAction(client,fallback);
       }
-      let errs=invariantErrors(ref);if(errs.length){const raw=JSON.parse(ref.exportState()),related=T.TRI_SIDES.flatMap(x=>raw.pieces[x]).filter(p=>p.alive&&(errs.some(e=>e.includes(p.id)||e.includes(p.coord))||p.linkedToId));totals.invariants.push({difficulty,game,seed,step:steps,action,res,errs,turn:raw.turn,pendingCombat:raw.pendingCombat,related,history:Object.fromEntries(T.TRI_SIDES.map(x=>[x,raw.history[x].slice(0,6)]))});break;}
+      let errs=invariantErrors(ref);if(process.env.CHECKPOINT==='1'&&!checkpoint.valid(ref.exportState()))errs.push('checkpoint inválido');if(errs.length){const raw=JSON.parse(ref.exportState()),related=T.TRI_SIDES.flatMap(x=>raw.pieces[x]).filter(p=>p.alive&&(errs.some(e=>e.includes(p.id)||e.includes(p.coord))||p.linkedToId));totals.invariants.push({difficulty,game,seed,step:steps,action,res,errs,turn:raw.turn,pendingCombat:raw.pendingCombat,related,history:Object.fromEntries(T.TRI_SIDES.map(x=>[x,raw.history[x].slice(0,6)]))});break;}
     }
     totals.games++;
     const end=JSON.parse(ref.exportState());totals.maxRound=Math.max(totals.maxRound,end.round||0);
@@ -51,4 +56,4 @@ for(const [di,difficulty] of difficulties.entries()){
 }
 Math.random=originalRandom;
 console.log(JSON.stringify(totals,null,2));
-if(totals.invalid||totals.invariants.length)process.exitCode=1;
+if(totals.invalid||totals.invariants.length||totals.stalled)process.exitCode=1;

@@ -1,0 +1,19 @@
+{
+  "version": "1.15.75",
+  "tests": {"total": 489, "passed": 489, "failed": 0, "skipped": 0},
+  "javascriptSyntax": 35,
+  "localHtmlReferences": 79,
+  "dynamicAssetReferences": 70,
+  "missingReferences": 0,
+  "duplicateHtmlIds": 0,
+  "workerParity": true,
+  "arenaParity": true,
+  "aiBundleParity": true,
+  "visibleVersionPages": 4,
+  "arenaSvgOutlineSuppressed": true,
+  "keyboardPolygonFocusPreserved": true,
+  "realBrowserTest": false,
+  "deploymentRequested": true,
+  "generalsModeImplemented": false,
+  "newSimulations": false
+}
