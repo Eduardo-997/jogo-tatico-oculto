@@ -1,7 +1,8 @@
-Batalha nas Sombras v1.15.73 — TESTE GIT
+Batalha nas Sombras v1.15.75 — TESTE GIT
 
-Base: v1.15.72; identificação de unidades, foco SVG e recuperação local após F5.
-Estado completo: SAVE_PROJETO_v1_15_73.md.
+Base: v1.15.74; foco SVG reforçado e versão visível nas quatro telas.
+Inclui recuperação local, identificação de unidades e Rendição junto das ações.
+Estado completo: SAVE_PROJETO_v1_15_75.md; SAVEs anteriores são históricos.
 Histórico antigo: docs/HISTORICO_DEPLOY_ATE_v1_15_70.txt.
 
 EXECUÇÃO E PUBLICAÇÃO
@@ -9,12 +10,12 @@ EXECUÇÃO E PUBLICAÇÃO
 - Clássico: /index.html; Online: /multiplayer.html.
 - Arena solo/Online: /triplayer.html; Treino: /training.html.
 - Arquivos abertos diretamente por file:// não fornecem o servidor WebSocket.
-- Para publicar, o próprio usuário executa npm run deploy quando aprovar.
-- Nenhum deploy ou alteração em sala real foi executado nesta revisão.
-- A v1.15.72 foi publicada no repositório de teste em tarefa anterior;
-  esta v1.15.73 ainda NÃO foi publicada.
+- Publicar somente com autorização explícita do usuário.
+- Nesta tarefa foi autorizada a publicação da v1.15.75 no repositório
+  Eduardo-997/jogo-tatico-oculto; Git aciona o build Cloudflare existente.
+- Resultado e commit de publicação são informados na mensagem final.
 - Clássico contra IA e Arena solo salvam a partida em sessionStorage nesta
-  aba a partir desta versão; atualizar a página tenta recuperar o estado.
+  aba desde a v1.15.73; atualizar a página tenta recuperar o estado.
 - Salvar depende da permissão/cota do navegador. Não é uma cópia na nuvem,
   não recupera partidas antigas perdidas e não é reconexão Online.
 - Reiniciar apaga a partida salva e mantém a formação para outro jogo.
@@ -41,8 +42,11 @@ FONTES E SINCRONIZAÇÃO
 - Names das folhas CSS são históricos; os parâmetros ?v invalidam o cache.
 
 VALIDAÇÃO
-- v1.15.73: 480 testes, mais 2.690 casos internos nas matrizes de pares/bônus/proteção.
-- Simulações/limitações detalhadas em docs/VALIDACAO_v1_15_73.json.
+- v1.15.75: 489 testes passaram, 35 arquivos JS/MJS válidos, 79 referências
+  HTML e 70 referências dinâmicas de assets existentes.
+- Resultado atual: docs/VALIDACAO_v1_15_75.json.
+- Matrizes e simulações amplas da v1.15.73 são histórico, não novas simulações
+  da v1.15.75: veja docs/VALIDACAO_v1_15_73.json.
 - npm test: regressões permanentes de mecânicas, IA, frontend e Online.
 - npm run validate: sintaxe, referências HTML, IDs e paridade das cópias.
 - npm run simulate:classic: 80 partidas contra oponente parado.
