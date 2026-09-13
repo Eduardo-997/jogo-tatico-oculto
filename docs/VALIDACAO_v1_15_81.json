@@ -1,0 +1,18 @@
+{
+  "version": "1.15.81",
+  "scope": "Revisão de layout e preparação do modo Generais",
+  "tests": {"total": 585, "passed": 585, "failed": 0},
+  "newRegressionCoverage": [
+    "abas G1/G2 locais",
+    "adicionar, posicionar e reposicionar pelo tabuleiro",
+    "remoção sem reativação por propagação",
+    "rascunhos independentes com um general Online dos dois lados",
+    "bloqueio da aba adversária para general de um lado",
+    "ordem responsiva: seleção antes do tabuleiro"
+  ],
+  "serverRulesChanged": false,
+  "balanceChanged": false,
+  "realBrowserTest": false,
+  "onlineTests": "WebSocket/Durable Objects mocks",
+  "deploymentTarget": "Eduardo-997/jogo-tatico-oculto"
+}

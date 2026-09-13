@@ -1,33 +1,26 @@
-# Modo Generais — Clássico, atualizado na v1.15.79
+# Modo Generais — Clássico, atualizado na v1.15.81
 
-## Melhorias da v1.15.79
+Generais é um modo de jogo e de observação: os generais montam os exércitos e as IAs executam a partida. Ele usa as regras e o tabuleiro do Clássico.
 
-Cada lado pode usar de 1 a 8 peças, com limite de perdas configurável. No Online, o anfitrião define a configuração antes da preparação. Uma sala nova e vazia também pode reservar ambos os lados para um só general; a reconexão recupera os dois. Em salas com dois amigos, cada preparação continua secreta até ambos confirmarem Pronto.
+## Preparação
 
-Ataques, deslocamentos e criações recentes permanecem destacados no mapa. O registro clicável localiza a ação e permite acompanhar automaticamente os acontecimentos. A ficha e o placar ajudam a consultar peças e perdas. A visão do observador nunca é fornecida às IAs.
+- Local: uma pessoa controla G1 e G2 pelas duas abas visíveis. Pode montar cada lado ou preencher tudo automaticamente.
+- Online com dois amigos: cada general ocupa G1 ou G2 e recebe somente sua própria preparação até os dois confirmarem.
+- Online sozinho: marque “Controlar G1 e G2” antes de entrar numa sala nova e vazia. As duas abas ficam disponíveis.
+- Cada lado aceita de 1 a 8 peças, duas bases e limite próprio de perdas. G1 configura esses limites no Online.
+- Clicar numa peça da lista adiciona e seleciona; clicar no tabuleiro posiciona. Uma peça ou Posto já colocado pode ser clicado para reposicionamento. “Remover” realmente retira a peça sem selecioná-la novamente.
 
-Encerrar observação não declara um vencedor: libera o replay e interrompe as IAs. Localmente basta confirmar; Online, ambos os lados precisam concordar (um general dos dois lados confirma sozinho). Um limite opcional de 1 a 500 rodadas oferece o mesmo encerramento para testes; 0 mantém a observação sem limite. Não é uma nova regra de empate do jogo normal. Algumas combinações podem permanecer em impasse sem esse limite.
+Na v1.15.81, a seleção foi movida para antes do tabuleiro, os lados viraram abas G1/G2, as confirmações receberam cartões separados e o layout ganhou regras próprias para celular. A aba de lado permanece acessível durante a observação para um general de ambos poder escolher qual exército consultar ou render.
 
-Recuperação local conserva configuração, registro e estado, sempre pausada. Se o armazenamento ficar cheio, tenta reduzir apenas o trecho de replay. O Online conserva preparações confirmadas durante desconexões e impede comandos em lados não controlados.
+## Observação
 
-Validação da v1.15.79: 569 testes passaram; simulações descritas em VALIDACAO_v1_15_79.json. Não foi realizado teste visual em navegador real.
+As IAs recebem somente a visão filtrada normal; a visão completa dos generais não vaza para a decisão delas. Ataques, movimentos, confrontos e criações recentes ficam marcados no mapa e no registro clicável. Há pausa, passo único, velocidade e replay.
 
-Não confundir com um espectador passivo de partidas humanas.
+Encerrar observação termina sem vencedor. Localmente basta confirmar. Online exige concordância dos dois lados; um general que controla G1 e G2 confirma por ambos. O limite opcional de 1 a 500 rodadas produz o mesmo encerramento para testes; 0 significa sem limite. Isso não altera a regra de empate do Clássico.
 
-Estado atual: preparação secreta Online entre dois amigos e observação local IA × IA implementadas no tabuleiro do Clássico. Entrada em /generals.html, com links nas telas Clássico e Arena. A versão da Arena deste modo ainda é futura; o link nela abre o duelo do Clássico, não um modo de três generais.
+Rendição continua sendo por exército. Um general comum não pode preparar ou render o lado alheio. Reconexão restaura o lado reservado e preparações confirmadas. A recuperação local volta pausada e reduz somente o trecho de replay se faltar espaço.
 
-Local: preparação manual de ambos os exércitos ou botão de observação aleatória; níveis de IA independentes, pausa, velocidade, passo de uma ação, ficha dos dois lados e recuperação local após F5 (pausada). Online: General 1 e 2 escolhem lados distintos e só recebem sua própria preparação até ambos darem Pronto. Visão completa liberada apenas depois do início. Reconexão por token separado das salas normais; nenhuma formação secreta fica no roomState.
+## Limites
 
-As ações das peças e escolhas de Confronto/Doppelgänger são feitas pelas IAs. Ambos os generais podem pausar/retomar e avançar uma ação; rendição é do próprio exército. Replay após encerramento: pode conter somente trecho recente, devido ao limite do visualizador. Não foram alteradas regras de vitória, prioridades ou atributos.
+Ainda não há Generais no tabuleiro da Arena. O replay pode conter apenas o trecho recente quando ultrapassa o limite de armazenamento. Testes Online usam simulações de WebSocket e Durable Objects; a validação automatizada não substitui conferência visual em navegador real.
 
-- Dois amigos escolhem lados diferentes. Cada general define seu próprio exército e posicionamento, sem acessar a formação do adversário.
-- A composição e as posições permanecem secretas durante toda a preparação, inclusive quando apenas um jogador confirmou Pronto.
-- Depois que ambos confirmam Pronto, o estado completo do mapa é revelado aos generais.
-- As IAs passam a comandar os exércitos; os generais observam, sem executar ações das peças.
-- A visão completa dos espectadores não deve ampliar a informação disponível aos controladores de IA: continuam usando as mesmas regras de informação oculta do jogo normal.
-- Servidor valida a propriedade do lado, a formação e a prontidão; ocultação não pode depender somente da interface.
-- Reconexão deve recuperar o lado do general e sua etapa de preparação ou observação, sem permitir tomar o lado do outro participante.
-
-Regressões permanentes cobrem isolamento de preparação, prontidão, IA dos dois lados, escolhas pendentes, reconexão, rollback de persistência/agendamento e replay. Relatório em docs/VALIDACAO_v1_15_76.json. Testes de servidor usam mocks de Durable Objects/WebSocket; navegador e Cloudflare reais ainda precisam de validação após publicação.
-
-Sem alteração de balanceamento. Rendição continua com a regra existente; apenas foi movida para junto das ações na v1.15.74. Não foi adicionada regra automática de empate.
