@@ -1,0 +1,30 @@
+{
+  "version": "1.15.83",
+  "scope": "Centralização e interação de preparação do modo Generais",
+  "tests": {"total": 586, "passed": 586, "failed": 0},
+  "checks": [
+    "contêiner completo centralizado na página",
+    "personagem novo posicionado automaticamente em casa válida",
+    "reposicionamento manual por clique preservado",
+    "arrastar e soltar personagem durante a preparação",
+    "arrastar e soltar Posto durante a preparação",
+    "destinos inválidos continuam bloqueados",
+    "bundles ESM e global sincronizados"
+  ],
+  "projectValidation": {
+    "javascriptSyntax": 45,
+    "localHtmlReferences": 95,
+    "missingReferences": 0,
+    "duplicateHtmlIds": 0,
+    "workerParity": true,
+    "arenaParity": true,
+    "aiBundleParity": true,
+    "generalGlobalBundleParity": true,
+    "assetCacheVersion": "1.15.83"
+  },
+  "generalsSimulation": {"games": 80, "completed": 80, "actions": 21376, "invalid": 0, "invariants": 0, "stalled": 0},
+  "serverRulesChanged": false,
+  "balanceChanged": false,
+  "realBrowserTest": false,
+  "deploymentTarget": "Eduardo-997/jogo-tatico-oculto"
+}

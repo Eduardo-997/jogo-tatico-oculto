@@ -10,7 +10,7 @@ function applyConfig(config){matchConfig=new window.GameReferee().normalizeMatch
 function changeConfig(){if(state||mode==='online'&&(!joined||!ownedSides().includes('player')))return;const cfg={teamSize:{},lossLimit:{}};for(const s of sides){cfg.teamSize[s]=Number($('generalTeam'+s).value)||4;cfg.lossLimit[s]=Number($('generalLoss'+s).value)||3;}const normalized=new window.GameReferee().normalizeMatchConfig(cfg);const roundLimit=Math.max(0,Math.min(500,Math.floor(Number($('generalRoundLimit').value)||0)));if(mode==='online')send({type:'setMatchConfig',config:normalized,roundLimit});else{control.roundLimit=roundLimit;applyConfig(normalized);ready={player:false,enemy:false};for(const s of sides)drafts[s].setup=drafts[s].setup.slice(0,teamSize(s));render();}}
 function observe(event){if(!event||lastObservationId===event.id)return;lastObservationId=event.id;actionLog.unshift(structuredClone(event));actionLog=actionLog.slice(0,40);focusedEvent=null;if($('generalFollow').checked&&event.cells?.[0])inspected=event.cells[0];}
 function finishText(){return state?.generalEnded?(state.generalEndReason==='roundLimit'?'Limite de rodadas atingido. Observação encerrada sem vencedor.':'Observação encerrada pelos generais, sem vencedor.'):`Partida encerrada: ${state?.result==='draw'?'empate':label(state?.result)+' venceu'}.`;}
-let mode='local',side='player',drafts={player:{setup:[],bases:[]},enemy:{setup:[],bases:[]}},ready={player:false,enemy:false},tool=null,ref=null,state=null,brains=null,control=defaultGeneralControl(),ws=null,joined=false,room='',roomState=null,timer=null,epoch=0,inspected=null,recorder=null,replayFrames=[],retry=null,heartbeat=null,closedByUser=false;
+let mode='local',side='player',drafts={player:{setup:[],bases:[]},enemy:{setup:[],bases:[]}},ready={player:false,enemy:false},tool=null,dragTool=null,ref=null,state=null,brains=null,control=defaultGeneralControl(),ws=null,joined=false,room='',roomState=null,timer=null,epoch=0,inspected=null,recorder=null,replayFrames=[],retry=null,heartbeat=null,closedByUser=false;
 const node=(tag,text,className)=>{const e=document.createElement(tag);if(text!=null)e.textContent=text;if(className)e.className=className;return e;};
 function status(text){$('generalStatus').textContent=text;}
 function randomRoomCode(){const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code='';for(let i=0;i<6;i++)code+=alphabet[Math.floor(Math.random()*alphabet.length)];return code;}
@@ -85,10 +85,18 @@ function randomSetup(){
   const available=coords.filter(c=>ownHalf(c)&&!R.isBlocked(c)).sort(()=>Math.random()-.5),bases=available.filter(c=>!['A1','H1','A8','H8'].includes(c)).slice(0,2);
   drafts[side]={setup:available.filter(c=>!bases.includes(c)).slice(0,count).map((coord,i)=>({name:names[i],coord})),bases};tool=null;status(`${label(side)} preenchido. Você pode ajustar antes de dar Pronto.`);render();
 }
-function ownHalf(c){return side==='player'?Number(c.slice(1))<=4:Number(c.slice(1))>=5;}
+function ownHalfFor(c,forSide){return forSide==='player'?Number(c.slice(1))<=4:Number(c.slice(1))>=5;}
+function ownHalf(c){return ownHalfFor(c,side);}
+function firstFreeSetupCell(forSide=side){const d=drafts[forSide];return coords.find(c=>ownHalfFor(c,forSide)&&!R.isBlocked(c)&&!d.setup.some(p=>p.coord===c)&&!d.bases.includes(c))||null;}
 function locked(){return !!state||!!ready[side]||(mode==='online'&&!joined);}
 function switchSide(next){if(!sides.includes(next)||!canUseSide(next))return status('Esse lado pertence ao outro general.');side=next;$('generalSide').value=side;tool=null;inspected=null;render();}
-function selectPiece(name){if(locked())return;const d=drafts[side];if(!d.setup.some(p=>p.name===name)){if(d.setup.length>=teamSize(side))return status('Remova uma peça antes de escolher outra.');d.setup.push({name,coord:null});}tool={kind:'piece',name};status(`Posicione ${name} nas linhas ${side==='player'?'1–4':'5–8'}.`);render();}
+function selectPiece(name){
+  if(locked())return;const d=drafts[side],existing=d.setup.find(p=>p.name===name);
+  if(existing){tool={kind:'piece',name};inspected=existing.coord;status(`${name} selecionado. Clique noutra casa ou arraste a peça para reposicionar.`);render();return;}
+  if(d.setup.length>=teamSize(side))return status('Remova uma peça antes de escolher outra.');
+  const coord=firstFreeSetupCell();if(!coord)return status('Não há casa livre para adicionar essa peça.');
+  d.setup.push({name,coord});tool=null;inspected=coord;status(`${name} adicionado em ${coord}. Você pode arrastá-lo para outra casa.`);render();
+}
 function clickCell(c){
   inspected=c;if(state){renderBoard();renderInspector();return;}
   if(locked()){renderInspector();return;}
@@ -103,7 +111,7 @@ function displayPieces(){if(!state||!ref)return [];return sides.flatMap(s=>ref.c
 function renderBoard(){
   const board=$('generalBoard');board.replaceChildren(node('span'));for(const l of 'ABCDEFGH')board.appendChild(node('span',l,'general-axis'));
   const blank=new window.GameReferee(),raw=state||JSON.parse(blank.exportState()),visibleDraftSides=mode==='local'&&$('generalShowBoth').checked?sides:[side],pieces=state?displayPieces().filter(p=>p.alive):visibleDraftSides.flatMap(s=>drafts[s].setup.filter(p=>p.coord).map(p=>({...R.byName[p.name],...p,owner:s,hp:R.byName[p.name].v,alive:true})));
-  const bases=state?raw.bases:visibleDraftSides.flatMap(s=>drafts[s].bases.map((coord,i)=>({coord,id:'draft'+s+i,owner:s})));
+  const bases=state?raw.bases:visibleDraftSides.flatMap(s=>drafts[s].bases.map((coord,i)=>({coord,id:'draft'+s+i,owner:s,draftIndex:i})));
   for(let y=1;y<=8;y++){board.appendChild(node('span',String(y),'general-axis'));for(const x of 'ABCDEFGH'){
     const c=x+y,cell=node('button',null,'general-cell'+(y>=5?' enemy-half':'')+(inspected===c?' inspecting':'')+(!state&&ownHalf(c)?' placing':''));cell.type='button';cell.dataset.coord=c;cell.setAttribute('aria-label',`Casa ${c}`);cell.onclick=()=>clickCell(c);
     const tree=raw.trees?.find(t=>t.coord===c),rock=raw.rocks?.includes(c),terrain=tree?(tree.state==='live'?A.terrain.tree:A.terrain.deadTree):rock?A.terrain.rock:raw.water?.includes(c)?A.terrain.water:raw.swamps?.includes(c)?A.terrain.swamp:null;
@@ -111,6 +119,13 @@ function renderBoard(){
     const base=bases.find(b=>b.coord===c);if(base)cell.appendChild(image(base.sabotaged?(base.owner==='player'?A.structures.baseSabotagedAlly:A.structures.baseSabotagedEnemy):(base.owner==='player'?A.structures.baseAlly:A.structures.baseEnemy),'general-terrain',`${label(base.owner)} · Posto`));
     const here=pieces.filter(p=>p.coord===c);here.forEach((p,i)=>{const src=A.character(p.displayName||p.name);if(src)cell.appendChild(image(src,'general-piece'+(here.length>1?' shared-'+i:''),p.displayName||p.name));cell.appendChild(node('span',String(p.hp)+(state?'/'+p.maxHp:''),'general-hp'+(here.length>1?' shared-'+i:'')));cell.classList.toggle('enemy-unit',p.owner==='enemy');});
     if(here.length)cell.appendChild(node('span',here[0].owner==='player'?'G1':'G2','general-owner'));
+    if(!state&&!locked()){
+      const ownPiece=here.find(p=>p.owner===side),ownBase=base?.owner===side?base:null,movable=ownPiece?{kind:'piece',name:ownPiece.name}:ownBase?{kind:'base',index:ownBase.draftIndex}:null;
+      if(movable){cell.draggable=true;cell.setAttribute('aria-label',`${cell.attributes?.['aria-label']||'Casa '+c}. Arrastável para reposicionar.`);cell.ondragstart=e=>{dragTool={...movable};tool=null;cell.classList.add('dragging');if(e?.dataTransfer){e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',movable.kind);}};cell.ondragend=()=>{dragTool=null;cell.classList.toggle('dragging',false);};}
+      cell.ondragover=e=>{if(!dragTool)return;e.preventDefault?.();if(e.dataTransfer)e.dataTransfer.dropEffect='move';cell.classList.add('drag-target');};
+      cell.ondragleave=()=>cell.classList.toggle('drag-target',false);
+      cell.ondrop=e=>{if(!dragTool)return;e.preventDefault?.();cell.classList.toggle('drag-target',false);const moving=dragTool;dragTool=null;tool=moving;clickCell(c);if(tool){tool=null;render();}};
+    }
     if(state){const active=sides.some(s=>here.some(p=>p.id===raw.activation?.[s]?.pieceId));if(active)cell.classList.add('active-unit');
       if(sides.some(s=>(raw.activation?.[s]?.pyroTargets||[]).includes(c)||(raw.activation?.[s]?.paranoiaTargets||[]).includes(c)))cell.classList.add('planned-target');
       if(sides.some(s=>raw.seer?.[s]?.__set?.includes(c)))cell.classList.add('seer-zone');

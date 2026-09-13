@@ -1,13 +1,13 @@
-Batalha nas Sombras v1.15.82 — TESTE GIT
+Batalha nas Sombras v1.15.83 — TESTE GIT
 
-Base: v1.15.81; compactação e centralização do layout de Generais.
+Base: v1.15.82; centralização final e preparação com posicionamento direto/arraste em Generais.
 Corrige estado antigo ao trocar de sala no Clássico e na Arena Online.
 O servidor identifica o lado na visão enviada, preservando informação oculta.
 Inclui recuperação local, identificação de unidades e Rendição separada das ações.
 Nova partida reinicia de verdade, sem recuperar checkpoint encerrado.
 Rendição da Arena elimina apenas o desistente; os demais continuam.
 Generais agora mantém tabuleiro à esquerda e preparação compacta à direita.
-Estado completo: SAVE_PROJETO_v1_15_82.md; SAVEs anteriores são históricos.
+Estado completo: SAVE_PROJETO_v1_15_83.md; SAVEs anteriores são históricos.
 Histórico antigo: docs/HISTORICO_DEPLOY_ATE_v1_15_70.txt.
 
 EXECUÇÃO E PUBLICAÇÃO
@@ -18,7 +18,7 @@ EXECUÇÃO E PUBLICAÇÃO
   globais do ZIP. Online precisa do servidor, como os outros modos Online.
 - Arquivos abertos diretamente por file:// não fornecem o servidor WebSocket.
 - Publicar somente com autorização explícita do usuário.
-- Esta v1.15.82 tem publicação autorizada somente no jogo-tatico-oculto.
+- Esta v1.15.83 tem publicação autorizada somente no jogo-tatico-oculto.
   Não assumir autorização anterior
   de deploy como autorização para publicar automaticamente toda versão.
 - Clássico contra IA e Arena solo salvam a partida em sessionStorage nesta
@@ -62,7 +62,8 @@ VALIDAÇÃO
   Clássico 160/160 encerradas, Arena 239/240, zero ações inválidas ou
   invariantes quebrados. Uma Arena atingiu 5.000 ações em impasse tático,
   reproduzido na candidata. Veja SAVE 78: não houve regra de empate nova.
-- As simulações de Generais abaixo foram feitas na v1.15.76, não neste hotfix.
+- A v1.15.83 executou 80 partidas de Generais: 80 encerradas, 21.376 ações,
+  sem ação inválida, invariante quebrada ou estagnação.
 - GAMES=40 RESTORE=1 SEED_OFFSET=40000 npm run simulate:generals:
   160 partidas IA x IA, 160 encerradas; 43.919 ações sem ações inválidas,
   ocupação/vínculos ilegais ou travamentos na bateria. Recuperação a cada
