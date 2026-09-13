@@ -132,10 +132,12 @@ function renderInspector(){
   const tree=state.trees?.find(t=>t.coord===inspected);if(tree)objects.push(`Árvore: V${tree.hp} · ${tree.state}`);if(state.rocks?.includes(inspected))objects.push('Pedra: V'+(state.rockHp?.[inspected]??3));for(const item of objects)el.appendChild(node('p',item));if(!here.length&&!objects.length)el.appendChild(node('p','Nenhuma peça ou estrutura nesta casa.'));
 }
 function render(){
+  document.body?.classList.toggle('generals-preparing',!state&&!roomState?.started);
+  $('generalModeSetup').hidden=!!state;
   $('generalMode').disabled=joined||!!state;$('generalSide').disabled=mode==='online'&&joined&&ownedSides().length===1;
   $('generalSideCaption').textContent=state?'Lado selecionado para controles e consulta':'Exército que você está editando';
   for(const s of sides){const tab=$('generalTab'+(s==='player'?'Player':'Enemy'));tab.classList.toggle('active',side===s);tab.classList.toggle('ready',!!ready[s]);tab.disabled=!canUseSide(s);tab.setAttribute('aria-pressed',String(side===s));}
-  $('generalBoth').disabled=joined||!!state;$('generalBothWrap').hidden=mode!=='online';$('generalShowBothWrap').hidden=mode!=='local'||!!state;
+  $('generalBoth').disabled=joined||!!state;$('generalBothWrap').hidden=mode!=='online'||joined||!!state;$('generalShowBothWrap').hidden=mode!=='local'||!!state;$('generalOptions').hidden=$('generalBothWrap').hidden&&$('generalShowBothWrap').hidden;
   const configLocked=!!state||!!roomState?.started||(mode==='online'&&(!joined||!ownedSides().includes('player')));for(const s of sides){$('generalTeam'+s).disabled=configLocked;$('generalLoss'+s).disabled=configLocked;}
   $('generalRoundLimit').disabled=configLocked;$('generalRoundLimit').value=control.roundLimit||0;
   $('generalConfig').hidden=!!state||!!roomState?.started;$('generalRosterTitle').textContent=`${label(side)} · escolha ${teamSize(side)} peças`;$('generalRosterCount').textContent=`${drafts[side].setup.length}/${teamSize(side)}`;

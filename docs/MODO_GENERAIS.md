@@ -1,4 +1,4 @@
-# Modo Generais — Clássico, atualizado na v1.15.81
+# Modo Generais — Clássico, atualizado na v1.15.82
 
 Generais é um modo de jogo e de observação: os generais montam os exércitos e as IAs executam a partida. Ele usa as regras e o tabuleiro do Clássico.
 
@@ -10,7 +10,7 @@ Generais é um modo de jogo e de observação: os generais montam os exércitos 
 - Cada lado aceita de 1 a 8 peças, duas bases e limite próprio de perdas. G1 configura esses limites no Online.
 - Clicar numa peça da lista adiciona e seleciona; clicar no tabuleiro posiciona. Uma peça ou Posto já colocado pode ser clicado para reposicionamento. “Remover” realmente retira a peça sem selecioná-la novamente.
 
-Na v1.15.81, a seleção foi movida para antes do tabuleiro, os lados viraram abas G1/G2, as confirmações receberam cartões separados e o layout ganhou regras próprias para celular. A aba de lado permanece acessível durante a observação para um general de ambos poder escolher qual exército consultar ou render.
+Na v1.15.82, o layout passou a seguir os outros modos: tabuleiro central à esquerda e preparação compacta à direita. Configuração, abas G1/G2, Postos, peças e confirmação ficam na mesma coluna lateral; a configuração avançada começa recolhida. A lateral possui rolagem própria apenas quando necessário, sem afastar o tabuleiro. No celular, a preparação aparece antes do tabuleiro. A aba de lado permanece acessível durante a observação para um general de ambos poder escolher qual exército consultar ou render.
 
 ## Observação
 
@@ -23,4 +23,3 @@ Rendição continua sendo por exército. Um general comum não pode preparar ou 
 ## Limites
 
 Ainda não há Generais no tabuleiro da Arena. O replay pode conter apenas o trecho recente quando ultrapassa o limite de armazenamento. Testes Online usam simulações de WebSocket e Durable Objects; a validação automatizada não substitui conferência visual em navegador real.
-

@@ -1,0 +1,17 @@
+{
+  "version": "1.15.82",
+  "scope": "Compactação e centralização do layout de Generais",
+  "tests": {"total": 585, "passed": 585, "failed": 0},
+  "checks": [
+    "tabuleiro antes do painel lateral no desktop",
+    "configuração avançada recolhida",
+    "tabuleiro limitado a 560 px",
+    "painel lateral fixo com rolagem própria",
+    "preparação antes do tabuleiro em telas estreitas",
+    "controles G1/G2 e seleção da v1.15.81 preservados"
+  ],
+  "serverRulesChanged": false,
+  "balanceChanged": false,
+  "realBrowserTest": false,
+  "deploymentTarget": "Eduardo-997/jogo-tatico-oculto"
+}
