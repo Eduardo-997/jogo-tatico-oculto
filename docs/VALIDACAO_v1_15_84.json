@@ -1,0 +1,12 @@
+{
+  "version": "1.15.84",
+  "scope": "Ficha e início manual explícitos no modo Generais",
+  "tests": {"total": 587, "passed": 587, "failed": 0},
+  "checks": ["ficha antes do catálogo", "atributos nos cartões", "início manual visível", "validação das duas formações", "atalho aleatório diferenciado", "bundle global sincronizado"],
+  "projectValidation": {"javascriptSyntax": 45, "localHtmlReferences": 95, "missingReferences": 0, "duplicateHtmlIds": 0, "workerParity": true, "arenaParity": true, "aiBundleParity": true, "generalGlobalBundleParity": true, "assetCacheVersion": "1.15.84"},
+  "generalsSimulation": {"games": 80, "completed": 80, "actions": 21376, "invalid": 0, "invariants": 0, "stalled": 0},
+  "serverRulesChanged": false,
+  "balanceChanged": false,
+  "realBrowserTest": false,
+  "deploymentTarget": "Eduardo-997/jogo-tatico-oculto"
+}

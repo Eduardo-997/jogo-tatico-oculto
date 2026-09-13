@@ -1,4 +1,4 @@
-# Modo Generais — Clássico, atualizado na v1.15.83
+# Modo Generais — Clássico, atualizado na v1.15.84
 
 Generais é um modo de jogo e de observação: os generais montam os exércitos e as IAs executam a partida. Ele usa as regras e o tabuleiro do Clássico.
 
@@ -9,8 +9,9 @@ Generais é um modo de jogo e de observação: os generais montam os exércitos 
 - Online sozinho: marque “Controlar G1 e G2” antes de entrar numa sala nova e vazia. As duas abas ficam disponíveis.
 - Cada lado aceita de 1 a 8 peças, duas bases e limite próprio de perdas. G1 configura esses limites no Online.
 - Clicar numa peça nova da lista já a adiciona à primeira casa livre do próprio campo. Para reorganizar, arraste personagens e Postos entre as casas ou clique no item e depois no destino. “Remover” realmente retira a peça sem selecioná-la novamente.
+- A ficha completa fica acima do catálogo, e os cartões mostram os atributos básicos. No modo Local, “Iniciar formações escolhidas” valida e inicia G1 e G2; “Observar partida aleatória” é apenas um atalho que sorteia tudo.
 
-Na v1.15.83, o conjunto completo foi centralizado na página. O tabuleiro fica à esquerda e a preparação compacta à direita. Configuração, abas G1/G2, Postos, peças e confirmação ficam na coluna lateral; a configuração avançada começa recolhida. A lateral possui rolagem própria apenas quando necessário. No celular, a preparação aparece antes do tabuleiro. A aba de lado permanece acessível durante a observação para um general de ambos poder escolher qual exército consultar ou render.
+Na v1.15.84, o conjunto completo foi centralizado na página. O tabuleiro fica à esquerda e a preparação compacta à direita. Configuração, abas G1/G2, Postos, peças e confirmação ficam na coluna lateral; a configuração avançada começa recolhida. A lateral possui rolagem própria apenas quando necessário. No celular, a preparação aparece antes do tabuleiro. A aba de lado permanece acessível durante a observação para um general de ambos poder escolher qual exército consultar ou render.
 
 ## Observação
 
